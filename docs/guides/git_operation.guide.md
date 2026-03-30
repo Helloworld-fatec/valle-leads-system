@@ -50,7 +50,7 @@ git commit -m "feat: descrição clara do que foi feito"
 - Pelo menos 1 aprovação do time é necessária
 - Todas as conversas do PR devem estar resolvidas antes do merge
 
-> 📄 Para mais detalhes sobre como abrir e revisar PRs, consulte: [PR Operation Guide]()
+> 📄 Para mais detalhes sobre como abrir e revisar PRs, consulte: [PR Operation Guide](./PR_operation.guide.md)
 
 **4. Ao final da sprint, abrir um Pull Request: `develop` → `main`**
 - O time revisa o estado geral da entrega
