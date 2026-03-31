@@ -91,15 +91,12 @@ docs/
 ├── sprint-1/
 │   ├── backlog.md
 │   ├── retrospective.md
-│   └── diagrams/
 ├── sprint-2/
 │   ├── backlog.md
 │   ├── retrospective.md
-│   └── diagrams/
 └── sprint-3/
     ├── backlog.md
     ├── retrospective.md
-    └── diagrams/
 ```
 
 ---
