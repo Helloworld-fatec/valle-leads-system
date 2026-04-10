@@ -3,134 +3,118 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  // Atualizado para o nome correto no Prisma 7
+  previewFeatures = ["schemaEngineDriverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // A URL não é mais definida aqui no Prisma 7, ela fica no prisma.config.ts
 }
 
-enum UserRole {
-  ADMIN
-  MANAGER
-  ATTENDANT
-}
-
-model Users {
-  id                 String    @id @default(uuid())
-  email              String    @unique
-  password_hash      String
+model Stores {
+  id                 String   @id @default(uuid())
   name               String
-  role               UserRole  @default(ATTENDANT)
-  is_active          Boolean   @default(false)
-  
-  team_id            String?
-  teams              Teams?    @relation(fields: [team_id], references: [id], onDelete: Restrict)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  address            String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
-  leads_assigned     Leads[]   @relation("AttendantLeads")
-  logs               SystemLogs[]
-  
-  @@index([team_id])
-  @@index([created_at])
-  @@map("users")
+  teams              Teams[]  
 }
 
 model Teams {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
+  store_id           String
+  store              Stores   @relation(fields: [store_id], references: [id], onDelete: Restrict)
   name               String
-  is_active          Boolean   @default(false)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  is_active          Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
-  users              Users[]
-  stores             Stores[]
+  user_teams         UserTeams[]
   customers          Customers[]
   leads              Leads[]
   negotiations       Negotiations[]
-
   @@index([created_at])
   @@map("teams")
 }
 
-model Stores {
-  id                 String    @id @default(uuid())
+model Users {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  password_hash      String
   name               String
-  address            String?
-  
-  team_id            String
-  teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  role               String   @default("ATTENDANT")
+  is_active          Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
-  leads              Leads[]
-
-  @@index([team_id])
+  user_teams         UserTeams[]
+  leads_assigned     Leads[]  @relation("AttendantLeads")
+  logs               SystemLogs[]
   @@index([created_at])
-  @@map("stores")
+  @@map("users")
+}
+
+model UserTeams {
+  id                 String   @id @default(uuid())
+  user_id            String
+  user               Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  team_id            String
+  team               Teams    @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  created_by_user_id String?
+  @@unique([user_id, team_id]) 
+  @@index([user_id])
+  @@index([team_id])
+  @@map("user_teams")
 }
 
 model Customers {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
   name               String
   email              String?
-  cpf                String    @unique
+  cpf                String?  @unique
   phone              String?
-  is_active          Boolean   @default(false)
-
-  team_id            String
-  teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  is_active          Boolean  @default(false)
+  team_id            String?
+  teams              Teams?   @relation(fields: [team_id], references: [id], onDelete: Restrict)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
   leads              Leads[]
-
-  @@index([team_id])
   @@index([created_at])
   @@map("customers")
 }
 
 model Leads {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
   source             String?   
-  status             String    @default("NEW")
-  is_active          Boolean   @default(false)
+  status             String   @default("NEW")
+  is_active          Boolean  @default(false)
   vehicle_interest   String?
-
   customer_id        String
   customers          Customers @relation(fields: [customer_id], references: [id], onDelete: Restrict)
-  
   team_id            String
   teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
-  
-  store_id           String
-  stores             Stores    @relation(fields: [store_id], references: [id], onDelete: Restrict)
-
   attendant_id       String?
   attendant          Users?    @relation("AttendantLeads", fields: [attendant_id], references: [id], onDelete: SetNull)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
   negotiations       Negotiations[]
-
   @@index([team_id])
   @@index([attendant_id])
   @@index([customer_id])
@@ -140,64 +124,81 @@ model Leads {
 }
 
 model Negotiations {
-  id                 String    @id @default(uuid())
-  amount             Decimal?  @db.Decimal(10, 2)
-  status             String
-  is_open            Boolean   @default(true)
-
-  lead_id            String
-  leads              Leads     @relation(fields: [lead_id], references: [id], onDelete: Restrict)
-
+  id                 String   @id @default(uuid())
   team_id            String
-  teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  teams              Teams    @relation(fields: [team_id], references: [id], onDelete: Restrict)
+  lead_id            String
+  leads              Leads    @relation(fields: [lead_id], references: [id], onDelete: Restrict)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
-  updated_by_user_id String?
-
+  updated_by_user_id String?   
+  status_history     NegotiationStatus[]
   stage_history      NegotiationStageHistory[]
-
+  importance_history NegotiationImportance[]
   @@index([team_id])
   @@index([lead_id])
-  @@index([status])
   @@index([created_at])
   @@map("negotiations")
 }
 
+model NegotiationStatus {
+  id                 String       @id @default(uuid())
+  status_negotiation String
+  notes              String?
+  negotiation_id     String
+  negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  created_by_user_id String?
+  updated_by_user_id String?
+  @@index([negotiation_id])
+  @@index([created_at])
+  @@map("negotiation_status_history")
+}
+
 model NegotiationStageHistory {
-  id                 String      @id @default(uuid())
+  id                 String       @id @default(uuid())
   old_status         String?
   new_status         String
   notes              String?
-
   negotiation_id     String
   negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
-
-  created_at         DateTime    @default(now())
-  updated_at         DateTime    @updatedAt
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-
   @@index([negotiation_id])
   @@index([created_at])
   @@map("negotiation_stage_history")
 }
 
+model NegotiationImportance {
+  id                 String       @id @default(uuid())
+  importance         String       @default("morno")
+  notes              String?
+  negotiation_id     String
+  negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  created_by_user_id String?
+  updated_by_user_id String?
+  @@index([negotiation_id])
+  @@index([created_at])
+  @@map("negotiation_importance_history")
+}
+
 model SystemLogs {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
   action             String    
   module             String
   description        String?
   ip_address         String?
-
   user_id            String?
-  users              Users?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
-
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  users              Users?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   created_by_user_id String?
-
   @@index([user_id])
   @@index([created_at])
   @@map("system_logs")
