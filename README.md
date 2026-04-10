@@ -9,19 +9,6 @@ O sistema permite o registro e acompanhamento de leads captados por diferentes c
 
 ---
 
-## 📑 Índice
-
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Tecnologias](#-tecnologias)
-- [Equipe](#-equipe)
-- [Metodologia Ágil (Scrum)](#-metodologia-ágil-scrum)
-- [Requisitos Funcionais](#-requisitos-funcionais)
-- [Requisitos Não Funcionais](#-requisitos-não-funcionais)
-- [Como Rodar](#-como-rodar)
-- [Documentação](#-documentação)
-
----
-
 ## 📌 Sobre o Projeto
 
 A 1000 Valle Multimarcas necessita de um sistema que centralize a gestão de leads, permita o acompanhamento do funil de vendas e forneça indicadores gerenciais consolidados. O sistema contempla:
