@@ -101,7 +101,7 @@ model Customers {
 model Leads {
   id                 String   @id @default(uuid())
   source             String?   
-  status             String   @default("NEW")
+  status             String   
   is_active          Boolean  @default(false)
   vehicle_interest   String?
   customer_id        String
