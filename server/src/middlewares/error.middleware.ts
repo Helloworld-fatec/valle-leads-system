@@ -29,3 +29,36 @@ export class AcessoNaoAutorizadoError extends AppError {
     this.name = 'AcessoNaoAutorizadoError';
   }
 }
+
+/**
+ * Erro para ser usado quando há conflito de dados (ex: CPF duplicado, e-mail já cadastrado).
+ * Mapeia para um status HTTP 409 (Conflict).
+ */
+export class ConflitoDeDadosError extends AppError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflitoDeDadosError';
+  }
+}
+
+/**
+ * Erro para ser usado quando a requisição é inválida (ex: regra de negócio violada).
+ * Mapeia para um status HTTP 400 (Bad Request).
+ */
+export class RequisicaoInvalidaError extends AppError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RequisicaoInvalidaError';
+  }
+}
+
+/**
+ * Erro para ser usado quando os dados enviados falham na validação do schema.
+ * Mapeia para um status HTTP 422 (Unprocessable Entity).
+ */
+export class ErroDeValidacaoError extends AppError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ErroDeValidacaoError';
+  }
+}
