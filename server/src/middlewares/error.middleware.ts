@@ -29,3 +29,14 @@ export class AcessoNaoAutorizadoError extends AppError {
     this.name = 'AcessoNaoAutorizadoError';
   }
 }
+
+/**
+ * Erro para ser usado quando uma operação viola uma regra de negócio.
+ * Mapeia para um status HTTP 400 (Bad Request).
+ */
+export class BusinessRuleError extends AppError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RegraDeNegocioError';
+  }
+}
