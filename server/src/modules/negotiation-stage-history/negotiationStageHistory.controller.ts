@@ -63,7 +63,7 @@ async function createHistoryEntry(req: Request, res: Response, next: NextFunctio
     }
 };
 
-export const negotiationStageHitoryController = {
+export const negotiationStageHistoryController = {
     getHistory,
     createHistoryEntry,
 };
