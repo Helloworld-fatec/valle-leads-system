@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { StoresService } from "../services/store.service.js";
+import { StoresService } from "../store.service.js";
 
 const service = new StoresService();
 
