@@ -1,4 +1,4 @@
-import { BusinessRuleError } from "../../middlewares/error.middleware.js"
+import { BusinessRuleError } from "../../middlewares/errors/globalError.middleware.js"
 import { negotiationStageHistoryRepository } from "./negotiationStageHistory.repository.js"
 import type { NegotiationStage } from "./negotiationStageHistory.dto.js"
 

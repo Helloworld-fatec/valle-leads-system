@@ -1,37 +1,33 @@
-import { prisma } from "../../../config/prisma.js";
+// server/src/modules/stores/stores.repository.ts
+import { prisma } from "../../config/prisma.js";
 
 export class StoresRepository {
 
-  // 🔍 LISTAR POR TEAM
-  async findByTeamId(teamId: string) {
-    return prisma.store.findMany({
-      where: {
-        team_id: teamId,
-        is_active: true
-      }
+  // 📋 LISTAR TODOS
+  async findAll() {
+    return prisma.stores.findMany({
+      where: { is_active: true }
     });
   }
 
-  // 🔍 BUSCAR POR ID (com leads)
+
+  // 🔍 BUSCAR POR ID 
   async findById(id: string) {
-    return prisma.store.findUnique({
-      where: { id },
-      include: {
-        leads: true // 🔥 necessário pro service
-      }
+    return prisma.stores.findUnique({
+      where: { id }
     });
   }
 
   // ➕ CRIAR
   async create(data: any) {
-    return prisma.store.create({
+    return prisma.stores.create({
       data
     });
   }
 
   // ✏️ ATUALIZAR
   async update(id: string, data: any) {
-    return prisma.store.update({
+    return prisma.stores.update({
       where: { id },
       data
     });
@@ -39,7 +35,7 @@ export class StoresRepository {
 
   // ❌ SOFT DELETE
   async softDelete(id: string) {
-    return prisma.store.update({
+    return prisma.stores.update({
       where: { id },
       data: {
         is_active: false

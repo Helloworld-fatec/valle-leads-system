@@ -1,3 +1,4 @@
+// server/src/modules/stores/stores.dtos.ts
 import { z } from "zod";
 
 // TEAM

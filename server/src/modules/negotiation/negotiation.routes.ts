@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { NegotiationsController } from "../../controllers/negotiation.controller.js";
-import { authenticate } from '../../middlewares/auth.middleware.js';
+import { authenticate } from '../../middlewares/auth/auth.middleware.js';
 import { validate } from '../../middlewares/validate.middleware.js';
 import {
     CREATE_NEGOTIATION_SCHEMA,

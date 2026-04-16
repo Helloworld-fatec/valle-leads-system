@@ -1,5 +1,6 @@
-import { TeamsRepository } from "../repositories/teams.repository.js";
-import { AppError } from "../../../utils/appError.utils.js";
+// server/src/modules/teams/teams.services.ts
+import { TeamsRepository } from "./teams.repository.js";
+import { AppError } from "../../middlewares/errors/domainErrors.middleware.js";
 
 export class TeamsService {
   private repo = new TeamsRepository();
@@ -42,15 +43,6 @@ export class TeamsService {
 
     if (!team) {
       throw new AppError("Team não encontrada", 404);
-    }
-
-    // 🚨 REGRA: não deletar se tiver users ou leads ativos
-    if (team.users?.length > 0) {
-      throw new AppError("Team possui usuários vinculados", 400);
-    }
-
-    if (team.stores?.some((store: any) => store.leads?.length > 0)) {
-      throw new AppError("Team possui leads ativos vinculados", 400);
     }
 
     await this.repo.softDelete(id);

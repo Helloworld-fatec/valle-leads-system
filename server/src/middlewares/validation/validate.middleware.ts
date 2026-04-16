@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodType, ZodError } from "zod";
-import { ErroDeValidacaoError } from "./error.middleware";
+import { ErroDeValidacaoError } from "../errors/domainErrors.middleware.js";
 
 // ─────────────────────────────────────────────
 // VALIDATE MIDDLEWARE

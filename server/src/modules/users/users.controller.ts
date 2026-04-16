@@ -1,5 +1,6 @@
+// server/src/modules/users/users.controller.ts
 import type { Request, Response, NextFunction } from "express";
-import { UsersService } from "../service/UsersService.js";
+import { UsersService } from "./users.service.js";
 
 export class UsersController {
     private usersService = new UsersService();
@@ -24,7 +25,7 @@ export class UsersController {
 
     async findById(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = Number(req.params.id);
+            const id = String(req.params.id);
             const user = await this.usersService.findById(id);
             return res.json(user);
         } catch (error) {
@@ -34,7 +35,7 @@ export class UsersController {
 
     async update(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = Number(req.params.id);
+            const id = String(req.params.id);
             const user = await this.usersService.update(id, req.body);
             return res.json(user);
         } catch (error) {
@@ -44,7 +45,7 @@ export class UsersController {
 
     async softDelete(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = Number(req.params.id);
+            const id = String(req.params.id);
             await this.usersService.softDelete(id);
             return res.status(204).send();
         } catch (error) {

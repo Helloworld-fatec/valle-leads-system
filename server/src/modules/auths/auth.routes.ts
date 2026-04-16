@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { AuthController } from "../controllers/auth.controller.js";
+import { AuthController } from "./auth.controller.js";
 
-import { validate } from "../../../middlewares/validade.middleware.js";
-import { authMiddleware } from "../../../middlewares/auth.middleware.js";
+import { validate } from "../../middlewares/validade.middleware.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
 
 import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   updatePasswordSchema
-} from "../dtos/auth.dto.js";
+} from "./auth.dto.js";
 
 const router = Router();
 const controller = new AuthController();

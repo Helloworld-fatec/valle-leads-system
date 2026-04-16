@@ -1,8 +1,8 @@
-// server/src/modules/stores/stores.controller.ts
+// server/src/modules/users-teams/usersTeams.controller.ts
 import type { Request, Response, NextFunction } from "express";
-import { StoresService } from "./store.service.js";
+import { UsersTeamsService } from "./usersTeams.service.js";
 
-const service = new StoresService();
+const service = new UsersTeamsService();
 
 // Função auxiliar para garantir que o parâmetro seja uma string simples
 function getParam(param: string | string[] | undefined): string | null {
@@ -10,16 +10,16 @@ function getParam(param: string | string[] | undefined): string | null {
   return param;
 }
 
-export class StoresController {
+export class UsersTeamsController {
 
-  // 🔍 LISTAR TODAS AS STORES (Refatorado para coincidir com service.findAll)
+  // 🔍 LISTAR TODOS OS VÍNCULOS
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const stores = await service.findAll();
+      const userTeams = await service.findAll();
 
       return res.status(200).json({
         success: true,
-        data: stores
+        data: userTeams
       });
 
     } catch (err) {
@@ -27,7 +27,7 @@ export class StoresController {
     }
   }
 
-  // 🔍 BUSCAR POR ID
+  // 🔍 BUSCAR VÍNCULO POR ID
   async findById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = getParam(req.params.id);
@@ -35,22 +35,15 @@ export class StoresController {
       if (!id) {
         return res.status(400).json({ 
           success: false, 
-          message: "Invalid id" 
+          message: "ID inválido ou não informado" 
         });
       }
 
-      const store = await service.findById(id);
-
-      if (!store) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Store not found" 
-        });
-      }
+      const userTeam = await service.findById(id);
 
       return res.status(200).json({
         success: true,
-        data: store
+        data: userTeam
       });
 
     } catch (err) {
@@ -58,14 +51,14 @@ export class StoresController {
     }
   }
 
-  // ➕ CRIAR STORE
+  // ➕ CRIAR VÍNCULO (Adicionar usuário a um time)
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const store = await service.create(req.body);
+      const userTeam = await service.create(req.body);
 
       return res.status(201).json({
         success: true,
-        data: store
+        data: userTeam
       });
 
     } catch (err) {
@@ -73,7 +66,7 @@ export class StoresController {
     }
   }
 
-  // ✏️ ATUALIZAR STORE
+  // ✏️ ATUALIZAR VÍNCULO
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const id = getParam(req.params.id);
@@ -81,15 +74,15 @@ export class StoresController {
       if (!id) {
         return res.status(400).json({ 
           success: false, 
-          message: "Invalid id" 
+          message: "ID inválido ou não informado" 
         });
       }
 
-      const store = await service.update(id, req.body);
+      const userTeam = await service.update(id, req.body);
 
       return res.status(200).json({
         success: true,
-        data: store
+        data: userTeam
       });
 
     } catch (err) {
@@ -97,7 +90,7 @@ export class StoresController {
     }
   }
 
-  // ❌ DELETAR STORE (SOFT DELETE)
+  // ❌ DELETAR VÍNCULO (Remover usuário do time)
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const id = getParam(req.params.id);
@@ -105,13 +98,14 @@ export class StoresController {
       if (!id) {
         return res.status(400).json({ 
           success: false, 
-          message: "Invalid id" 
+          message: "ID inválido ou não informado" 
         });
       }
 
       await service.delete(id);
 
-      return res.status(204).send(); // 204 No Content é o padrão ideal para deleções com sucesso sem payload
+      // 204 No Content é o padrão RESTful para deleções bem-sucedidas sem payload de retorno
+      return res.status(204).send(); 
 
     } catch (err) {
       next(err);
