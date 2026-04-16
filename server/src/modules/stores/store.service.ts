@@ -1,18 +1,20 @@
-import { StoresRepository } from "./repositories/stores.repository.js";
-import { TeamsRepository } from "../../teams/repositories/teams.repository.js";
-import { AppError } from "../../middlewares/errors/globalError.middleware.js";
+// server/src/modules/stores/store.service.ts
+import { StoresRepository } from "./stores.repository.js";
+import { TeamsRepository } from "../teams/teams.repository.js";
+import { AppError } from "../../middlewares/errors/domainErrors.middleware.js";
 
 export class StoresService {
   private repo = new StoresRepository();
   private teamsRepo = new TeamsRepository();
 
-  // 🔍 LISTAR POR TEAM
-  async findByTeamId(teamId: string) {
-    if (!teamId) {
-      throw new AppError("Team ID não informado", 400);
-    }
+  // 📋 LISTAR TODOS
+  async findAll() {
+    return this.repo.findAll();
+  }
 
-    return this.repo.findByTeamId(teamId);
+  // 🔍 BUSCAR POR ID
+  async findById(id: string) {
+    return this.repo.findById(id);
   }
 
   // ➕ CRIAR STORE
@@ -61,16 +63,10 @@ export class StoresService {
 
     if (!store) {
       throw new AppError("Store não encontrada", 404);
-    }
+    } else if (!store.is_active) {    
+      throw new AppError("Store já está inativa", 400);
+    } 
 
-    // 🚨 REGRA: não deletar se tiver leads ativos
-    if (store.leads && store.leads.length > 0) {
-      throw new AppError(
-        "Não é possível deletar store com leads ativos",
-        400
-      );
-    }
-
-    await this.repo.softDelete(id);
+    return this.repo.softDelete(id);
   }
 }

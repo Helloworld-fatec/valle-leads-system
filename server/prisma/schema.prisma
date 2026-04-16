@@ -22,6 +22,7 @@ model Stores {
   id                 String   @id @default(uuid())
   name               String
   address            String?
+  is_active          Boolean  @default(true)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?
@@ -34,7 +35,7 @@ model Teams {
   store_id           String
   store              Stores   @relation(fields: [store_id], references: [id], onDelete: Restrict)
   name               String
-  is_active          Boolean  @default(false)
+  is_active          Boolean  @default(true)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?
@@ -53,7 +54,7 @@ model Users {
   password_hash      String
   name               String
   role               String   @default("ATTENDANT")
-  is_active          Boolean  @default(false)
+  is_active          Boolean  @default(true)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?

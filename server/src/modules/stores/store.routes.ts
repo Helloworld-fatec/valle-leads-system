@@ -1,33 +1,52 @@
+// server/src/modules/stores/store.routes.ts
 import { Router } from "express";
-import { StoresController } from "../controllers/stores.controller.js";
-
-import { validate } from "../../../middlewares/validade.middleware.js";
-import { authMiddleware } from "../../../middlewares/auth.middleware.js";
+import { StoresController } from "./stores.controller.js"; // Ajustado para o caminho local correto
+import { validateBody } from "../../middlewares/validation/validate.middleware.js"; // Ajustado para importar o validateBody
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js"; // Verifique se o caminho do authMiddleware está correto no seu projeto
 
 import {
   createStoreSchema,
   updateStoreSchema
-} from "../dtos/stores.dtos.js";
+} from "./stores.dtos.js";
 
 const router = Router();
 const controller = new StoresController();
 
-router.get("/team/:teamId", authMiddleware, controller.findByTeamId);
+// 🔍 LISTAR TODAS AS STORES (Mapeado para o findAll do controller)
+router.get(
+  "/", 
+  authMiddleware, 
+  controller.findAll.bind(controller)
+);
 
+// 🔍 BUSCAR STORE POR ID (Nova rota baseada no controller)
+router.get(
+  "/:id", 
+  authMiddleware, 
+  controller.findById.bind(controller)
+);
+
+// ➕ CRIAR STORE (Com validação do body)
 router.post(
   "/",
   authMiddleware,
-  validate(createStoreSchema),
-  controller.create
+  validateBody(createStoreSchema),
+  controller.create.bind(controller)
 );
 
+// ✏️ ATUALIZAR STORE (Com validação do body)
 router.put(
   "/:id",
   authMiddleware,
-  validate(updateStoreSchema),
-  controller.update
+  validateBody(updateStoreSchema),
+  controller.update.bind(controller)
 );
 
-router.delete("/:id", authMiddleware, controller.delete);
+// ❌ DELETAR STORE
+router.delete(
+  "/:id", 
+  authMiddleware, 
+  controller.delete.bind(controller)
+);
 
 export default router;

@@ -1,4 +1,4 @@
-// src/app.ts
+// server/src/app.ts
 import express from 'express';
 import { json } from 'express';
 //import cors from 'cors';

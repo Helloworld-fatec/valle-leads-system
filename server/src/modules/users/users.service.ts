@@ -1,3 +1,4 @@
+// server/src/modules/users/users.service.ts
 import { UsersRepository } from "./users.repository.js";
 import type { CreateUserDTO, UpdateUserDTO } from "./users.dto.js";
 import bcrypt from "bcrypt";

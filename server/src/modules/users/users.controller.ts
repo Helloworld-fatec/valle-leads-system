@@ -1,3 +1,4 @@
+// server/src/modules/users/users.controller.ts
 import type { Request, Response, NextFunction } from "express";
 import { UsersService } from "./users.service.js";
 
