@@ -1,20 +1,21 @@
-import { prisma } from "../../../config/prisma.js";
+// server/src/modules/teams/teams.repository.ts
+import { prisma } from "../../config/prisma.js";
 
 export class TeamsRepository {
 
   // 🔍 LISTAR (com filtro is_active)
   async findAll(isActive?: boolean) {
-    return prisma.team.findMany({
+    return prisma.teams.findMany({
       where: isActive !== undefined ? { is_active: isActive } : {},
     });
   }
 
   // 🔍 BUSCAR POR ID (com users e stores + leads)
   async findById(id: string) {
-    return prisma.team.findUnique({
+    return prisma.teams.findUnique({
       where: { id },
       include: {
-        users: true,
+        user_teams: true,
         stores: {
           include: {
             leads: true
@@ -26,14 +27,14 @@ export class TeamsRepository {
 
   // ➕ CRIAR
   async create(data: any) {
-    return prisma.team.create({
+    return prisma.teams.create({
       data
     });
   }
 
   // ✏️ ATUALIZAR
   async update(id: string, data: any) {
-    return prisma.team.update({
+    return prisma.teams.update({
       where: { id },
       data
     });
@@ -41,7 +42,7 @@ export class TeamsRepository {
 
   // ❌ SOFT DELETE
   async softDelete(id: string) {
-    return prisma.team.update({
+    return prisma.teams.update({
       where: { id },
       data: {
         is_active: false

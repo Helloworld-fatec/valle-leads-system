@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { TeamsService } from "../services/teams.services.js";
+import { TeamsService } from "./teams.service.js";
 
 const service = new TeamsService();
 
