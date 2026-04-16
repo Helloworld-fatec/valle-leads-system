@@ -39,10 +39,10 @@ A 1000 Valle Multimarcas necessita de um sistema que centralize a gestão de lea
 |---|---|
 | Bruno Berval | Product Owner (PO) |
 | Nicolas Kauê | Scrum Master (SM) |
-| Bruna Rodrigues | Dev Team (DT) |
-| Pedro Enrique | Dev Team (DT) |
-| Ryan Tinel | Dev Team (DT) |
-| Suelen Castro | Dev Team (DT) |
+| Bruna Rodrigues | Dev Team |
+| Pedro Enrique | Dev Team |
+| Ryan Tinel | Dev Team |
+| Suelen Castro | Dev Team |
 
 ---
 
@@ -52,36 +52,25 @@ O projeto é desenvolvido em **3 sprints**, seguindo os princípios do Scrum com
 
 ### Cronograma
 
-| Sprint | Período |
-|---|---|
-| Sprint 1 | 24/03/2026 → 14/04/2026 |
-| Sprint 2 | 15/04/2026 → 21/05/2026 |
-| Sprint 3 | 22/05/2026 → 11/06/2026 |
-| Apresentação Final | Semana de 22/07/2026 |
+| Sprint | Período | Foco Principal |
+|---|---|---|
+| Sprint 1 | 24/03/2026 → 14/04/2026 | Documentação, elicitação, scaffolding do backend e módulos iniciais |
+| Sprint 2 | 15/04/2026 → 21/05/2026 | Autenticação, RBAC, fechamento das rotas e primeiras telas |
+| Sprint 3 | 22/05/2026 → 11/06/2026 | Telas completas, funil de negociações e dashboards analíticos |
+| Apresentação Final | Semana de 22/07/2026 | — |
 
 ---
 
-### 📋 Product Backlog
+## 🏃 Sprints
 
-> Em construção — será preenchido ao longo do projeto.
+### [Sprint 1 — 24/03 a 14/04/2026](./docs/sprint-1/README.md)
+Primeira entrega incremental do projeto. Foco em documentação, elicitação de requisitos, scaffolding do backend e implementação dos módulos iniciais: Negotiations, StageHistory, Leads, Customers, Users, Auth, Teams e Stores.
 
----
+### [Sprint 2 — 15/04 a 21/05/2026](./docs/sprint-2/README.md)
+Segunda entrega incremental. Foco em autenticação, controle de acesso por role (RBAC), fechamento das rotas do backend e primeiras telas do frontend.
 
-### 🏃 Sprint 1 — 24/03 a 14/04/2026
-
-> Em construção — será preenchido ao início da sprint.
-
----
-
-### 🏃 Sprint 2 — 15/04 a 21/05/2026
-
-> A definir.
-
----
-
-### 🏃 Sprint 3 — 22/05 a 11/06/2026
-
-> A definir.
+### [Sprint 3 — 22/05 a 11/06/2026](./docs/sprint-3/README.md)
+Entrega final do ciclo de desenvolvimento. Foco nas telas completas, funil de negociações, dashboards analíticos e preparação para a apresentação final.
 
 ---
 
@@ -121,18 +110,25 @@ O projeto é desenvolvido em **3 sprints**, seguindo os princípios do Scrum com
 
 ## 🚀 Como Rodar
 
-> Em construção — as instruções de execução serão adicionadas em breve.
-
 ```bash
 # clone o repositório
-git clone https://github.com/seu-org/valle-leads-system.git
+git clone https://github.com/Helloworld-fatec/valle-leads-system.git
 
 # navegue até a pasta do projeto
 cd valle-leads-system
 
+# configure as variáveis de ambiente
+cp server/.env.example server/.env
+# edite o server/.env com suas configurações locais
+
 # suba os containers
-docker compose up
+docker compose up -d
+
+# rode as migrations
+docker compose exec backend npx prisma migrate dev
 ```
+
+O servidor estará disponível em `http://localhost:3000`.
 
 ---
 
@@ -140,5 +136,8 @@ docker compose up
 
 | Recurso | Link |
 |---|---|
-| Documentação do Frontend | _em breve_ |
-| Documentação do Backend | _em breve_ |
+| Documentação do Backend | [server/README.MD](./server/README.MD) |
+| Documentação do Frontend | [client/README.md](./client/README.md) |
+| Documentação da Sprint 1 | [docs/sprint-1/README.md](./docs/sprint-1/README.md) |
+| Documentação da Sprint 2 | [docs/sprint-2/README.md](./docs/sprint-2/README.md) |
+| Documentação da Sprint 3 | [docs/sprint-3/README.md](./docs/sprint-3/README.md) |

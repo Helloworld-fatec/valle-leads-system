@@ -1,0 +1,39 @@
+# ==========================================
+# 📦 DEPENDÊNCIAS
+# ==========================================
+node_modules/
+
+# ==========================================
+# 🔒 SEGURANÇA E VARIÁVEIS DE AMBIENTE
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# 🏗️ COMPILAÇÃO E BUILD
+# ==========================================
+dist/
+build/
+
+# ==========================================
+# 🗄️ CÓDIGO GERADO AUTOMATICAMENTE
+# ==========================================
+src/generated/prisma/
+
+# ==========================================
+# 📝 LOGS DE ERRO
+# ==========================================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# 💻 SISTEMA OPERACIONAL E EDITORES
+# ==========================================
+# Ignora arquivos de cache criados pelo Windows ou Mac.
+.DS_Store
+Thumbs.db
+# Ignora configurações específicas da máquina no VS Code ou outros editores.
+.vscode/
+.idea/
