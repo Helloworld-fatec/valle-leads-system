@@ -5,7 +5,7 @@ import {
   UpdateCustomerSchema,
   QueryCustomerSchema,
 } from "./customer.dtos";
-import { validateBody, validateQuery } from "../../middlewares/validate.middleware";
+import { validateBody, validateQuery } from "../../middlewares/validation/validate.middleware";
 
 // ─────────────────────────────────────────────
 // CUSTOMER ROUTES

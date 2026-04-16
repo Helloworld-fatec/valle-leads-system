@@ -1,8 +1,10 @@
-import { prisma } from '../../config/prisma';import {
+// server/src/modules/customers/customer.repository.ts
+import { prisma } from '../../config/prisma.js';
+import {
   CreateCustomerDTO,
   UpdateCustomerDTO,
   QueryCustomerDTO,
-} from "./customer.dtos";
+} from "./customer.dtos.js";
 
 // ─────────────────────────────────────────────
 // CUSTOMER REPOSITORY
@@ -44,15 +46,25 @@ export const CustomersRepository = {
   },
 
   async create(data: CreateCustomerDTO) {
+    // 1. Remove qualquer propriedade que seja 'undefined' para respeitar o TS estrito
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, value]) => value !== undefined)
+    );
+
     return prisma.customers.create({
-      data,
+      data: cleanData as any, // O prisma aceita os campos opcionais mesmo sem o cleanData, mas o cast é necessário para evitar erro de tipo
     });
   },
 
   async update(id: string, data: UpdateCustomerDTO) {
+    // 1. Remove qualquer propriedade que seja 'undefined' para respeitar o TS estrito
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, value]) => value !== undefined)
+    );
+
     return prisma.customers.update({
       where: { id },
-      data,
+      data: cleanData,
     });
   },
 
