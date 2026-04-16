@@ -1,6 +1,6 @@
 import { StoresRepository } from "./repositories/stores.repository.js";
 import { TeamsRepository } from "../../teams/repositories/teams.repository.js";
-import { AppError } from "../../middlewares/error.middleware.js";
+import { AppError } from "../../middlewares/errors/globalError.middleware.js";
 
 export class StoresService {
   private repo = new StoresRepository();

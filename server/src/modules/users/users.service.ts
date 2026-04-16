@@ -1,5 +1,5 @@
-import { UsersRepository } from "../repository/UsersRepository.js";
-import type { CreateUserDTO, UpdateUserDTO } from "../dtos/UsersDTO.js";
+import { UsersRepository } from "./users.repository.js";
+import type { CreateUserDTO, UpdateUserDTO } from "./users.dto.js";
 import bcrypt from "bcrypt";
 
 export class UsersService {
@@ -27,15 +27,15 @@ export class UsersService {
         return this.usersRepository.findAll();
     }
 
-    async findById(id: number) {
+    async findById(id: string) {
         return this.usersRepository.findById(id);
     }
 
-    async update(id: number, data: UpdateUserDTO) {
+    async update(id: string, data: UpdateUserDTO) {
         return this.usersRepository.update(id, data);
     }
 
-    async softDelete(id: number) {
+    async softDelete(id: string) {
         return this.usersRepository.softDelete(id);
     }
 }

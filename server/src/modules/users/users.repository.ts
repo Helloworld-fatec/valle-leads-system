@@ -1,40 +1,40 @@
-import { prisma } from "../../../config/prisma.js";
+import { prisma } from "../../config/prisma.js";
 
 export class UsersRepository {
 
     async findAll() {
-        return prisma.user.findMany({
+        return prisma.users.findMany({
             where: { is_active: true }
         });
     }
 
-    async findById(id: number) {
-        return prisma.user.findUnique({
+    async findById(id: string) {
+        return prisma.users.findUnique({
             where: { id }
         });
     }
 
     async findByEmail(email: string) {
-        return prisma.user.findUnique({
+        return prisma.users.findUnique({
             where: { email }
         });
     }
 
     async create(data: any) {
-        return prisma.user.create({
+        return prisma.users.create({
             data
         });
     }
 
-    async update(id: number, data: any) {
-        return prisma.user.update({
+    async update(id: string, data: any) {
+        return prisma.users.update({
             where: { id },
             data
         });
     }
 
-    async softDelete(id: number) {
-        return prisma.user.update({
+    async softDelete(id: string) {
+        return prisma.users.update({
             where: { id },
             data: { is_active: false }
         });

@@ -1,5 +1,5 @@
 import { importanceRepository } from "./importance.repository.js";
-import { RecursoNaoEncontradoError, BusinessRuleError } from "../../middlewares/error.middleware.js";
+import { RecursoNaoEncontradoError, BusinessRuleError } from "../../middlewares/errors/globalError.middleware.js";
 import type { NegotiationImportance } from "./importance.dto.js";
 
 // Retorna o importance atual de uma negociação (registro mais recente)

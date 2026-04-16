@@ -1,3 +1,5 @@
+// src/middlewares/errors/domainErrors.middleware.ts
+
 /**
  * Classe base para todos os erros da aplicação.
  */
@@ -16,7 +18,7 @@ export class AppError extends Error {
  */
 export class RecursoNaoEncontradoError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 404);
     this.name = 'RecursoNaoEncontradoError';
   }
 }
@@ -27,7 +29,7 @@ export class RecursoNaoEncontradoError extends AppError {
  */
 export class AcessoNaoAutorizadoError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 403);
     this.name = 'AcessoNaoAutorizadoError';
   }
 }
@@ -38,14 +40,18 @@ export class AcessoNaoAutorizadoError extends AppError {
  */
 export class BusinessRuleError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 400);
     this.name = 'RegraDeNegocioError';
+  }
+}
+
+/**
  * Erro para ser usado quando há conflito de dados (ex: CPF duplicado, e-mail já cadastrado).
  * Mapeia para um status HTTP 409 (Conflict).
  */
 export class ConflitoDeDadosError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 409);
     this.name = 'ConflitoDeDadosError';
   }
 }
@@ -56,7 +62,7 @@ export class ConflitoDeDadosError extends AppError {
  */
 export class RequisicaoInvalidaError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 400);
     this.name = 'RequisicaoInvalidaError';
   }
 }
@@ -67,7 +73,7 @@ export class RequisicaoInvalidaError extends AppError {
  */
 export class ErroDeValidacaoError extends AppError {
   constructor(message: string) {
-    super(message);
+    super(message, 422);
     this.name = 'ErroDeValidacaoError';
   }
 }

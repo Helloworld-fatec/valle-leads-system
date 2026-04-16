@@ -8,7 +8,7 @@ import {
 import {
   RecursoNaoEncontradoError,
   RequisicaoInvalidaError,
-} from "../../middlewares/error.middleware";
+} from "../../middlewares/errors/globalError.middleware";
 
 // ─────────────────────────────────────────────
 // LEADS SERVICE

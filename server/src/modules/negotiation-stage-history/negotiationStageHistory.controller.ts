@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { negotiationStageHistoryService } from "./negotiationStageHistory.service.js";
 import { createNegotiationStageHistorySchema } from "./negotiationStageHistory.dto.js";
-import { RecursoNaoEncontradoError } from "../../middlewares/error.middleware.js";
+import { RecursoNaoEncontradoError } from "../../middlewares/errors/globalError.middleware.js";
 
 /**
  * GET /negotiations/:id/history
