@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { LeadsService } from "./leads.service";
+import { LeadsService } from "./lead.service";
 import {
   QueryLeadSchema,
   CreateLeadSchema,

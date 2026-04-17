@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { UsersTeamsController } from "./usersTeams.controller.js";
 import { validateBody } from "../../middlewares/validation/validate.middleware.js";
-import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+
 import { 
   createUserTeamSchema, 
   updateUserTeamSchema 
@@ -11,44 +11,34 @@ import {
 const router = Router();
 const controller = new UsersTeamsController();
 
+// Handlers seguros
+const findAll = controller.findAll.bind(controller);
+const findById = controller.findById.bind(controller);
+const create = controller.create.bind(controller);
+const update = controller.update.bind(controller);
+const remove = controller.delete.bind(controller);
+
 // 🔍 LISTAR TODOS OS VÍNCULOS
-// Geralmente usado por administradores para ver a árvore completa de acessos
-router.get(
-  "/", 
-  authMiddleware, 
-  controller.findAll.bind(controller)
-);
+router.get("/", findAll);
 
 // 🔍 BUSCAR VÍNCULO ESPECÍFICO POR ID
-router.get(
-  "/:id", 
-  authMiddleware, 
-  controller.findById.bind(controller)
-);
+router.get("/:id", findById);
 
 // ➕ VINCULAR UTILIZADOR A UM TIME
-// Valida se o user_id e team_id são UUIDs válidos antes de processar
 router.post(
   "/",
-  authMiddleware,
   validateBody(createUserTeamSchema),
-  controller.create.bind(controller)
+  create
 );
 
 // ✏️ ATUALIZAR VÍNCULO
-// Útil caso queira transferir um registo de vínculo para outro ID sem apagar
 router.put(
   "/:id",
-  authMiddleware,
   validateBody(updateUserTeamSchema),
-  controller.update.bind(controller)
+  update
 );
 
 // ❌ REMOVER UTILIZADOR DO TIME (DESVINCULAR)
-router.delete(
-  "/:id", 
-  authMiddleware, 
-  controller.delete.bind(controller)
-);
+router.delete("/:id", remove);
 
 export default router;

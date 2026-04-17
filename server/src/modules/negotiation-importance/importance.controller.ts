@@ -1,60 +1,100 @@
-import type { Request, Response, NextFunction } from "express";
-import { importanceService } from "./importance.service.js";
-import { updateNegotiationImportanceSchema } from "./importance.dto.js";
+// server/src/modules/negotiation-importance/importance.controller.ts
+import { Request, Response, NextFunction } from "express";
+import { NegotiationImportanceService } from "./importance.service";
 
-/**
- * GET /negotiations/:id/importance
- * Retorna o importance atual de uma negociação (UC23)
- */
-async function getImportance(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { id } = req.params;
-    if (!id || Array.isArray(id)) {
-      res.status(400).json({ success: false, message: "Negotiation ID not provided." });
-      return;
-    }
+// ─────────────────────────────────────────────
+// NEGOTIATION IMPORTANCE CONTROLLER
+// ─────────────────────────────────────────────
 
-    const data = await importanceService.getImportance(id);
+// Tipo auxiliar para tipar req.params com id obrigatório
+type ParamsWithId = { id: string };
 
-    res.status(200).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-};
+export const NegotiationImportanceController = {
+  async findAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Os query params já chegam validados, tipados e limpos pelo Zod no middleware
+      const filters = req.query as any;
+      const importanceHistory = await NegotiationImportanceService.findAll(filters);
 
-/**
- * PUT /negotiations/:id/importance
- * Registra um novo importance para a negociação (UC23 — RN17)
- */
-async function updateImportance(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { id } = req.params;
-    if (!id || Array.isArray(id)) {
-      res.status(400).json({ success: false, message: "Negotiation ID not provided." });
-      return;
-    }
-
-    const parsed = updateNegotiationImportanceSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: parsed.error.issues.map((i) => i.message).join(", "),
+      return res.status(200).json({
+        success: true,
+        data: importanceHistory,
       });
-      return;
+    } catch (error) {
+      next(error);
     }
+  },
 
-    // changedBy virá de req.user.id após integração completa do authMiddleware
-    const changedBy = req.user?.id ?? req.body.userId;
+  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const importanceHistory = await NegotiationImportanceService.findById(id);
 
-    const data = await importanceService.updateImportance(id, parsed.data.importance, changedBy);
+      return res.status(200).json({
+        success: true,
+        data: importanceHistory,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-};
+  // Equivalente ao seu antigo "updateImportance" (cria um novo registro na linha do tempo)
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      // O req.body já chega 100% validado de acordo com o Schema do Zod
+      const data = req.body;
 
-export const importanceController = {
-  getImportance,
-  updateImportance,
+      // ⚠️ Extrai o ID do usuário autenticado no token (req.user)
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const importanceHistory = await NegotiationImportanceService.create({
+        ...data,
+        created_by_user_id: userId,
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: importanceHistory,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const importanceHistory = await NegotiationImportanceService.update(id, {
+        ...data,
+        updated_by_user_id: userId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: importanceHistory,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async delete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+
+      await NegotiationImportanceService.delete(id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Histórico de importância excluído com sucesso.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

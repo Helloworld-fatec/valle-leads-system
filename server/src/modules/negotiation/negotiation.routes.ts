@@ -1,22 +1,63 @@
+// server/src/modules/negotiation/negotiation.routes.ts
 import { Router } from "express";
-import { NegotiationsController } from "../../controllers/negotiation.controller.js";
-import { authenticate } from '../../middlewares/auth/auth.middleware.js';
-import { validate } from '../../middlewares/validate.middleware.js';
+import { NegotiationsController } from "./negotiation.controller";
 import {
-    CREATE_NEGOTIATION_SCHEMA,
-    UPDATE_NEGOTIATION_SCHEMA,
-    UPDATE_STATUS_SCHEMA,
-} from './negotiation.dto.js';
+  CreateNegotiationSchema,
+  UpdateNegotiationSchema,
+  QueryNegotiationSchema,
+} from "./negotiation.dto";
+import { 
+  validateBody, 
+  validateQuery 
+} from "../../middlewares/validation/validate.middleware";
 
-const router = Router();
-const controller = new NegotiationsController();
+// ─────────────────────────────────────────────
+// NEGOTIATIONS ROUTES
+// ─────────────────────────────────────────────
 
-router.use(authenticate);
+const negotiationsRoutes = Router();
 
-router.get('/', controller.list);
-router.get('/:id', controller.detail);
-router.post('/', validate(CREATE_NEGOTIATION_SCHEMA), controller.create);
-router.put('/:id', validate(UPDATE_NEGOTIATION_SCHEMA), controller.update);
-router.patch('/:id/status', validate(UPDATE_STATUS_SCHEMA), controller.changeStatus);
+// ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint para garantir que req.user exista
+// negotiationsRoutes.use(authMiddleware);
 
-export default router;
+// GET / - Listagem com filtros opcionais via query params (validados pelo Zod)
+negotiationsRoutes.get(
+  "/",
+  validateQuery(QueryNegotiationSchema),
+  NegotiationsController.findAll
+);
+
+// GET /:id - Busca de uma negociação específica pelo ID com todo seu histórico
+negotiationsRoutes.get(
+  "/:id",
+  NegotiationsController.findById
+);
+
+// POST / - Criação de uma nova negociação (e seus históricos iniciais na transaction)
+negotiationsRoutes.post(
+  "/",
+  validateBody(CreateNegotiationSchema),
+  NegotiationsController.create
+);
+
+// PUT /:id - Atualização da negociação (ex: mudança de equipe ou lead)
+negotiationsRoutes.put(
+  "/:id",
+  validateBody(UpdateNegotiationSchema),
+  NegotiationsController.update
+);
+
+// PATCH /:id - Atualização parcial (como UpdateNegotiationSchema só tem optionals, funciona igual ao PUT)
+negotiationsRoutes.patch(
+  "/:id",
+  validateBody(UpdateNegotiationSchema),
+  NegotiationsController.update
+);
+
+// DELETE /:id - Exclusão física da negociação (deleta históricos em cascata)
+negotiationsRoutes.delete(
+  "/:id",
+  NegotiationsController.delete
+);
+
+export default negotiationsRoutes;

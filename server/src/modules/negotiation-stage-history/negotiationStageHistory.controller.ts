@@ -1,70 +1,101 @@
-import type { Request, Response, NextFunction } from "express";
-import { negotiationStageHistoryService } from "./negotiationStageHistory.service.js";
-import { createNegotiationStageHistorySchema } from "./negotiationStageHistory.dto.js";
-import { RecursoNaoEncontradoError } from "../../middlewares/errors/globalError.middleware.js";
+// server/src/modules/negotiation-stage-history/negotiationStageHistory.controller.ts
+import { Request, Response, NextFunction } from "express";
+import { NegotiationStageHistoryService } from "./negotiationStageHistory.service";
 
-/**
- * GET /negotiations/:id/history
- * Retorna o histórico completo de estágios de uma negociação (UC27)
- */
-async function getHistory(req: Request, res: Response, next: NextFunction) {
-    try{
-        const {id} = req.params;
-        if(!id || Array.isArray(id))
-                throw new RecursoNaoEncontradoError("Negotiation ID not provided.");
-        
-        const history = await negotiationStageHistoryService.getHistoryByNegotiationId(id);
+// ─────────────────────────────────────────────
+// NEGOTIATION STAGE HISTORY CONTROLLER
+// ─────────────────────────────────────────────
 
-        res.status(200).json({
-            success: true,
-            data: history,
-        });
-    }   catch (error) {
-        next(error)
+// Tipo auxiliar para tipar req.params com id obrigatório
+type ParamsWithId = { id: string };
+
+export const NegotiationStageHistoryController = {
+  async findAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Os query params já chegam validados, tipados e limpos pelo Zod no middleware
+      const filters = req.query as any;
+      const stageHistory = await NegotiationStageHistoryService.findAll(filters);
+
+      return res.status(200).json({
+        success: true,
+        data: stageHistory,
+      });
+    } catch (error) {
+      next(error);
     }
-};
+  },
 
-/**
- * POST /negotiations/:id:history
- * Permite adicionar uma entrada manual no histórico com notes (ex.: ajuste administrativo)
- */
-async function createHistoryEntry(req: Request, res: Response, next: NextFunction) {
-    try{
-        const {id} = req.params;
-        if(!id || Array.isArray(id))
-                throw new RecursoNaoEncontradoError("Negotiation ID not provided.");
+  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const stageHistory = await NegotiationStageHistoryService.findById(id);
 
-        // Valida o body com o schema Zod do DTO
-        const parsed = createNegotiationStageHistorySchema.safeParse(req.body);
-        if(!parsed.success) {
-            res.status(400).json({
-                success: true,
-                message: parsed.error.issues.map((i) => i.message).join(", "),
-            });
-            return;
-        }
-
-        // changedBy virá do token JWT após o middleware de atenticação ser implementeado
-        const changedBy = req.body.userId;
-
-        const entry = await negotiationStageHistoryService.recordStageChange(
-            id,
-            parsed.data.old_status ?? parsed.data.new_status,
-            parsed.data.new_status,
-            changedBy,
-        );
-
-        res.status(201).json({
-            success: true,
-            data: entry,
-        })
-    }   catch (error) {
-        next(error);
+      return res.status(200).json({
+        success: true,
+        data: stageHistory,
+      });
+    } catch (error) {
+      next(error);
     }
-};
+  },
 
-export const negotiationStageHistoryController = {
-    getHistory,
-    createHistoryEntry,
-};
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      // O req.body já chega 100% validado de acordo com o Schema do Zod
+      const data = req.body;
 
+      // ⚠️ Extrai o ID do usuário autenticado no token (req.user)
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const stageHistory = await NegotiationStageHistoryService.create({
+        ...data,
+        created_by_user_id: userId,
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: stageHistory,
+      });
+    } catch (error) {
+      // Se a regra de negócio do Service falhar (ex: tentar adicionar estágio em negociação 'closed'),
+      // o erro cai aqui e o domainErrors.middleware devolve o status 400 bonitinho.
+      next(error);
+    }
+  },
+
+  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const stageHistory = await NegotiationStageHistoryService.update(id, {
+        ...data,
+        updated_by_user_id: userId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: stageHistory,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async delete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+
+      await NegotiationStageHistoryService.delete(id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Histórico de estágio excluído com sucesso.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+};

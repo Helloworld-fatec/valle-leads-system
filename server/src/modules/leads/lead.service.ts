@@ -1,4 +1,4 @@
-import { LeadsRepository } from "./leads.repository";
+import { LeadsRepository } from "./lead.repository";
 import { CustomersRepository } from "../customers/customer.repository";
 import {
   CreateLeadDTO,
@@ -8,7 +8,7 @@ import {
 import {
   RecursoNaoEncontradoError,
   RequisicaoInvalidaError,
-} from "../../middlewares/errors/globalError.middleware";
+} from "../../middlewares/errors/domainErrors.middleware";
 
 // ─────────────────────────────────────────────
 // LEADS SERVICE
