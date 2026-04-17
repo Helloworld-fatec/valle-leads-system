@@ -6,51 +6,55 @@ import {
   QueryCustomerSchema,
 } from "./customer.dtos";
 import { validateBody, validateQuery } from "../../middlewares/validation/validate.middleware";
+import { de } from "zod/locales";
 
 // ─────────────────────────────────────────────
 // CUSTOMER ROUTES
 // ─────────────────────────────────────────────
 
-export const customersRouter = Router();
+const customersRoutes = Router();
 
 // ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint
 // customersRouter.use(authMiddleware);
 
 // Listagem com filtros opcionais via query params
-customersRouter.get(
+customersRoutes.get(
   "/",
   validateQuery(QueryCustomerSchema),
   CustomersController.findAll
 );
 
-customersRouter.get(
+customersRoutes.get(
   "/:id",
   CustomersController.findById
 );
 
 // validateBody garante que o body está válido antes de chegar no controller
-customersRouter.post(
+customersRoutes.post(
   "/",
   validateBody(CreateCustomerSchema),
   CustomersController.create
 );
 
 // PUT — atualização completa do recurso
-customersRouter.put(
+customersRoutes.put(
   "/:id",
   validateBody(UpdateCustomerSchema),
   CustomersController.update
 );
 
 // PATCH — atualização parcial, usa o mesmo schema pois todos os campos já são opcionais
-customersRouter.patch(
+customersRoutes.patch(
   "/:id",
   validateBody(UpdateCustomerSchema),
   CustomersController.update
 );
 
 // DELETE — soft delete, não remove o registro do banco
-customersRouter.delete(
+customersRoutes.delete(
   "/:id",
   CustomersController.softDelete
 );
+
+
+export default customersRoutes;

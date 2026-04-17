@@ -1,50 +1,102 @@
-import type { Request, Response, NextFunction } from "express";
-import { NegotiationsRepository } from "../repositories/negotiation.repository.js";
+// server/src/modules/negotiation/negotiation.controller.ts
+import { Request, Response, NextFunction } from "express";
+import { NegotiationsService } from "./negotiation.service";
 
-const repository = new NegotiationsRepository();
+// ─────────────────────────────────────────────
+// NEGOTIATIONS CONTROLLER
+// ─────────────────────────────────────────────
 
-export class NegotiationsController {
-    async list(req: Request, res: Response, next: NextFunction) {
-        try {
-            const { team_id, status, is_open } = req.query;
-            const data = await repository.findAll({
-                team_id: team_id as string,
-                status: status as string,
-                is_open: is_open ? is_open === 'true': undefined,
-            });
-            res.json({ success: true, data });
-        } catch (error) { next(error); }
+// Tipo auxiliar para tipar req.params com id obrigatório
+type ParamsWithId = { id: string };
+
+export const NegotiationsController = {
+  async findAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Os filtros já chegam validados e tipados pelo middleware validateQuery
+      // Usamos "as any" aqui apenas para facilitar a ponte com o Service,
+      // mas você também pode importar QueryNegotiationDTO e fazer o cast
+      const filters = req.query as any; 
+      const negotiations = await NegotiationsService.findAll(filters);
+
+      return res.status(200).json({
+        success: true,
+        data: negotiations,
+      });
+    } catch (error) {
+      next(error);
     }
+  },
 
-    async detail(req: Request, res: Response, next: NextFunction) {
-        try {
-            const data = await repository.findById(req.params.id);
-            if (!data) return res.status(404).json({ message: 'Negotiation not found'});
-        } catch (error) { next(error); }
-    }
+  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const negotiation = await NegotiationsService.findById(id);
 
-    async create(req: Request, res: Response, next: NextFunction) {
-        try {
-            const userId = (req as any).user.id;
-            const data = await repository.create(req.body, userId);
-            res.status(201).json({ success: true, data });
-        } catch (error) { next(error); }
+      return res.status(200).json({
+        success: true,
+        data: negotiation,
+      });
+    } catch (error) {
+      next(error);
     }
+  },
 
-    async update(req: Request, res: Response, next: NextFunction) {
-        try {
-            const userId = (req as any).user.id;
-            const data = await repository.update(req.params.id, req.body, userId);
-            res.json({ success: true, data});
-        } catch (error) { next(error); }
-    }
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      // O req.body já chega 100% validado pelo validateBody
+      const data = req.body;
 
-    async changeStatus(req: Request, res: Response, next: NextFunction) {
-        try {
-            const userId = (req as any).user.id;
-            const { status, notes } = req.body;
-            const data = await repository.updateStatus(req.params.id, status, notes, userId);
-            res.json({ success: true, data });
-        } catch (error) { next(error); }
+      // ⚠️ Pega o ID do usuário autenticado no token.
+      // Substitua o fallback UUID padrão pelo comportamento esperado caso o usuário não exista (ex: lançar erro).
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const negotiation = await NegotiationsService.create({
+        ...data,
+        created_by_user_id: userId,
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: negotiation,
+      });
+    } catch (error) {
+      next(error);
     }
-}
+  },
+
+  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+
+      const negotiation = await NegotiationsService.update(id, {
+        ...data,
+        updated_by_user_id: userId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: negotiation,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async delete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+
+      await NegotiationsService.delete(id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Negociação excluída com sucesso.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+};

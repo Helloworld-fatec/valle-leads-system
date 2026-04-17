@@ -1,11 +1,64 @@
+// server/src/modules/negotiation-importance/importance.routes.ts
 import { Router } from "express";
-import { importanceController } from "./importance.controller.js";
+import { NegotiationImportanceController } from "./importance.controller";
+import {
+  CreateNegotiationImportanceSchema,
+  UpdateNegotiationImportanceSchema,
+  QueryNegotiationImportanceSchema,
+} from "./importance.dto";
+import { 
+  validateBody, 
+  validateQuery 
+} from "../../middlewares/validation/validate.middleware";
 
-const router = Router({ mergeParams: true });
+// ─────────────────────────────────────────────
+// NEGOTIATION IMPORTANCE ROUTES
+// ─────────────────────────────────────────────
 
-// mergeParams: true — necessário para acessar :id vindo do router pai (/negotiations/:id/importance)
+const negotiationImportanceRoutes = Router();
 
-router.get("/", importanceController.getImportance);
-router.put("/", importanceController.updateImportance);
+// ⚠️ TODO: aplicar authMiddleware em todas as rotas para garantir req.user
+// negotiationImportanceRoutes.use(authMiddleware);
 
-export const importanceRouter = router;
+// GET / - Listagem do histórico de importância com filtros (ex: por negotiation_id)
+negotiationImportanceRoutes.get(
+  "/",
+  validateQuery(QueryNegotiationImportanceSchema),
+  NegotiationImportanceController.findAll
+);
+
+// GET /:id - Busca de um registro específico de mudança de importância
+negotiationImportanceRoutes.get(
+  "/:id",
+  NegotiationImportanceController.findById
+);
+
+// POST / - Registra uma nova temperatura para a negociação (RN17)
+// O Service validará se a temperatura é diferente da atual e se a negociação existe.
+negotiationImportanceRoutes.post(
+  "/",
+  validateBody(CreateNegotiationImportanceSchema),
+  NegotiationImportanceController.create
+);
+
+// PUT /:id - Atualização de um registro de histórico (ex: correção de notas)
+negotiationImportanceRoutes.put(
+  "/:id",
+  validateBody(UpdateNegotiationImportanceSchema),
+  NegotiationImportanceController.update
+);
+
+// PATCH /:id - Atualização parcial (mesmo schema do PUT)
+negotiationImportanceRoutes.patch(
+  "/:id",
+  validateBody(UpdateNegotiationImportanceSchema),
+  NegotiationImportanceController.update
+);
+
+// DELETE /:id - Exclusão física de um registro de importância
+negotiationImportanceRoutes.delete(
+  "/:id",
+  NegotiationImportanceController.delete
+);
+
+export default negotiationImportanceRoutes;

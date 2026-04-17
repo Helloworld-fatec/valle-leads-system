@@ -5,52 +5,54 @@ import {
   UpdateLeadSchema,
   QueryLeadSchema,
 } from "./lead.dtos";
-import { validateBody, validateQuery } from "../../middlewares/validate.middleware";
+import { validateBody, validateQuery } from "../../middlewares/validation/validate.middleware";
 
 // ─────────────────────────────────────────────
 // LEADS ROUTES
 // ─────────────────────────────────────────────
 
-export const leadsRouter = Router();
+const leadsRoutes = Router();
 
 // ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint
 // leadsRouter.use(authMiddleware);
 
 // Listagem com filtros opcionais via query params
-leadsRouter.get(
+leadsRoutes.get(
   "/",
   validateQuery(QueryLeadSchema),
   LeadsController.findAll
 );
 
-leadsRouter.get(
+leadsRoutes.get(
   "/:id",
   LeadsController.findById
 );
 
 // validateBody garante que o body está válido antes de chegar no controller
-leadsRouter.post(
+leadsRoutes.post(
   "/",
   validateBody(CreateLeadSchema),
   LeadsController.create
 );
 
 // PUT — atualização completa do recurso
-leadsRouter.put(
+leadsRoutes.put(
   "/:id",
   validateBody(UpdateLeadSchema),
   LeadsController.update
 );
 
 // PATCH — atualização parcial, usa o mesmo schema pois todos os campos já são opcionais
-leadsRouter.patch(
+leadsRoutes.patch(
   "/:id",
   validateBody(UpdateLeadSchema),
   LeadsController.update
 );
 
 // DELETE — soft delete, não remove o registro do banco
-leadsRouter.delete(
+leadsRoutes.delete(
   "/:id",
   LeadsController.softDelete
 );
+
+export default leadsRoutes;

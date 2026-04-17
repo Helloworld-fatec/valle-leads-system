@@ -2,9 +2,7 @@
 import { Router } from "express";
 import { TeamsController } from "./teams.controller.js";
 
-// Ajuste os caminhos abaixo conforme a localização exata no seu projeto
-import { validateBody } from "../../middlewares/validation/validate.middleware.js"; 
-import { authMiddleware } from "../../middlewares/auth/auth.middleware.js"; 
+import { validateBody } from "../../middlewares/validation/validate.middleware.js";
 
 import {
   createTeamSchema,
@@ -14,41 +12,34 @@ import {
 const router = Router();
 const controller = new TeamsController();
 
+// Handlers seguros
+const findAll = controller.findAll.bind(controller);
+const findById = controller.findById.bind(controller);
+const create = controller.create.bind(controller);
+const update = controller.update.bind(controller);
+const remove = controller.delete.bind(controller);
+
 // 🔍 LISTAR TODAS AS TEAMS (aceita query param is_active)
-router.get(
-  "/", 
-  authMiddleware, 
-  controller.findAll.bind(controller)
-);
+router.get("/", findAll);
 
 // 🔍 BUSCAR TEAM POR ID
-router.get(
-  "/:id", 
-  authMiddleware, 
-  controller.findById.bind(controller)
-);
+router.get("/:id", findById);
 
-// ➕ CRIAR TEAM (Com validação do body)
+// ➕ CRIAR TEAM
 router.post(
   "/",
-  authMiddleware,
   validateBody(createTeamSchema),
-  controller.create.bind(controller)
+  create
 );
 
-// ✏️ ATUALIZAR TEAM (Com validação do body)
+// ✏️ ATUALIZAR TEAM
 router.put(
   "/:id",
-  authMiddleware,
   validateBody(updateTeamSchema),
-  controller.update.bind(controller)
+  update
 );
 
 // ❌ DELETAR TEAM
-router.delete(
-  "/:id", 
-  authMiddleware, 
-  controller.delete.bind(controller)
-);
+router.delete("/:id", remove);
 
 export default router;

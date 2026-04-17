@@ -1,70 +1,77 @@
-import { prisma } from "../config/prisma.js";
-import type { CreateNegotiationDTO, UpdateNegotiationDTO } from "../modules/negotiation/negotiation.dto.js";
+// server/src/modules/negotiation/negotiation.repository.ts
+import { prisma } from "../../config/prisma";
+import {
+  CreateNegotiationDTO,
+  UpdateNegotiationDTO,
+  QueryNegotiationDTO,
+} from "./negotiation.dto";
 
-export class NegotiationsRepository {
-    async findAll(filters: { team_id?: string | undefined; status?: string | undefined; is_open?: boolean | undefined}) {
-        return prisma.negotiations.findMany({
-            where: {
-                team_id: filters.team_id,
-                status: filters.status,
-                is_open: filters.is_open,
-            },
-            include: { leads: true },
-            orderBy: { created_at: 'desc'},
-        });
-    }
+export const NegotiationsRepository = {
+  async findAll(filters: QueryNegotiationDTO) {
+    const { team_id, lead_id, page = 1, limit = 20 } = filters;
 
-    async findById(id: string){
-        return prisma.negotiations.findUnique({
-            where: {id},
-            include: {
-                leads: { include : {customers: true}},
-                stage_history: { orderBy: { created_at: 'desc'}},
-            },
-        });
-    }
+    return prisma.negotiations.findMany({
+      where: {
+        ...(team_id && { team_id }),
+        ...(lead_id && { lead_id }),
+      },
+      include: {
+        leads: true,
+        teams: true,
+        // Trazendo o status, estágio e importância mais recentes como conveniência na listagem
+        status_history: { orderBy: { created_at: "desc" }, take: 1 },
+        stage_history: { orderBy: { created_at: "desc" }, take: 1 },
+        importance_history: { orderBy: { created_at: "desc" }, take: 1 },
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { created_at: "desc" },
+    });
+  },
 
-    async create(data: CreateNegotiationDTO, userId: string) {
-        return prisma.negotiations.create({
-            data: {
-                ...data,
-                created_by_user_id: userId,
-            },
-        });
-    }
+  async findById(id: string) {
+    return prisma.negotiations.findUnique({
+      where: { id },
+      include: {
+        leads: true,
+        teams: true,
+        // No detalhe, trazemos todo o histórico ordenado do mais recente para o mais antigo
+        status_history: { orderBy: { created_at: "desc" } },
+        stage_history: { orderBy: { created_at: "desc" } },
+        importance_history: { orderBy: { created_at: "desc" } },
+      },
+    });
+  },
 
-    async update(id: string, data: UpdateNegotiationDTO, userId: string) {
-        return prisma.negotiations.update({
-            where: { id },
-            data: {
-                ...data,
-                updated_by_user_id: userId,
-            },
-        });
-    }
+  async create(data: CreateNegotiationDTO & { created_by_user_id: string }) {
+    return prisma.negotiations.create({
+      data: {
+        team_id: data.team_id,
+        lead_id: data.lead_id,
+        created_by_user_id: data.created_by_user_id,
+      },
+    });
+  },
 
-    async updateStatus(id: string, status: string, notes: string | undefined, userId: string) {
-        return prisma.$transaction(async (tx) => {
-            const current = await tx.negotiations.findUnique({ where: { id }});
-            
-            const updated = await tx.negotiations.update({
-                where: {id},
-                data: {
-                    status,
-                    updated_by_user_id: userId
-                },
-            });
+  async update(
+    id: string,
+    data: UpdateNegotiationDTO & { updated_by_user_id: string }
+  ) {
+    return prisma.negotiations.update({
+      where: { id },
+      data: {
+        ...(data.team_id && { team_id: data.team_id }),
+        ...(data.lead_id && { lead_id: data.lead_id }),
+        updated_by_user_id: data.updated_by_user_id,
+      },
+    });
+  },
 
-            await tx.negotiationStageHistory.create({
-                data: {
-                    negotiation_id: id,
-                    old_status: current?.status,
-                    new_status: status,
-                    notes,
-                    created_by_user_id: userId,
-                },
-            });
-            return updated;
-        });
-    }
-}
+  // Como Negotiations não possui "is_active", usamos delete físico. 
+  // (Cascade está configurado no schema para os históricos).
+  async delete(id: string) {
+    return prisma.negotiations.delete({
+      where: { id },
+    });
+  },
+};

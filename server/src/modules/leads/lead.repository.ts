@@ -1,13 +1,10 @@
+// server/src/modules/leads/lead.repository.ts
 import { prisma } from '../../config/prisma';
 import {
   CreateLeadDTO,
   UpdateLeadDTO,
   QueryLeadDTO,
 } from "./lead.dtos";
-
-// ─────────────────────────────────────────────
-// LEADS REPOSITORY
-// ─────────────────────────────────────────────
 
 export const LeadsRepository = {
   async findAll(filters: QueryLeadDTO) {
@@ -23,17 +20,14 @@ export const LeadsRepository = {
 
     return prisma.leads.findMany({
       where: {
-        // Spread condicional — só adiciona o filtro se o valor foi informado
         ...(team_id && { team_id }),
         ...(status && { status }),
         ...(attendant_id && { attendant_id }),
         ...(customer_id && { customer_id }),
-        // is_active usa !== undefined pois false é um valor válido e deve ser filtrado
         ...(is_active !== undefined && { is_active }),
       },
       include: {
         customers: true,
-        // Seleciona apenas campos públicos do attendant — nunca expor password_hash
         attendant: {
           select: { id: true, name: true, email: true, role: true },
         },
@@ -50,30 +44,48 @@ export const LeadsRepository = {
       include: {
         customers: true,
         teams: true,
-        // Seleciona apenas campos públicos do attendant — nunca expor password_hash
         attendant: {
           select: { id: true, name: true, email: true, role: true },
         },
-        // Inclui negotiations para exibir histórico completo do lead
         negotiations: true,
       },
     });
   },
 
-  async create(data: CreateLeadDTO) {
+  async create(dto: CreateLeadDTO) {
     return prisma.leads.create({
-      data,
+      data: {
+        status: dto.status,
+        customer_id: dto.customer_id,
+        team_id: dto.team_id,
+
+        // 👇 normalização obrigatória
+        source: dto.source ?? null,
+        vehicle_interest: dto.vehicle_interest ?? null,
+        attendant_id: dto.attendant_id ?? null,
+      },
     });
   },
 
-  async update(id: string, data: UpdateLeadDTO) {
+  async update(id: string, dto: UpdateLeadDTO) {
     return prisma.leads.update({
       where: { id },
-      data,
+      data: {
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.is_active !== undefined && { is_active: dto.is_active }),
+
+        // 👇 normalização obrigatória
+        ...(dto.source !== undefined && { source: dto.source ?? null }),
+        ...(dto.vehicle_interest !== undefined && {
+          vehicle_interest: dto.vehicle_interest ?? null,
+        }),
+        ...(dto.attendant_id !== undefined && {
+          attendant_id: dto.attendant_id ?? null,
+        }),
+      },
     });
   },
 
-  // Soft delete: mantém o registro no banco, apenas desativa o lead
   async softDelete(id: string) {
     return prisma.leads.update({
       where: { id },
