@@ -32,10 +32,10 @@ interface AuthContextData {
 //   "GENERAL_MANAGER"→ Pedro, Ryan
 // ─────────────────────────────────────────────
 const MOCK_USER: AuthUser = {
-  id: "mock-user-id-001",
+  id: "mock-user-id-001", // ← volta para o mock
   name: "Dev Local",
   email: "dev@vallemultimarcas.com.br",
-  role: "ATTENDANT", // ← altere aqui para testar diferentes perfis
+  role: "ATTENDANT",
   team_id: "mock-team-id-001",
 };
 
