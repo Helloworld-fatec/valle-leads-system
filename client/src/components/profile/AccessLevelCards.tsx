@@ -1,41 +1,41 @@
 import { UserRole, roleLabels, roleColors } from "../../data/mockUsers";
-import { Check, X, ShieldCheck, TrendingUp, Headphones } from "lucide-react";
+import { Check, X, ShieldCheck, Shield, Headphones } from "lucide-react";
 
 interface Permission {
   label: string;
+  admin: boolean;
   manager: boolean;
-  seller: boolean;
   attendant: boolean;
 }
 
 const permissions: Permission[] = [
-  { label: "Ver todos os leads", manager: true, seller: false, attendant: false },
-  { label: "Criar leads", manager: true, seller: true, attendant: true },
-  { label: "Editar leads próprios", manager: true, seller: true, attendant: true },
-  { label: "Editar leads da equipe", manager: true, seller: false, attendant: false },
-  { label: "Mover no funil", manager: true, seller: true, attendant: true },
-  { label: "Fechar negociação", manager: true, seller: true, attendant: false },
-  { label: "Gerenciar usuários", manager: true, seller: false, attendant: false },
-  { label: "Acessar relatórios", manager: true, seller: false, attendant: false },
-  { label: "Configurar equipes", manager: true, seller: false, attendant: false },
-  { label: "Ver logs do sistema", manager: true, seller: false, attendant: false },
+  { label: "Ver todos os leads", admin: true, manager: true, attendant: false },
+  { label: "Criar leads", admin: true, manager: true, attendant: true },
+  { label: "Editar leads próprios", admin: true, manager: true, attendant: true },
+  { label: "Editar leads da equipe", admin: true, manager: true, attendant: false },
+  { label: "Mover no funil", admin: true, manager: true, attendant: true },
+  { label: "Fechar negociação", admin: true, manager: true, attendant: false },
+  { label: "Gerenciar usuários", admin: true, manager: true, attendant: false },
+  { label: "Acessar relatórios", admin: true, manager: true, attendant: false },
+  { label: "Configurar equipes", admin: true, manager: true, attendant: false },
+  { label: "Ver logs do sistema", admin: true, manager: true, attendant: false },
 ];
 
 const roleIcons: Record<UserRole, React.ReactNode> = {
+  ADMIN: <Shield size={18} />,
   MANAGER: <ShieldCheck size={18} />,
-  SELLER: <TrendingUp size={18} />,
   ATTENDANT: <Headphones size={18} />,
 };
 
 const roleDescriptions: Record<UserRole, string> = {
+  ADMIN: "Acesso completo ao sistema como administrador.",
   MANAGER: "Acesso completo ao sistema, equipes e relatórios.",
-  SELLER: "Gestão de próprios leads e negociações.",
   ATTENDANT: "Criação e acompanhamento básico de leads.",
 };
 
 const rolePermMap: Record<UserRole, keyof Permission> = {
+  ADMIN: "admin",
   MANAGER: "manager",
-  SELLER: "seller",
   ATTENDANT: "attendant",
 };
 
@@ -44,7 +44,7 @@ interface AccessLevelCardsProps {
 }
 
 export default function AccessLevelCards({ currentRole }: AccessLevelCardsProps) {
-  const roles: UserRole[] = ["MANAGER", "SELLER", "ATTENDANT"];
+  const roles: UserRole[] = ["ADMIN", "MANAGER", "ATTENDANT"];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

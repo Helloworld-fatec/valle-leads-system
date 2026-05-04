@@ -1,4 +1,4 @@
-export type UserRole = "MANAGER" | "SELLER" | "ATTENDANT";
+export type UserRole = "ADMIN" | "MANAGER" | "ATTENDANT";
 
 export interface User {
   id: string;
@@ -26,7 +26,7 @@ export const mockUsers: User[] = [
     id: "2",
     name: "Rafael Oliveira",
     email: "rafael.oliveira@valleleads.com",
-    role: "SELLER",
+    role: "ATTENDANT",
     is_active: true,
     created_at: "2024-02-15",
     team: "Equipe Alpha",
@@ -36,7 +36,7 @@ export const mockUsers: User[] = [
     id: "3",
     name: "Camila Souza",
     email: "camila.souza@valleleads.com",
-    role: "SELLER",
+    role: "ATTENDANT",
     is_active: true,
     created_at: "2024-02-20",
     team: "Equipe Beta",
@@ -76,7 +76,7 @@ export const mockUsers: User[] = [
     id: "7",
     name: "Amanda Rocha",
     email: "amanda.rocha@valleleads.com",
-    role: "SELLER",
+    role: "ATTENDANT",
     is_active: true,
     created_at: "2024-04-05",
     team: "Equipe Alpha",
@@ -96,7 +96,7 @@ export const mockUsers: User[] = [
     id: "9",
     name: "Natália Pereira",
     email: "natalia.pereira@valleleads.com",
-    role: "SELLER",
+    role: "ATTENDANT",
     is_active: false,
     created_at: "2024-05-01",
     team: "Equipe Gamma",
@@ -115,13 +115,13 @@ export const mockUsers: User[] = [
 ];
 
 export const roleLabels: Record<UserRole, string> = {
+  ADMIN: "Administrador",
   MANAGER: "Gerente",
-  SELLER: "Vendedor",
   ATTENDANT: "Atendente",
 };
 
 export const roleColors: Record<UserRole, { bg: string; text: string; dot: string }> = {
+  ADMIN: { bg: "#F5F3FF", text: "#7C3AED", dot: "#8B5CF6" },
   MANAGER: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#2563EB" },
-  SELLER: { bg: "#F0FDF4", text: "#15803D", dot: "#10B981" },
   ATTENDANT: { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
 };

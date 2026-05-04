@@ -1,9 +1,9 @@
-import { User } from "../../data/mockUsers";
 import { roleLabels, roleColors } from "../../data/mockUsers";
 import { Camera, CheckCircle2 } from "lucide-react";
+import type { ProfileUser } from "../../pages/Profile";
 
 interface ProfileHeaderProps {
-  user: User;
+  user: ProfileUser;
 }
 
 function getInitials(name: string) {

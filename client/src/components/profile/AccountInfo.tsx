@@ -1,9 +1,9 @@
-import { User } from "../../data/mockUsers";
 import { roleLabels } from "../../data/mockUsers";
 import { Mail, Shield, Hash, Calendar } from "lucide-react";
+import type { ProfileUser } from "../../pages/Profile";
 
 interface AccountInfoProps {
-  user: User;
+  user: ProfileUser;
 }
 
 interface InfoRowProps {
