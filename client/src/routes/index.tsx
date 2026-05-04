@@ -9,6 +9,7 @@ import Users from "../pages/Users";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
+import SalesFunnel from "../pages/salesFunnel";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -77,7 +78,7 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
         
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
-        <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
+        <Route path="/funil" element={<SalesFunnel />} />
         <Route path="/usuarios" element={<Users />} />
         <Route path="/perfil" element={<Profile />} />
       </Route>
