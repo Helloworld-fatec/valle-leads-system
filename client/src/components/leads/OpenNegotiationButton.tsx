@@ -15,7 +15,7 @@ export default function OpenNegotiationButton({ lead }: Props) {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
     if (!user?.id) return;
@@ -26,12 +26,13 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
       await createNegotiation({
         lead_id: lead.id,
-        attendant_id: user.id,
+        team_id: lead.team_id,
       });
 
       navigate("/funil");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao abrir negociação.";
+      const msg =
+        err instanceof Error ? err.message : "Erro ao abrir negociação.";
       setError(msg);
     } finally {
       setLoading(false);

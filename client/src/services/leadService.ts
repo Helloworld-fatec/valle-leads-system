@@ -67,9 +67,8 @@ export interface UpdateLeadDTO {
 
 export interface CreateNegotiationDTO {
   lead_id: string;
-  attendant_id: string;
+  team_id: string;
 }
-
 // ─────────────────────────────────────────────
 // HOOK
 // ─────────────────────────────────────────────
