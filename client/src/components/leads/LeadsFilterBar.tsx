@@ -7,29 +7,26 @@ type Props = {
   onStage: (v: string) => void;
   source: string;
   onSource: (v: string) => void;
-  importance: string;
-  onImportance: (v: string) => void;
   onClear: () => void;
 };
 
-const stages = ["Todos", "Novo", "Contato Inicial", "Qualificação", "Proposta", "Negociação", "Fechamento"];
+const stages = ["Todos", "ABERTO", "EM_PROGRESSO", "CLOSED_WON", "CLOSED_LOST"];
 const sources = ["Todos", "Indicação", "Site", "WhatsApp", "Instagram", "Google"];
-const importances = ["Todos", "quente", "morno", "frio"];
 
-const importanceLabels: Record<string, string> = {
-  quente: "🔥 Quente",
-  morno: "🌡️ Morno",
-  frio: "❄️ Frio",
+const stageLabels: Record<string, string> = {
+  "ABERTO": "Aberto",
+  "EM_PROGRESSO": "Em Progresso",
+  "CLOSED_WON": "Ganho",
+  "CLOSED_LOST": "Perdido",
 };
 
 export default function LeadsFilterBar({
   search, onSearch,
   stage, onStage,
   source, onSource,
-  importance, onImportance,
   onClear,
 }: Props) {
-  const hasFilters = stage !== "Todos" || source !== "Todos" || importance !== "Todos" || search !== "";
+  const hasFilters = stage !== "Todos" || source !== "Todos" || search !== "";
 
   return (
     <div
@@ -59,7 +56,9 @@ export default function LeadsFilterBar({
           style={{ background: "#F8FAFC", borderColor: "#E5E7EB", color: "#374151" }}
         >
           {stages.map(s => (
-            <option key={s} value={s}>{s === "Todos" ? "Etapa: Todas" : s}</option>
+            <option key={s} value={s}>
+              {s === "Todos" ? "Etapa: Todas" : stageLabels[s]}
+            </option>
           ))}
         </select>
       </div>
@@ -73,18 +72,6 @@ export default function LeadsFilterBar({
       >
         {sources.map(s => (
           <option key={s} value={s}>{s === "Todos" ? "Origem: Todas" : s}</option>
-        ))}
-      </select>
-
-      {/* Importance filter */}
-      <select
-        value={importance}
-        onChange={(e) => onImportance(e.target.value)}
-        className="text-sm py-2 pl-3 pr-7 rounded-lg border outline-none cursor-pointer appearance-none"
-        style={{ background: "#F8FAFC", borderColor: "#E5E7EB", color: "#374151" }}
-      >
-        {importances.map(i => (
-          <option key={i} value={i}>{i === "Todos" ? "Prioridade: Todas" : importanceLabels[i]}</option>
         ))}
       </select>
 

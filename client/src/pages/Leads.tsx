@@ -17,14 +17,23 @@ function filterLeads(
   leads: Lead[],
   status: string,
   source: string,
+  search: string,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
 ): Lead[] {
   return leads.filter((l) => {
     if (status !== "Todos" && l.status !== status) return false;
     if (source !== "Todos" && (l.source ?? "") !== source) return false;
     if (dateFrom && new Date(l.created_at) < new Date(dateFrom)) return false;
-    if (dateTo   && new Date(l.created_at) > new Date(dateTo))   return false;
+    if (dateTo && new Date(l.created_at) > new Date(dateTo)) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const name = l.customers?.name?.toLowerCase() ?? "";
+      const email = l.customers?.email?.toLowerCase() ?? "";
+      const cpf = l.customers?.cpf ?? "";
+      if (!name.includes(q) && !email.includes(q) && !cpf.includes(q))
+        return false;
+    }
     return true;
   });
 }
@@ -38,17 +47,18 @@ export default function Leads() {
   const { getLeads } = useLeadService();
 
   // ── Estado ──────────────────────────────────
-  const [leads, setLeads]           = useState<Lead[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Filtros
-  const [status, setStatus]   = useState("Todos");
-  const [source, setSource]   = useState("Todos");
+  const [status, setStatus] = useState("Todos");
+  const [source, setSource] = useState("Todos");
   const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo]     = useState("");
-  const [page, setPage]         = useState(1);
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
   // ── Busca leads do atendente logado ─────────
   useEffect(() => {
@@ -61,7 +71,8 @@ export default function Leads() {
         const data = await getLeads({ attendant_id: user!.id });
         setLeads(data);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Erro ao carregar leads.";
+        const msg =
+          err instanceof Error ? err.message : "Erro ao carregar leads.";
         setError(msg);
       } finally {
         setLoading(false);
@@ -69,38 +80,37 @@ export default function Leads() {
     }
 
     fetchLeads();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   // ── Filtragem local ──────────────────────────
   const filtered = useMemo(
-    () => filterLeads(leads, status, source, dateFrom, dateTo),
-    [leads, status, source, dateFrom, dateTo]
+    () => filterLeads(leads, status, source, search, dateFrom, dateTo),
+    [leads, status, source, search, dateFrom, dateTo],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const paginated  = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   function handleFilter(key: string, value: string) {
     setPage(1);
-    if (key === "status")   setStatus(value);
-    if (key === "source")   setSource(value);
+    if (key === "status") setStatus(value);
+    if (key === "source") setSource(value);
     if (key === "dateFrom") setDateFrom(value);
-    if (key === "dateTo")   setDateTo(value);
+    if (key === "dateTo") setDateTo(value);
   }
 
   function handleClear() {
     setStatus("Todos");
     setSource("Todos");
+    setSearch("");
     setDateFrom("");
     setDateTo("");
     setPage(1);
   }
-
   // ── Render ───────────────────────────────────
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -117,21 +127,53 @@ export default function Leads() {
 
       {/* Filtros */}
       <LeadsFilterBar
-        search=""
-        onSearch={() => {}}
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
         stage={status}
         onStage={(v) => handleFilter("status", v)}
         source={source}
         onSource={(v) => handleFilter("source", v)}
-        importance="Todos"
-        onImportance={() => {}}
         onClear={handleClear}
       />
 
+      {/* Filtro de data */}
+      <div className="flex items-center gap-2 mb-5">
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => handleFilter("dateFrom", e.target.value)}
+          className="text-sm py-2 px-3 rounded-lg border outline-none"
+          style={{
+            background: "#F8FAFC",
+            borderColor: "#E5E7EB",
+            color: "#374151",
+          }}
+        />
+        <span className="text-xs" style={{ color: "#9CA3AF" }}>
+          até
+        </span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => handleFilter("dateTo", e.target.value)}
+          className="text-sm py-2 px-3 rounded-lg border outline-none"
+          style={{
+            background: "#F8FAFC",
+            borderColor: "#E5E7EB",
+            color: "#374151",
+          }}
+        />
+      </div>
+
       {/* Erro */}
       {error && (
-        <div className="rounded-xl p-4 mb-4 text-sm font-medium"
-          style={{ background: "#FEF2F2", color: "#DC2626" }}>
+        <div
+          className="rounded-xl p-4 mb-4 text-sm font-medium"
+          style={{ background: "#FEF2F2", color: "#DC2626" }}
+        >
           ⚠️ {error}
         </div>
       )}
@@ -147,8 +189,10 @@ export default function Leads() {
 
       {/* Lista vazia */}
       {!loading && !error && filtered.length === 0 && (
-        <div className="rounded-xl border flex flex-col items-center justify-center py-20"
-          style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}>
+        <div
+          className="rounded-xl border flex flex-col items-center justify-center py-20"
+          style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
+        >
           <p className="text-4xl mb-3">🔍</p>
           <p className="font-semibold" style={{ color: "#374151" }}>
             Nenhum lead encontrado
@@ -163,11 +207,7 @@ export default function Leads() {
       {!loading && !error && paginated.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginated.map((lead) => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              onClick={setSelectedLead}
-            />
+            <LeadCard key={lead.id} lead={lead} onClick={setSelectedLead} />
           ))}
         </div>
       )}

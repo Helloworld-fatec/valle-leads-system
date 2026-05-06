@@ -3,9 +3,11 @@
     "rootDir": ".",
     "outDir": "./dist",
 
-    "module": "CommonJS",
+    "module": "nodenext",
     "target": "esnext",
     "types": ["node"],
+
+    "moduleResolution": "nodenext",
 
     "sourceMap": true,
     "declaration": true,
