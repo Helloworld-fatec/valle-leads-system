@@ -1,35 +1,42 @@
-# ─── Stage 1: build ───────────────────────────────────────────────────────────
-FROM node:22-alpine AS build
+# ─── Stage 1: Build ───────────────────────────────────────────────────────────
+# O FROM deve ser sempre a primeira linha de instrução válida
+FROM node:22-alpine AS build 
 
-WORKDIR /app
+WORKDIR /app 
 
-COPY package*.json ./
-RUN npm ci
+# Instalação limpa de dependências
+COPY package*.json ./ 
+RUN npm ci 
 
-COPY . .
+# Copia o código e gera o Prisma Client
+COPY . . 
 
-# Gera o Prisma Client e compila TypeScript (inclui prisma/seed.ts -> dist/prisma/seed.js)
-RUN npx prisma generate
-RUN npm run build
+# IMPORTANTE: No Prisma 7, NÃO remova o prisma.config.ts 
+# Ele é necessário para que o migrate deploy funcione corretamente 
+RUN npx prisma generate 
+RUN npm run build 
 
 # ─── Stage 2: production ──────────────────────────────────────────────────────
 FROM node:22-alpine AS prod
 
 WORKDIR /app
-
 ENV NODE_ENV=production
 
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Build compilado (inclui dist/prisma/seed.js)
+# Copia o build compilado
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 
-# Schema e CSV de seed
+# CORREÇÃO: Copia o Prisma Client para DENTRO da estrutura do dist
+# para que o caminho relativo '../generated/prisma' funcione
+COPY --from=build /app/src/generated ./dist/src/generated
+
+# Schema e config necessários para o deploy
 COPY prisma ./prisma
+COPY --from=build /app/prisma.config.ts ./ 
 
 EXPOSE 3000
 
-# migrate deploy (idempotente) + seed (idempotente via findFirst/upsert) + servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/prisma/seed.js && node dist/server.js"]
+# Comando ajustado (sem a flag --url que causava erro no Prisma 7)
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/server.js"]

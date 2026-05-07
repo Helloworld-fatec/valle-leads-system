@@ -1,0 +1,18 @@
+services:
+  server:
+    command: npm run dev # Usa o tsx watch que está no seu package.json
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  client:
+    # No modo de desenvolvimento, não usamos o Nginx, mas sim o Vite
+    build:
+      context: ./client
+      target: build # Para no estágio de Node do seu Dockerfile
+    command: npm run dev -- --host
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules

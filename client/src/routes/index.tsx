@@ -9,7 +9,7 @@ import Users from "../pages/Users";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
-import SalesFunnel from "../pages/salesFunnel";
+import SalesFunnel from "../pages/SalesFunnel";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
