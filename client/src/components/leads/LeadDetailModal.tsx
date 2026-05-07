@@ -6,12 +6,15 @@ import OpenNegotiationButton from "./OpenNegotiationButton";
 // STATUS BADGE
 // ─────────────────────────────────────────────
 
-const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  novo:           { bg: "#EFF6FF", text: "#2563EB", label: "Novo" },
+const statusConfig: Record<
+  string,
+  { bg: string; text: string; label: string }
+> = {
+  novo: { bg: "#EFF6FF", text: "#2563EB", label: "Novo" },
   em_atendimento: { bg: "#F5F3FF", text: "#7C3AED", label: "Em Atendimento" },
-  aguardando:     { bg: "#FFFBEB", text: "#D97706", label: "Aguardando" },
-  finalizado:     { bg: "#ECFDF5", text: "#059669", label: "Finalizado" },
-  perdido:        { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
+  aguardando: { bg: "#FFFBEB", text: "#D97706", label: "Aguardando" },
+  finalizado: { bg: "#ECFDF5", text: "#059669", label: "Finalizado" },
+  perdido: { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
 };
 
 // ─────────────────────────────────────────────
@@ -36,7 +39,9 @@ function InfoRow({
         {icon}
       </div>
       <div>
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>{label}</p>
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+          {label}
+        </p>
         <p className="text-sm font-medium mt-0.5" style={{ color: "#111827" }}>
           {value ?? "Não informado"}
         </p>
@@ -52,15 +57,22 @@ function InfoRow({
 interface LeadDetailModalProps {
   lead: Lead;
   onClose: () => void;
+  onAssign?: () => void;
 }
 
 // ─────────────────────────────────────────────
 // COMPONENTE
 // ─────────────────────────────────────────────
 
-export default function LeadDetailModal({ lead, onClose }: LeadDetailModalProps) {
+export default function LeadDetailModal({
+  lead,
+  onClose,
+  onAssign
+}: LeadDetailModalProps) {
   const status = statusConfig[lead.status] ?? {
-    bg: "#F1F5F9", text: "#6B7280", label: lead.status,
+    bg: "#F1F5F9",
+    text: "#6B7280",
+    label: lead.status,
   };
 
   return (
@@ -103,11 +115,12 @@ export default function LeadDetailModal({ lead, onClose }: LeadDetailModalProps)
 
         {/* Body */}
         <div className="px-6 py-5 space-y-6">
-
           {/* Seção: Dados do cliente */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3"
-              style={{ color: "#9CA3AF" }}>
+            <p
+              className="text-xs font-semibold uppercase tracking-wide mb-3"
+              style={{ color: "#9CA3AF" }}
+            >
               Dados do Cliente
             </p>
             <div className="space-y-3">
@@ -139,8 +152,10 @@ export default function LeadDetailModal({ lead, onClose }: LeadDetailModalProps)
 
           {/* Seção: Dados do lead */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3"
-              style={{ color: "#9CA3AF" }}>
+            <p
+              className="text-xs font-semibold uppercase tracking-wide mb-3"
+              style={{ color: "#9CA3AF" }}
+            >
               Dados do Lead
             </p>
             <div className="space-y-3">
@@ -163,6 +178,16 @@ export default function LeadDetailModal({ lead, onClose }: LeadDetailModalProps)
           className="px-6 py-4 border-t"
           style={{ borderColor: "#F1F5F9", background: "#F8FAFC" }}
         >
+          {/* Botão atribuir — só aparece se onAssign foi passado */}
+          {onAssign && (
+            <button
+              onClick={onAssign}
+              className="w-full py-2 rounded-xl text-sm font-semibold border transition-all hover:bg-gray-50"
+              style={{ borderColor: "#E5E7EB", color: "#374151" }}
+            >
+              Atribuir a Atendente
+            </button>
+          )}
           <OpenNegotiationButton lead={lead} />
         </div>
       </div>

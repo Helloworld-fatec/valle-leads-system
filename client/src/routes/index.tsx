@@ -9,6 +9,7 @@ import Users from "../pages/Users";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
+import ManagerLeads from "../pages/ManagerLeads";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -77,6 +78,7 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
         
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/manager/leads" element={<ManagerLeads />} />
         <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
         <Route path="/usuarios" element={<Users />} />
         <Route path="/perfil" element={<Profile />} />
