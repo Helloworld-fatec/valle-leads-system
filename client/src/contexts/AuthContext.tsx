@@ -31,7 +31,9 @@ interface AuthContextData {
 //   "GENERAL_MANAGER" → visão gerente geral
 // ─────────────────────────────────────────────
 
+
 // ─────────────────────────────────────────────
+//Para testar com um usuário com outro 'role', basta descomentar o bloco correspondente e comentar o atual.
 
 /*
 const MOCK_USER: AuthUser = {
@@ -50,6 +52,8 @@ const MOCK_USER: AuthUser = {
   team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
 };
 */
+
+// ─────────────────────────────────────────────
 
 const MOCK_USER: AuthUser = {
   id: "d450a691-e2ea-47c1-9087-ecdd9bbde73c",
