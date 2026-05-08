@@ -1,18 +1,62 @@
+version: '3.8'
+
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: valle_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   server:
-    command: npm run dev # Usa o tsx watch que está no seu package.json
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: build
+    container_name: valle_server
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
+      CHOKIDAR_USEPOLLING: "true"
+    # Usamos o npx para garantir que o Docker encontre o tsx interno
+    command: npx tsx watch src/server.ts
     volumes:
       - ./server:/app
       - /app/node_modules
+      - /app/src/generated
+    ports:
+      - "3000:3000"
 
   client:
-    # No modo de desenvolvimento, não usamos o Nginx, mas sim o Vite
     build:
       context: ./client
-      target: build # Para no estágio de Node do seu Dockerfile
+      dockerfile: Dockerfile
+      target: build
+    container_name: valle_client
+    environment:
+      - CHOKIDAR_USEPOLLING=true
     command: npm run dev -- --host
-    ports:
-      - "5173:5173"
     volumes:
       - ./client:/app
       - /app/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
+  seed_flag:

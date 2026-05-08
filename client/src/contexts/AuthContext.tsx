@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-import { createContext, useState, ReactNode } from "react";
+import { createContext, useState, useEffect, ReactNode } from "react";
 
 // ─────────────────────────────────────────────
 // Tipos
@@ -32,11 +32,11 @@ interface AuthContextData {
 //   "GENERAL_MANAGER"→ Pedro, Ryan
 // ─────────────────────────────────────────────
 const MOCK_USER: AuthUser = {
-  id: "mock-user-id-001",
+  id: "f47ac10b-58cc-4372-a567-0e02b2c3d479", // Use exatamente este ID
   name: "Dev Local",
   email: "dev@vallemultimarcas.com.br",
-  role: "ATTENDANT", // ← altere aqui para testar diferentes perfis
-  team_id: "mock-team-id-001",
+  role: "ATTENDANT",
+  team_id: "7027d110-63f5-4424-9169-7756f7000e40", // Também deve ser UUID
 };
 
 const MOCK_TOKEN = "mock-access-token";
@@ -57,6 +57,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // e implemente o login/logout abaixo normalmente.
   const [user, setUser] = useState<AuthUser | null>(MOCK_USER);
   const [accessToken, setAccessToken] = useState<string | null>(MOCK_TOKEN);
+
+  // TESTE
+  useEffect(() => {
+    if (!localStorage.getItem("accessToken")) {
+      localStorage.setItem("accessToken", MOCK_TOKEN);
+    }
+  }, []);
+
+  // TESTE
+  if (typeof window !== "undefined" && !localStorage.getItem("accessToken")) {
+    localStorage.setItem("accessToken", MOCK_TOKEN);
+    localStorage.setItem("refreshToken", "mock-refresh-token");
+  }
 
   function login(userData: AuthUser, token: string, refreshToken: string) {
     localStorage.setItem("refreshToken", refreshToken);

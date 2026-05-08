@@ -9,7 +9,7 @@ export const useNegotiationsService = () => {
     };
 
     const getNegotiationsById = async (id: string) => {
-        const res = await apiFetch(`/negotiations/:${id}`);
+        const res = await apiFetch(`/negotiations/${id}`);
         return res.json();
     };
 
@@ -19,7 +19,7 @@ export const useNegotiationsService = () => {
     };
 
     const getStageHistory = async (id: string) => {
-        const res = await apiFetch(`/negotiations/${id}/history`);
+        const res = await apiFetch(`/negotiations/${id}/stage-history`);
         return res.json();
     };
 
@@ -32,7 +32,7 @@ export const useNegotiationsService = () => {
         id: string,
         body: {old_status: string | null; new_status: string; notes?: string; userId?: string}
     ) => {
-        const res = await apiFetch(`/negotiations/${id}/history`, {
+        const res = await apiFetch(`/negotiations/${id}/stage-history`, {
             method: "POST",
             body: JSON.stringify(body),
         });

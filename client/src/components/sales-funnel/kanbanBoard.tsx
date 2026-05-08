@@ -138,7 +138,7 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
                             bg={stage.bg}
                             leads={columns[stage.key].map((neg) => ({
                                 id: neg.id,
-                                name: neg.lead?.customer?.name ?? "—",
+                                name: neg.lead?.customers?.name ?? "—",
                                 email: "",
                                 phone: "",
                                 value: "—",

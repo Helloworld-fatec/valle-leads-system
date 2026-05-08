@@ -34,7 +34,7 @@ export default function NegotiationCard({ negotiation, color, isDragging = false
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : undefined;
 
-  const clientName   = negotiation.lead?.customer?.name ?? "—";
+  const clientName   = negotiation.lead?.customers?.name ?? "—";
   const vehicle      = negotiation.lead?.vehicle_interest ?? "Não informado";
   const statusHistory = negotiation.status_history ?? [];
   const currentStatus = statusHistory[statusHistory.length - 1]?.status_negotiation ?? "Sem status";

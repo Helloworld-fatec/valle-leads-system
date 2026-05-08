@@ -40,7 +40,7 @@ export interface Negotiation {
   lead?: {
     vehicle_interest: string | null;
     attendant_id: string | null;
-    customer?: {
+    customers?: {
       name: string;
     };
   };
