@@ -1,3 +1,4 @@
+//src/services/leadService.ts
 import { useApi } from "./api";
 
 // ─────────────────────────────────────────────
@@ -97,21 +98,21 @@ export function useLeadService() {
    */
 
  async function getLeads(filters: QueryLeadDTO = {}): Promise<Lead[]> {
-  const res = await apiFetch(`/leads${buildQuery(filters)}`);
+  const res = await apiFetch(`/api/leads${buildQuery(filters)}`);
   const json = await res.json();
   return json.data ?? json; // ← extrai o array de dentro do { success, data }
 }
 
   /** Busca detalhes completos de um lead */
  async function getLeadById(id: string): Promise<Lead> {
-  const res = await apiFetch(`/leads/${id}`);
+  const res = await apiFetch(`/api/leads/${id}`);
   const json = await res.json();
   return json.data ?? json;
 }
 
   /** Atualiza parcialmente um lead */
  async function updateLead(id: string, data: UpdateLeadDTO): Promise<Lead> {
-  const res = await apiFetch(`/leads/${id}`, {
+  const res = await apiFetch(`/api/leads/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -136,7 +137,7 @@ export function useLeadService() {
 
   /** Cria uma negociação a partir de um lead */
   async function createNegotiation(data: CreateNegotiationDTO): Promise<{ id: string }> {
-    const res = await apiFetch("/negotiations", {
+    const res = await apiFetch("/api/negotiations", {
       method: "POST",
       body: JSON.stringify(data),
     });

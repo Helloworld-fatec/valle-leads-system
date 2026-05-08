@@ -42,7 +42,7 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
   useEffect(() => {
     async function fetchAttendants() {
       try {
-        const res  = await apiFetch(`/users?team_id=${teamId}`);
+        const res  = await apiFetch(`/api/users?team_id=${teamId}`);
         const json = await res.json();
         const list = json.data ?? json;
         // Filtra só atendentes
@@ -156,7 +156,7 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
                   }}
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                     style={{ background: "#2563EB" }}
                   >
                     {a.name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
