@@ -5,11 +5,11 @@ import type { Lead } from "../../services/leadService";
 // STATUS BADGE
 // ─────────────────────────────────────────────
 
-const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  ABERTO:       { bg: "#EFF6FF", text: "#2563EB", label: "Aberto" },
-  EM_PROGRESSO: { bg: "#F5F3FF", text: "#7C3AED", label: "Em Progresso" },
-  CLOSED_WON:   { bg: "#ECFDF5", text: "#059669", label: "Ganho" },
-  CLOSED_LOST:  { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
+const statusConfig = {
+  OPEN:        { bg: "#EFF6FF", text: "#2563EB", label: "Aberto" },
+  IN_PROGRESS: { bg: "#F5F3FF", text: "#7C3AED", label: "Em Progresso" },
+  CLOSED_WON:  { bg: "#ECFDF5", text: "#059669", label: "Ganho" },
+  CLOSED_LOST: { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
 };
 
 const sourceIcons: Record<string, string> = {

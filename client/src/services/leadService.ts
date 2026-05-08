@@ -6,8 +6,8 @@ import { useApi } from "./api";
 // ─────────────────────────────────────────────
 
 export type LeadStatus =
-  | "ABERTO"
-  | "EM_PROGRESSO"
+  | "OPEN"
+  | "IN_PROGRESS"
   | "CLOSED_WON"
   | "CLOSED_LOST";
 
