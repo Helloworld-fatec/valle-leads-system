@@ -1,7 +1,7 @@
 // server/src/app.ts
 import express from 'express';
 import { json } from 'express';
-//import cors from 'cors';
+import cors from 'cors'
 import cookieParser from 'cookie-parser';
 
 import mainRouter from './routes';
@@ -19,13 +19,13 @@ app.use(json());
 
 // 2. Middleware CORS.
 
-/** 
-const allowedOrigins = ['http://localhost:5173', FRONTEND_URL]; // Adicione a URL do seu frontend
+ 
+const allowedOrigins = ['http://localhost:5173']; // Adicione a URL do seu frontend
 app.use(cors({
   origin: allowedOrigins,
   credentials: true, // Muito importante para permitir o envio e recebimento de cookies (refreshToken)
 }));
-*/
+
 
 // 3. NOVO MIDDLEWARE: Analisa os cookies das requisições.
 // Sem esta linha, `req.cookies` será um objeto vazio.
