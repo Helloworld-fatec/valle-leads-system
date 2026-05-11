@@ -1,9 +1,11 @@
-// client/src/routes/index.tsx
+// src/routes/index.tsx
 import { Routes, Route, Navigate, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import type { UserRole } from "../contexts/AuthContext";
 
 // Pages
 import Login from "../pages/Login";
-import Dashboard from "../pages/Dashboard";
+import Dashboard from "../pages/Dashboard";          // ← orquestrador de roles
 import Leads from "../pages/Leads";
 import Users from "../pages/Users";
 import Profile from "../pages/Profile";
@@ -14,7 +16,10 @@ import ManagerLeads from "../pages/ManagerLeads";
 // Layout
 import MainLayout from "../layouts/MainLayout";
 
+// ─────────────────────────────────────────────
 // Placeholder
+// ─────────────────────────────────────────────
+
 const FunilPlaceholder = ({ onNavigate }: { onNavigate: (p: string) => void }) => (
   <div className="flex flex-col items-center justify-center h-full py-32 text-center">
     <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
@@ -25,18 +30,47 @@ const FunilPlaceholder = ({ onNavigate }: { onNavigate: (p: string) => void }) =
   </div>
 );
 
-// Tipagem das props que nosso componente de rotas vai receber
+// ─────────────────────────────────────────────
+// Guard de roles
+// Uso: <RoleRoute allow={["MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
+// ─────────────────────────────────────────────
+
+interface RoleRouteProps {
+  allow: UserRole[];
+}
+
+function RoleRoute({ allow }: RoleRouteProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  if (!user) return null;
+
+  if (!allow.includes(user.role)) {
+    return <Forbidden onNavigate={navigate} />;
+  }
+
+  return <Outlet />;
+}
+
+// ─────────────────────────────────────────────
+// Props do AppRoutes
+// ─────────────────────────────────────────────
+
 interface AppRoutesProps {
   isAuthenticated: boolean;
   onLogin: () => void;
   onLogout: () => void;
 }
 
+// ─────────────────────────────────────────────
+// Rotas
+// ─────────────────────────────────────────────
+
 export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRoutesProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Wrapper para proteger rotas e aplicar o Layout
+  /** Protege todas as rotas filhas e injeta o MainLayout */
   const ProtectedRoute = () => {
     if (!isAuthenticated) {
       return <Navigate to="/login" replace />;
@@ -53,7 +87,6 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
           }
         }}
       >
-        {/* O Outlet diz onde as páginas (Dashboard, Leads, etc) vão ser renderizadas dentro do Layout */}
         <Outlet />
       </MainLayout>
     );
@@ -61,30 +94,69 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
 
   return (
     <Routes>
-      {/* Rotas Públicas */}
-      <Route 
-        path="/login" 
+      {/* ── Rotas Públicas ─────────────────────────────── */}
+      <Route
+        path="/login"
         element={
           isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login onLogin={onLogin} />
-        } 
+        }
       />
       <Route path="/403" element={<Forbidden onNavigate={navigate} />} />
       <Route path="/404" element={<NotFound onNavigate={navigate} />} />
 
-      {/* Rotas Protegidas (Envolvidas pelo ProtectedRoute/MainLayout) */}
+      {/* ── Rotas Protegidas ───────────────────────────── */}
       <Route element={<ProtectedRoute />}>
-        {/* Rota raiz redireciona pro dashboard */}
+        {/* Redireciona raiz para o dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
+
+        {/*
+          /dashboard — Dashboard.tsx decide qual view renderizar baseado no role:
+            ATTENDANT       → DashboardAttendant
+            MANAGER         → DashboardManager
+            GENERAL_MANAGER → DashboardGeneralManager
+            ADMIN           → DashboardGeneralManager
+        */}
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/leads" element={<Leads />} />
-        <Route path="/manager/leads" element={<ManagerLeads />} />
-        <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
-        <Route path="/usuarios" element={<Users />} />
+
+        {/* Rotas acessíveis a todos os roles autenticados */}
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
+
+        {/*
+          /leads — visível para ATTENDANT (próprios leads).
+          Gerentes e acima acessam leads pelo /manager/leads.
+        */}
+        <Route
+          element={
+            <RoleRoute allow={["ATTENDANT", "MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
+          }
+        >
+          <Route path="/leads" element={<Leads />} />
+        </Route>
+
+        {/*
+          /manager/leads — visível para MANAGER, GENERAL_MANAGER e ADMIN.
+          ATTENDANT recebe Forbidden.
+        */}
+        <Route
+          element={
+            <RoleRoute allow={["MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
+          }
+        >
+          <Route path="/manager/leads" element={<ManagerLeads />} />
+        </Route>
+
+        {/*
+          /usuarios — somente GENERAL_MANAGER e ADMIN.
+        */}
+        <Route
+          element={<RoleRoute allow={["GENERAL_MANAGER", "ADMIN"]} />}
+        >
+          <Route path="/usuarios" element={<Users />} />
+        </Route>
       </Route>
 
-      {/* Catch-all: qualquer rota não encontrada cai aqui */}
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   );

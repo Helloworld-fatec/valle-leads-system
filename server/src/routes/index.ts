@@ -9,6 +9,9 @@ import usersTeamsRoutes from '../modules/users-teams/usersTeams.routes.js';
 import customersRoutes from '../modules/customers/customer.routes.js';
 import leadsRoutes from '../modules/leads/lead.routes.js';
 import negotiationsRoutes from '../modules/negotiation/negotiation.routes.js';
+import dashboardAttendantRoutes from '../modules/dashboards/attendant/dashboardAttendant.routes.js';
+import dashboardManagerRoutes from '../modules/dashboards/dashboard-manager/dashboardManager.routes.js';
+import dashboardGeneralManagerRoutes from '../modules/dashboards/general-manager/dashboardGeneralManager.routes.js';
 
 const mainRouter = Router();
 
@@ -32,5 +35,10 @@ mainRouter.use('/leads', leadsRoutes);
 
 // Negociações
 mainRouter.use('/negotiations', negotiationsRoutes);
+    
+// Dashboards
+mainRouter.use('/dashboards/attendant', dashboardAttendantRoutes);
+mainRouter.use('/dashboards/manager', dashboardManagerRoutes);
+mainRouter.use('/dashboards/general-manager', dashboardGeneralManagerRoutes);
 
 export default mainRouter;

@@ -1,4 +1,5 @@
-import { PrismaClient } from "../generated/prisma/client.js";
+// src/config/prisma.ts
+import { PrismaClient, Prisma } from "../generated/prisma/client.js"; // 👈 Adicione o Prisma aqui
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
@@ -13,3 +14,4 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 
 export const prisma = new PrismaClient({ adapter });
+export { Prisma }; 
