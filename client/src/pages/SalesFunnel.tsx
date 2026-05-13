@@ -31,21 +31,21 @@ export default function SalesFunnel() {
         );
     }
 
-    if (error) {
-        return (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="text-center">
-          <p className="text-red-500 text-sm font-medium">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-3 text-sm text-indigo-600 underline hover:text-indigo-800"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </div>
-        );
-    }
+    // if (error) {
+    //     return (
+    //         <div className="flex items-center justify-center h-full min-h-[400px]">
+    //     <div className="text-center">
+    //       <p className="text-red-500 text-sm font-medium">{error}</p>
+    //       <button
+    //         onClick={() => window.location.reload()}
+    //         className="mt-3 text-sm text-indigo-600 underline hover:text-indigo-800"
+    //       >
+    //         Tentar novamente
+    //       </button>
+    //     </div>
+    //   </div>
+    //     );
+    // }
 
     return (
     <div className="p-6 flex flex-col gap-6">
