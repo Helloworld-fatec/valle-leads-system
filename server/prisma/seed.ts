@@ -4,11 +4,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { parse } from "csv-parse/sync";
 
-// ESM: substitui __dirname
-const __dirname = path.resolve();
+const csvPath = path.resolve("prisma", "seed_data.csv");
 
 // ─────────────────────────────────────────────────────────────
 // FLAG DE CONTROLE

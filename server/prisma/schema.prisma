@@ -49,19 +49,30 @@ model Teams {
 }
 
 model Users {
-  id                 String   @id @default(uuid())
-  email              String   @unique
-  password_hash      String
-  name               String
-  role               String   @default("ATTENDANT")
-  is_active          Boolean  @default(true)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  created_by_user_id String?
-  updated_by_user_id String?
-  user_teams         UserTeams[]
-  leads_assigned     Leads[]  @relation("AttendantLeads")
-  logs               SystemLogs[]
+  id                   String      @id @default(uuid())
+  email                String      @unique
+  password_hash        String
+  name                 String
+  role                 String      @default("ATTENDANT")
+  phone_1_ddd          String?
+  phone_1_number       String?
+  phone_2_ddd          String?
+  phone_2_number       String?
+  address_street       String?
+  address_number       String?
+  address_complement   String?
+  address_neighborhood String?
+  address_city         String?
+  address_state        String?
+  address_zip          String?
+  is_active            Boolean     @default(true)
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @updatedAt
+  created_by_user_id   String?
+  updated_by_user_id   String?
+  user_teams           UserTeams[]
+  leads_assigned       Leads[]     @relation("AttendantLeads")
+  logs                 SystemLogs[]
   @@index([created_at])
   @@map("users")
 }

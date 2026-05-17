@@ -33,6 +33,15 @@ export class UsersService {
     }
 
     async update(id: string, data: UpdateUserDTO) {
+        // Se a senha foi enviada, faz hash antes de persistir
+        if (data.password) {
+            const hashedPassword = await bcrypt.hash(data.password, 10);
+            return this.usersRepository.update(id, {
+                ...data,
+                password: hashedPassword
+            });
+        }
+
         return this.usersRepository.update(id, data);
     }
 

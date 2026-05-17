@@ -10,6 +10,10 @@ import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
 import SalesFunnel from "../pages/SalesFunnel";
+import ManagerLeads from "../pages/ManagerLeads";
+import Stores from "../pages/Stores";
+import Teams from "../pages/Teams";
+import GMLeads from "../pages/GMLeads";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -25,7 +29,6 @@ const FunilPlaceholder = ({ onNavigate }: { onNavigate: (p: string) => void }) =
   </div>
 );
 
-// Tipagem das props que nosso componente de rotas vai receber
 interface AppRoutesProps {
   isAuthenticated: boolean;
   onLogin: () => void;
@@ -36,7 +39,6 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Wrapper para proteger rotas e aplicar o Layout
   const ProtectedRoute = () => {
     if (!isAuthenticated) {
       return <Navigate to="/login" replace />;
@@ -53,7 +55,6 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
           }
         }}
       >
-        {/* O Outlet diz onde as páginas (Dashboard, Leads, etc) vão ser renderizadas dentro do Layout */}
         <Outlet />
       </MainLayout>
     );
@@ -62,28 +63,32 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
   return (
     <Routes>
       {/* Rotas Públicas */}
-      <Route 
-        path="/login" 
+      <Route
+        path="/login"
         element={
           isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login onLogin={onLogin} />
-        } 
+        }
       />
       <Route path="/403" element={<Forbidden onNavigate={navigate} />} />
       <Route path="/404" element={<NotFound onNavigate={navigate} />} />
 
-      {/* Rotas Protegidas (Envolvidas pelo ProtectedRoute/MainLayout) */}
+      {/* Rotas Protegidas */}
       <Route element={<ProtectedRoute />}>
-        {/* Rota raiz redireciona pro dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
+
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/funil" element={<SalesFunnel />} />
+        <Route path="/manager/leads" element={<ManagerLeads />} />
+        <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
         <Route path="/usuarios" element={<Users />} />
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/stores" element={<Stores />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/gm/leads" element={<GMLeads />} />
       </Route>
 
-      {/* Catch-all: qualquer rota não encontrada cai aqui */}
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   );

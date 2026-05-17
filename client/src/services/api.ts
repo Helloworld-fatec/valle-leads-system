@@ -1,4 +1,4 @@
-// src/service/useApi.ts
+// src/service/api.ts
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hook/useAuth";

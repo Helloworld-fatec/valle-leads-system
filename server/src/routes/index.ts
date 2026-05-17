@@ -41,5 +41,7 @@ mainRouter.use('/negotiation-importance', negotiationImportanceRoutes);
 // Stage-History
 mainRouter.use('/negotiation-stage-history', negotiationStageHistoryRoutes);
 
+// Negociações
+mainRouter.use('/negotiations', negotiationsRoutes);
 
 export default mainRouter;

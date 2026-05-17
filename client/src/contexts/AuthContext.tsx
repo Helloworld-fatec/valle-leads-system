@@ -24,13 +24,18 @@ interface AuthContextData {
 }
 
 // ─────────────────────────────────────────────
-// Usuário mockado — usado enquanto o backend de
-// auth não está pronto. Troque o `role` conforme
-// a tela que está desenvolvendo:
-//   "ATTENDANT"      → Nicolas, Bruna (visão atendente)
-//   "MANAGER"        → Bruna (visão gerente)
-//   "GENERAL_MANAGER"→ Pedro, Ryan
+// Usuário mockado
+// Troque o `role` conforme a tela que está desenvolvendo:
+//   "ATTENDANT"       → visão atendente
+//   "MANAGER"         → visão gerente
+//   "GENERAL_MANAGER" → visão gerente geral
 // ─────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────
+//Para testar com um usuário com outro 'role', basta descomentar o bloco correspondente e comentar o atual.
+
+/*
 const MOCK_USER: AuthUser = {
   id: "d290f1ee-6c54-4b01-90e6-d701748f0851", // Use exatamente este ID
   name: "Dev Local",
@@ -38,6 +43,19 @@ const MOCK_USER: AuthUser = {
   role: "ATTENDANT",
   team_id: "7027d110-63f5-4424-9169-7756f7000e40", // Também deve ser UUID
 };
+*/
+
+// ─────────────────────────────────────────────
+
+const MOCK_USER: AuthUser = {
+  id: "d450a691-e2ea-47c1-9087-ecdd9bbde73c",
+  name: "Gerente Local",
+  email: "dev@vallemultimarcas.com.br",
+  role: "MANAGER",
+  team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
+};
+
+// ─────────────────────────────────────────────
 
 const MOCK_TOKEN = "mock-access-token";
 
@@ -47,14 +65,17 @@ const MOCK_TOKEN = "mock-access-token";
 
 export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  // Inicializa já com o mock enquanto o login real não existe.
-  // Quando o login estiver pronto, mude o estado inicial para `null`
-  // e implemente o login/logout abaixo normalmente.
   const [user, setUser] = useState<AuthUser | null>(MOCK_USER);
   const [accessToken, setAccessToken] = useState<string | null>(MOCK_TOKEN);
 
