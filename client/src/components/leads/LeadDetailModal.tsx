@@ -6,17 +6,12 @@ import OpenNegotiationButton from "./OpenNegotiationButton";
 // STATUS BADGE
 // ─────────────────────────────────────────────
 
-const statusConfig: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  novo: { bg: "#EFF6FF", text: "#2563EB", label: "Novo" },
-  em_atendimento: { bg: "#F5F3FF", text: "#7C3AED", label: "Em Atendimento" },
-  aguardando: { bg: "#FFFBEB", text: "#D97706", label: "Aguardando" },
-  finalizado: { bg: "#ECFDF5", text: "#059669", label: "Finalizado" },
-  perdido: { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
+const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+  OPEN:        { bg: "#EFF6FF", text: "#1E3A8A", label: "Aberto" },
+  IN_PROGRESS: { bg: "#F5F3FF", text: "#7C3AED", label: "Em Progresso" },
+  CLOSED_WON:  { bg: "#DCFCE7", text: "#16A34A", label: "Ganho" },
+  CLOSED_LOST: { bg: "#FEF2F2", text: "#DC2626", label: "Perdido" },
 };
-
 // ─────────────────────────────────────────────
 // SUB-COMPONENTE: linha de informação
 // ─────────────────────────────────────────────
@@ -67,7 +62,7 @@ interface LeadDetailModalProps {
 export default function LeadDetailModal({
   lead,
   onClose,
-  onAssign
+  onAssign,
 }: LeadDetailModalProps) {
   const status = statusConfig[lead.status] ?? {
     bg: "#F1F5F9",
@@ -169,21 +164,24 @@ export default function LeadDetailModal({
                 label="Veículo de interesse"
                 value={lead.vehicle_interest}
               />
+              <InfoRow
+                icon={<User size={15} />}
+                label="Atendente responsável"
+                value={lead.attendant?.name ?? "Não atribuído"}
+              />
             </div>
           </div>
         </div>
 
         {/* Footer com o botão */}
         <div
-          className="px-6 py-4 border-t"
+          className="px-6 py-4 border-t flex flex-col gap-2"
           style={{ borderColor: "#F1F5F9", background: "#F8FAFC" }}
         >
-          {/* Botão atribuir — só aparece se onAssign foi passado */}
           {onAssign && (
             <button
               onClick={onAssign}
-              className="w-full py-2 rounded-xl text-sm font-semibold border transition-all hover:bg-gray-50"
-              style={{ borderColor: "#E5E7EB", color: "#374151" }}
+              className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-semibold flex items-center justify-center gap-2"
             >
               Atribuir a Atendente
             </button>
