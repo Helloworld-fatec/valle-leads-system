@@ -9,6 +9,7 @@ import Users from "../pages/Users";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
+import SalesFunnel from "../pages/SalesFunnel";
 import ManagerLeads from "../pages/ManagerLeads";
 import Stores from "../pages/Stores";
 import Teams from "../pages/Teams";
@@ -77,6 +78,7 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
 
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/funil" element={<SalesFunnel />} />
         <Route path="/manager/leads" element={<ManagerLeads />} />
         <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
         <Route path="/usuarios" element={<Users />} />

@@ -8,17 +8,17 @@ import {
 
 export const NegotiationsRepository = {
   async findAll(filters: QueryNegotiationDTO) {
-    const { team_id, lead_id, page = 1, limit = 20 } = filters;
+    const { team_id, lead_id, attendant_id, page = 1, limit = 20 } = filters;
 
     return prisma.negotiations.findMany({
       where: {
         ...(team_id && { team_id }),
         ...(lead_id && { lead_id }),
+        ...(attendant_id && { created_by_user_id: attendant_id }), // <-- FILTRO APLICADO AQUI
       },
       include: {
-        leads: true,
+        leads: { include: { customers: true } }, // Garante que traga o cliente para o card
         teams: true,
-        // Trazendo o status, estágio e importância mais recentes como conveniência na listagem
         status_history: { orderBy: { created_at: "desc" }, take: 1 },
         stage_history: { orderBy: { created_at: "desc" }, take: 1 },
         importance_history: { orderBy: { created_at: "desc" }, take: 1 },

@@ -1,5 +1,5 @@
-// src/contexts/AuthContext.tsx
-import { createContext, useState, ReactNode, useContext } from "react";
+// src/context/AuthContext.tsx
+import { createContext, useState, useEffect, ReactNode } from "react";
 
 // ─────────────────────────────────────────────
 // Tipos
@@ -37,19 +37,11 @@ interface AuthContextData {
 
 /*
 const MOCK_USER: AuthUser = {
-  id: "92e8f1df-9e6e-4af8-8b4e-82fa3bc88120",
+  id: "d290f1ee-6c54-4b01-90e6-d701748f0851", // Use exatamente este ID
   name: "Dev Local",
   email: "dev@vallemultimarcas.com.br",
   role: "ATTENDANT",
-  team_id: "fcc5008a-3313-49e4-8ddd-5e68a9363502",
-};
-
-const MOCK_USER: AuthUser = {
-  id: "c6fe0f87-5147-4e2d-a19d-fa6d076524b9",
-  name: "Gerente Geral",
-  email: "dev@vallemultimarcas.com.br",
-  role: "GENERAL_MANAGER",
-  team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
+  team_id: "7027d110-63f5-4424-9169-7756f7000e40", // Também deve ser UUID
 };
 */
 
@@ -86,6 +78,19 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(MOCK_USER);
   const [accessToken, setAccessToken] = useState<string | null>(MOCK_TOKEN);
+
+  // TESTE
+  useEffect(() => {
+    if (!localStorage.getItem("accessToken")) {
+      localStorage.setItem("accessToken", MOCK_TOKEN);
+    }
+  }, []);
+
+  // TESTE
+  if (typeof window !== "undefined" && !localStorage.getItem("accessToken")) {
+    localStorage.setItem("accessToken", MOCK_TOKEN);
+    localStorage.setItem("refreshToken", "mock-refresh-token");
+  }
 
   function login(userData: AuthUser, token: string, refreshToken: string) {
     localStorage.setItem("refreshToken", refreshToken);

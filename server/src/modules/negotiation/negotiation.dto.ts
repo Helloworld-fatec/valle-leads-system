@@ -21,11 +21,10 @@ export const UpdateNegotiationSchema = z.object({
 });
 
 export const QueryNegotiationSchema = z.object({
-  // Filtros para listagem
   team_id: z.string().uuid().optional(),
   lead_id: z.string().uuid().optional(),
+  attendant_id: z.string().uuid().optional(),
   
-  // Paginação
   page: z.string().transform(Number).optional(),
   limit: z.string().transform(Number).optional(),
 });

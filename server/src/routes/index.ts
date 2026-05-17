@@ -9,6 +9,8 @@ import usersTeamsRoutes from '../modules/users-teams/usersTeams.routes.js';
 import customersRoutes from '../modules/customers/customer.routes.js';
 import leadsRoutes from '../modules/leads/lead.routes.js';
 import negotiationsRoutes from '../modules/negotiation/negotiation.routes.js';
+import negotiationImportanceRoutes from '../modules/negotiation-importance/importance.routes.js';
+import negotiationStageHistoryRoutes from '../modules/negotiation-stage-history/negotiationStageHistory.routes.js';
 
 const mainRouter = Router();
 
@@ -29,6 +31,15 @@ mainRouter.use('/customers', customersRoutes);
 
 // Leads
 mainRouter.use('/leads', leadsRoutes);
+
+// Negotiations
+mainRouter.use('/negotiations', negotiationsRoutes);
+
+// Importance
+mainRouter.use('/negotiation-importance', negotiationImportanceRoutes);
+
+// Stage-History
+mainRouter.use('/negotiation-stage-history', negotiationStageHistoryRoutes);
 
 // Negociações
 mainRouter.use('/negotiations', negotiationsRoutes);

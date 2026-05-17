@@ -24,5 +24,8 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src", "prisma"]
+  "include": ["src", "prisma"],
+  "exclude": [
+    "src/modules/auths"
+  ]
 }

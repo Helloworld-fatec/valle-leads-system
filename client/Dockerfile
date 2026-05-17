@@ -1,14 +1,10 @@
-# ─── Stage 1: build ───────────────────────────────────────────────────────────
+# Estágio de desenvolvimento (É este que o Docker Compose vai usar)
 FROM node:22-alpine AS build
-
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm ci
-
+RUN npm install
 COPY . .
 
-RUN npm run build
 
 # ─── Stage 2: production (Nginx) ──────────────────────────────────────────────
 FROM nginx:1.27-alpine AS prod
