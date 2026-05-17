@@ -8,8 +8,7 @@ import { fileURLToPath } from "url";
 import { parse } from "csv-parse/sync";
 
 // ESM: substitui __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.resolve();
 
 // Inicializa o Prisma com adapter pg (igual ao prisma.ts do projeto)
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não definida!");

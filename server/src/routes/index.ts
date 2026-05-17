@@ -8,6 +8,7 @@ import teamsRoutes from '../modules/teams/teams.routes.js';
 import usersTeamsRoutes from '../modules/users-teams/usersTeams.routes.js';
 import customersRoutes from '../modules/customers/customer.routes.js';
 import leadsRoutes from '../modules/leads/lead.routes.js';
+import negotiationsRoutes from '../modules/negotiation/negotiation.routes.js';
 
 const mainRouter = Router();
 
@@ -29,5 +30,7 @@ mainRouter.use('/customers', customersRoutes);
 // Leads
 mainRouter.use('/leads', leadsRoutes);
 
+// Negociações
+mainRouter.use('/negotiations', negotiationsRoutes);
 
 export default mainRouter;

@@ -1,22 +1,22 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hook/useAuth";
 import { useLeadService } from "../services/leadService";
-import type { Lead, LeadStatus } from "../services/leadService";
+import type { Lead } from "../services/leadService";
 import LeadCard, { LeadCardSkeleton } from "../components/leads/LeadCard";
 import LeadsFilterBar from "../components/leads/LeadsFilterBar";
 import LeadsPagination from "../components/leads/LeadsPagination";
 import LeadDetailModal from "../components/leads/LeadDetailModal";
+import AssignLeadModal from "../components/leads/AssignLeadModal";
+import BulkAssignToolbar from "../components/leads/BulkAssignToolbar";
 
 const PER_PAGE = 12;
-
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
 
 function filterLeads(
   leads: Lead[],
   status: string,
   source: string,
+  attendantId: string,
   search: string,
   dateFrom: string,
   dateTo: string,
@@ -24,6 +24,7 @@ function filterLeads(
   return leads.filter((l) => {
     if (status !== "Todos" && l.status !== status) return false;
     if (source !== "Todos" && (l.source ?? "") !== source) return false;
+    if (attendantId !== "Todos" && l.attendant_id !== attendantId) return false;
     if (dateFrom && new Date(l.created_at) < new Date(dateFrom)) return false;
     if (dateTo && new Date(l.created_at) > new Date(dateTo)) return false;
     if (search) {
@@ -38,37 +39,47 @@ function filterLeads(
   });
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE
-// ─────────────────────────────────────────────
-
-export default function Leads() {
+export default function ManagerLeads() {
   const { user } = useAuth();
   const { getLeads } = useLeadService();
+  const navigate = useNavigate();
+
+  // 🔒 Proteção de rota
+  useEffect(() => {
+    if (user && user.role !== "MANAGER") {
+      navigate("/leads");
+    }
+  }, [user, navigate]);
 
   // ── Estado ──────────────────────────────────
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [assignLead, setAssignLead] = useState<Lead | null>(null);
+  const [search, setSearch] = useState("");
+
+  // Seleção em lote
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulk, setShowBulk] = useState(false);
 
   // Filtros
   const [status, setStatus] = useState("Todos");
   const [source, setSource] = useState("Todos");
+  const [attendantId, setAttendantId] = useState("Todos");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
 
-  // ── Busca leads do atendente logado ─────────
+  // ── Busca todos os leads da equipe ──────────
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.team_id) return;
 
     async function fetchLeads() {
       try {
         setLoading(true);
         setError(null);
-        const data = await getLeads({ attendant_id: user!.id });
+        const data = await getLeads({ team_id: user!.team_id! });
         setLeads(data);
       } catch (err: unknown) {
         const msg =
@@ -81,21 +92,34 @@ export default function Leads() {
 
     fetchLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.team_id]);
 
   // ── Filtragem local ──────────────────────────
   const filtered = useMemo(
-    () => filterLeads(leads, status, source, search, dateFrom, dateTo),
-    [leads, status, source, search, dateFrom, dateTo],
+    () =>
+      filterLeads(leads, status, source, attendantId, search, dateFrom, dateTo),
+    [leads, status, source, attendantId, search, dateFrom, dateTo],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
+  // Atendentes únicos para o filtro extra
+  const attendants = useMemo(() => {
+    const map = new Map<string, string>();
+    leads.forEach((l) => {
+      if (l.attendant_id && l.attendant?.name) {
+        map.set(l.attendant_id, l.attendant.name);
+      }
+    });
+    return Array.from(map.entries());
+  }, [leads]);
+
   function handleFilter(key: string, value: string) {
     setPage(1);
     if (key === "status") setStatus(value);
     if (key === "source") setSource(value);
+    if (key === "attendant") setAttendantId(value);
     if (key === "dateFrom") setDateFrom(value);
     if (key === "dateTo") setDateTo(value);
   }
@@ -103,19 +127,48 @@ export default function Leads() {
   function handleClear() {
     setStatus("Todos");
     setSource("Todos");
+    setAttendantId("Todos");
     setSearch("");
     setDateFrom("");
     setDateTo("");
     setPage(1);
   }
-  // ── Render ───────────────────────────────────
+
+  // ── Seleção em lote ──────────────────────────
+  function handleCheckChange(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = checked ? [...prev, id] : prev.filter((i) => i !== id);
+      setShowBulk(next.length > 0);
+      return next;
+    });
+  }
+
+  function handleClearSelection() {
+    setSelectedIds([]);
+    setShowBulk(false);
+  }
+
+  function handleAssigned(_updatedLead: Lead) {
+  // Refaz o fetch completo para garantir dados atualizados
+  async function refetch() {
+    try {
+      const data = await getLeads({ team_id: user!.team_id! });
+      setLeads(data);
+    } catch {
+      // silencioso
+    }
+  }
+  refetch();
+  setAssignLead(null);
+  handleClearSelection();
+}
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "#111827" }}>
-            Meus Leads
+            Leads da Equipe
           </h1>
           <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
             {loading
@@ -124,6 +177,15 @@ export default function Leads() {
           </p>
         </div>
       </div>
+
+      {/* Toolbar de seleção em lote */}
+      {showBulk && (
+        <BulkAssignToolbar
+          selectedCount={selectedIds.length}
+          onAssign={() => setAssignLead({ id: "bulk" } as Lead)}
+          onClear={handleClearSelection}
+        />
+      )}
 
       {/* Filtros */}
       <LeadsFilterBar
@@ -139,8 +201,26 @@ export default function Leads() {
         onClear={handleClear}
       />
 
-      {/* Filtro de data */}
-      <div className="flex items-center gap-2 mb-5">
+      {/* Filtros extras: atendente + data */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <select
+          value={attendantId}
+          onChange={(e) => handleFilter("attendant", e.target.value)}
+          className="text-sm py-2 pl-3 pr-7 rounded-lg border outline-none cursor-pointer appearance-none"
+          style={{
+            background: "#F8FAFC",
+            borderColor: "#E5E7EB",
+            color: "#374151",
+          }}
+        >
+          <option value="Todos">Atendente: Todos</option>
+          {attendants.map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
+
         <input
           type="date"
           value={dateFrom}
@@ -178,7 +258,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Loading — skeletons */}
+      {/* Loading */}
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -207,7 +287,15 @@ export default function Leads() {
       {!loading && !error && paginated.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginated.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} onClick={setSelectedLead} />
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onClick={setSelectedLead}
+              showAttendant
+              showCheckbox
+              checked={selectedIds.includes(lead.id)}
+              onCheckChange={handleCheckChange}
+            />
           ))}
         </div>
       )}
@@ -224,10 +312,24 @@ export default function Leads() {
       )}
 
       {/* Modal de detalhes */}
-      {selectedLead && (
+      {selectedLead && selectedLead.id !== "bulk" && (
         <LeadDetailModal
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
+          onAssign={() => {
+            setAssignLead(selectedLead);
+            setSelectedLead(null);
+          }}
+        />
+      )}
+
+      {/* Modal de atribuição */}
+      {assignLead && (
+        <AssignLeadModal
+          leadIds={assignLead.id === "bulk" ? selectedIds : [assignLead.id]}
+          teamId={user?.team_id ?? ""}
+          onClose={() => setAssignLead(null)}
+          onAssigned={handleAssigned}
         />
       )}
     </div>
