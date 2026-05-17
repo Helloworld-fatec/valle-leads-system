@@ -12,6 +12,8 @@ import negotiationsRoutes from '../modules/negotiation/negotiation.routes.js';
 import dashboardAttendantRoutes from '../modules/dashboards/attendant/dashboardAttendant.routes.js';
 import dashboardManagerRoutes from '../modules/dashboards/dashboard-manager/dashboardManager.routes.js';
 import dashboardGeneralManagerRoutes from '../modules/dashboards/general-manager/dashboardGeneralManager.routes.js';
+import negotiationImportanceRoutes from '../modules/negotiation-importance/importance.routes.js';
+import negotiationStageHistoryRoutes from '../modules/negotiation-stage-history/negotiationStageHistory.routes.js';
 
 const mainRouter = Router();
 
@@ -32,6 +34,15 @@ mainRouter.use('/customers', customersRoutes);
 
 // Leads
 mainRouter.use('/leads', leadsRoutes);
+
+// Negotiations
+mainRouter.use('/negotiations', negotiationsRoutes);
+
+// Importance
+mainRouter.use('/negotiation-importance', negotiationImportanceRoutes);
+
+// Stage-History
+mainRouter.use('/negotiation-stage-history', negotiationStageHistoryRoutes);
 
 // Negociações
 mainRouter.use('/negotiations', negotiationsRoutes);

@@ -55,11 +55,7 @@ export default function OpenNegotiationButton({ lead }: Props) {
       <button
         onClick={handleClick}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 
-                   rounded-xl text-sm font-semibold text-white transition-all 
-                   hover:opacity-90 active:scale-95 disabled:opacity-60 
-                   disabled:cursor-not-allowed"
-        style={{ background: "#2563EB" }}
+        className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {loading ? (
           <>

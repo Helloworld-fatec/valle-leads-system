@@ -11,7 +11,11 @@ import Users from "../pages/Users";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Forbidden from "../pages/Forbidden";
+import SalesFunnel from "../pages/SalesFunnel";
 import ManagerLeads from "../pages/ManagerLeads";
+import Stores from "../pages/Stores";
+import Teams from "../pages/Teams";
+import GMLeads from "../pages/GMLeads";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -30,32 +34,6 @@ const FunilPlaceholder = ({ onNavigate }: { onNavigate: (p: string) => void }) =
   </div>
 );
 
-// ─────────────────────────────────────────────
-// Guard de roles
-// Uso: <RoleRoute allow={["MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
-// ─────────────────────────────────────────────
-
-interface RoleRouteProps {
-  allow: UserRole[];
-}
-
-function RoleRoute({ allow }: RoleRouteProps) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  if (!user) return null;
-
-  if (!allow.includes(user.role)) {
-    return <Forbidden onNavigate={navigate} />;
-  }
-
-  return <Outlet />;
-}
-
-// ─────────────────────────────────────────────
-// Props do AppRoutes
-// ─────────────────────────────────────────────
-
 interface AppRoutesProps {
   isAuthenticated: boolean;
   onLogin: () => void;
@@ -70,7 +48,6 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
   const location = useLocation();
   const navigate = useNavigate();
 
-  /** Protege todas as rotas filhas e injeta o MainLayout */
   const ProtectedRoute = () => {
     if (!isAuthenticated) {
       return <Navigate to="/login" replace />;
@@ -94,7 +71,7 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
 
   return (
     <Routes>
-      {/* ── Rotas Públicas ─────────────────────────────── */}
+      {/* Rotas Públicas */}
       <Route
         path="/login"
         element={
@@ -104,56 +81,20 @@ export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRou
       <Route path="/403" element={<Forbidden onNavigate={navigate} />} />
       <Route path="/404" element={<NotFound onNavigate={navigate} />} />
 
-      {/* ── Rotas Protegidas ───────────────────────────── */}
+      {/* Rotas Protegidas */}
       <Route element={<ProtectedRoute />}>
-        {/* Redireciona raiz para o dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/*
-          /dashboard — Dashboard.tsx decide qual view renderizar baseado no role:
-            ATTENDANT       → DashboardAttendant
-            MANAGER         → DashboardManager
-            GENERAL_MANAGER → DashboardGeneralManager
-            ADMIN           → DashboardGeneralManager
-        */}
         <Route path="/dashboard" element={<Dashboard />} />
-
-        {/* Rotas acessíveis a todos os roles autenticados */}
-        <Route path="/perfil" element={<Profile />} />
+        <Route path="/leads" element={<Leads />} />
+        <Route path="/funil" element={<SalesFunnel />} />
+        <Route path="/manager/leads" element={<ManagerLeads />} />
         <Route path="/funil" element={<FunilPlaceholder onNavigate={navigate} />} />
-
-        {/*
-          /leads — visível para ATTENDANT (próprios leads).
-          Gerentes e acima acessam leads pelo /manager/leads.
-        */}
-        <Route
-          element={
-            <RoleRoute allow={["ATTENDANT", "MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
-          }
-        >
-          <Route path="/leads" element={<Leads />} />
-        </Route>
-
-        {/*
-          /manager/leads — visível para MANAGER, GENERAL_MANAGER e ADMIN.
-          ATTENDANT recebe Forbidden.
-        */}
-        <Route
-          element={
-            <RoleRoute allow={["MANAGER", "GENERAL_MANAGER", "ADMIN"]} />
-          }
-        >
-          <Route path="/manager/leads" element={<ManagerLeads />} />
-        </Route>
-
-        {/*
-          /usuarios — somente GENERAL_MANAGER e ADMIN.
-        */}
-        <Route
-          element={<RoleRoute allow={["GENERAL_MANAGER", "ADMIN"]} />}
-        >
-          <Route path="/usuarios" element={<Users />} />
-        </Route>
+        <Route path="/usuarios" element={<Users />} />
+        <Route path="/perfil" element={<Profile />} />
+        <Route path="/stores" element={<Stores />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/gm/leads" element={<GMLeads />} />
       </Route>
 
       {/* Catch-all */}

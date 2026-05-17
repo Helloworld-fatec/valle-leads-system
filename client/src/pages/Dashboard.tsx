@@ -1,16 +1,26 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom"; // 👈 Importação necessária para a navegação
-import { useAuth } from "../hook/useAuth";
-import { useDashboardService } from "../services/dashboardService";
+import {
+  ClipboardList,
+  Activity,
+  CheckCircle2,
+  DollarSign,
+  TrendingUp,
+} from "lucide-react";
 
-// Importação das visões
-import DashboardAttendant from "./DashboardAttendant";
-import DashboardManager from "./DashboardManager";
-import DashboardGeneralManager from "./DashboardGeneralManager";
-import Forbidden from "./Forbidden";
+import { motion } from "framer-motion";
 
-// Tipagem para as abas disponíveis
-type TabType = "GLOBAL" | "TEAM" | "ATTENDANT";
+import MetricCard from "../components/dashboard/MetricCard";
+import FunnelChart from "../components/dashboard/FunnelChart";
+import RecentLeads from "../components/dashboard/RecentLeads";
+import PipelineSummary from "../components/dashboard/PipelineSummary";
+
+function formatDate() {
+  return new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -89,143 +99,231 @@ export default function Dashboard() {
   if (!user) return <Forbidden onNavigate={navigate} />; // 👈 Corrigido: onNavigate adicionado
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] w-full">
-      {/* ──────────────────────────────────────────────────────────────────
-          HEADER & MENU DE NAVEGAÇÃO (TABS)
-          ────────────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-gray-900">Central de Resultados</h1>
-              <div className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                Acesso: {user.role}
-              </div>
-            </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#060816] text-white">
 
-            {/* Menu de Abas Estilizado */}
-            {isManagerOrHigher && (
-              <div className="flex space-x-8 overflow-x-auto no-scrollbar">
-                {isGlobalOrHigher && (
-                  <TabButton 
-                    label="Visão Global" 
-                    active={activeTab === "GLOBAL"} 
-                    onClick={() => setActiveTab("GLOBAL")} 
-                  />
-                )}
-                <TabButton 
-                  label="Visão da Equipe" 
-                  active={activeTab === "TEAM"} 
-                  onClick={() => setActiveTab("TEAM")} 
-                />
-                <TabButton 
-                  label="Desempenho Individual" 
-                  active={activeTab === "ATTENDANT"} 
-                  onClick={() => setActiveTab("ATTENDANT")} 
-                />
-              </div>
-            )}
-          </div>
-        </div>
+      {/* BACKGROUND */}
+      <div className="absolute inset-0 overflow-hidden">
+
+        {/* base gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563EB_0%,transparent_26%),radial-gradient(circle_at_bottom_right,#7C3AED_0%,transparent_22%),linear-gradient(135deg,#050816_0%,#081120_45%,#0B1730_100%)]" />
+
+        {/* animated glow */}
+        <motion.div
+          animate={{
+            x: [0, 40, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-[-120px] left-[-120px] w-[380px] h-[380px] rounded-full bg-blue-500/20 blur-[120px]"
+        />
+
+        <motion.div
+          animate={{
+            x: [0, -30, 0],
+            y: [0, 40, 0],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute bottom-[-150px] right-[-120px] w-[350px] h-[350px] rounded-full bg-violet-500/20 blur-[120px]"
+        />
+
+        {/* grid */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
+            backgroundSize: "42px 42px",
+          }}
+        />
+
+        {/* floating dots */}
+        <div className="absolute top-24 left-1/3 w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+        <div className="absolute bottom-32 right-1/4 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
       </div>
 
-      {/* ──────────────────────────────────────────────────────────────────
-          BARRA DE SELEÇÃO DINÂMICA (SELECTS)
-          ────────────────────────────────────────────────────────────────── */}
-      {(activeTab === "TEAM" || activeTab === "ATTENDANT") && isManagerOrHigher && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
-            <div className="flex items-center gap-2 text-gray-500">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <span className="text-sm font-medium">Filtrar visão:</span>
+      {/* CONTENT */}
+      <div className="relative z-10 p-5 sm:p-7 lg:p-9">
+
+        {/* TOP HEADER */}
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-10"
+        >
+
+          {/* LEFT */}
+          <div>
+
+            {/* status badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur-xl mb-6 shadow-[0_0_25px_rgba(37,99,235,0.08)]">
+
+              <div className="relative flex items-center justify-center">
+                <div className="absolute w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <div className="relative w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              </div>
+
+              <span className="text-[12px] tracking-wide text-white/65">
+                Sistema operacional • tempo real
+              </span>
             </div>
 
-            {/* Seletor de Equipe (Apenas para Global/Admin na Aba de Equipe) */}
-            {activeTab === "TEAM" && isGlobalOrHigher && (
-              <select
-                value={selectedTeamId}
-                onChange={(e) => setSelectedTeamId(e.target.value)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-50 outline-none transition-all"
-              >
-                <option value="">Selecione uma Equipe</option>
-                {teamsList.map(team => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            )}
+            {/* title */}
+            <h1 className="text-[32px] sm:text-[38px] font-semibold tracking-[-0.03em] leading-tight text-white">
+              Dashboard comercial
+            </h1>
 
-            {/* Seletor de Atendente (Para qualquer Gestor na Aba de Atendente) */}
-            {activeTab === "ATTENDANT" && isManagerOrHigher && (
-              <select
-                value={selectedAttendantId}
-                onChange={(e) => setSelectedAttendantId(e.target.value)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-50 outline-none transition-all"
-              >
-                {usersList.map(u => (
-                  <option key={u.id} value={u.id}>{u.name} {u.id === user.id ? "(Eu)" : ""}</option>
-                ))}
-              </select>
-            )}
+            {/* subtitle */}
+            <p className="mt-3 text-sm text-white/45 max-w-xl leading-relaxed">
+              Visualize métricas, acompanhe negociações e monitore o
+              desempenho da equipe em uma experiência moderna e dinâmica.
+            </p>
 
-            {loadingAux && <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
+            {/* date */}
+            <div className="mt-5 flex items-center gap-3 text-white/35 text-sm">
+
+              <div className="h-[1px] w-10 bg-white/10" />
+
+              <span className="capitalize tracking-wide">
+                {formatDate()}
+              </span>
+            </div>
           </div>
+
+          {/* RIGHT INFO */}
+          <motion.div
+            animate={{
+              y: [0, -6, 0],
+            }}
+            transition={{
+              duration: 5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl px-6 py-5 shadow-[0_0_50px_rgba(37,99,235,0.08)]"
+          >
+
+            <div className="flex items-center gap-4">
+
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-[0_0_35px_rgba(59,130,246,0.35)]">
+                <TrendingUp size={24} />
+              </div>
+
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+                  Receita mensal
+                </p>
+
+                <h2 className="text-2xl font-semibold mt-1">
+                  R$ 6,1M
+                </h2>
+
+                <p className="text-emerald-400 text-sm mt-1">
+                  +21% este mês
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* METRICS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+
+          {[
+            {
+              title: "Total de Leads",
+              value: "731",
+              icon: <ClipboardList size={20} />,
+              iconBg: "#2563EB",
+              trend: 12,
+              trendLabel: "vs mês anterior",
+            },
+            {
+              title: "Leads Ativos",
+              value: "489",
+              icon: <Activity size={20} />,
+              iconBg: "#8B5CF6",
+              trend: 8,
+              trendLabel: "negociação ativa",
+            },
+            {
+              title: "Negócios Fechados",
+              value: "38",
+              icon: <CheckCircle2 size={20} />,
+              iconBg: "#10B981",
+              trend: -3,
+              trendLabel: "vs mês anterior",
+            },
+            {
+              title: "Valor Fechado",
+              value: "R$ 6,1M",
+              icon: <DollarSign size={20} />,
+              iconBg: "#F97316",
+              trend: 21,
+              trendLabel: "receita mensal",
+            },
+          ].map((card, i) => (
+            <motion.div
+              key={card.title}
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: i * 0.08,
+                duration: 0.45,
+              }}
+              whileHover={{
+                y: -6,
+              }}
+              className="group relative overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl shadow-[0_0_50px_rgba(37,99,235,0.06)]"
+            >
+
+              {/* glow hover */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-500/10 to-cyan-400/5" />
+
+              {/* border shine */}
+              <div className="absolute inset-0 rounded-[30px] p-[1px] bg-gradient-to-br from-white/10 to-transparent opacity-50" />
+
+              <div className="relative z-10">
+                <MetricCard {...card} />
+              </div>
+            </motion.div>
+          ))}
         </div>
-      )}
 
-      {/* ──────────────────────────────────────────────────────────────────
-          ÁREA DE RENDERIZAÇÃO DO CONTEÚDO
-          ────────────────────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto py-6 animate-in fade-in duration-700">
-        <div className="px-4 sm:px-6 lg:px-8">
-          {activeTab === "GLOBAL" && isGlobalOrHigher && (
-            <DashboardGeneralManager />
-          )}
+        {/* CHARTS */}
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 mb-8">
 
-          {activeTab === "TEAM" && (
-            isManagerOrHigher ? (
-              selectedTeamId ? (
-                <DashboardManager targetTeamId={selectedTeamId} />
-              ) : (
-                <EmptyState message="Selecione uma equipe para visualizar os dados consolidados." />
-              )
-            ) : <Forbidden onNavigate={navigate} /> // 👈 Corrigido: onNavigate adicionado
-          )}
+          <motion.div
+            whileHover={{ y: -4 }}
+            className="xl:col-span-3 rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
+          >
+            <FunnelChart />
+          </motion.div>
 
-          {activeTab === "ATTENDANT" && (
-            <DashboardAttendant targetAttendantId={selectedAttendantId} />
-          )}
+          <motion.div
+            whileHover={{ y: -4 }}
+            className="xl:col-span-2 rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
+          >
+            <PipelineSummary />
+          </motion.div>
         </div>
-      </main>
-    </div>
-  );
-}
 
-// ─── Sub-componentes Auxiliares ──────────────────────────────────────────────
-
-function TabButton({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        pb-4 px-1 text-sm font-semibold transition-all relative
-        ${active ? "text-blue-600" : "text-gray-500 hover:text-gray-700"}
-      `}
-    >
-      {label}
-      {active && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full animate-in slide-in-from-left-full duration-300"></div>
-      )}
-    </button>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center bg-white rounded-3xl border border-dashed border-gray-300">
-      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7"></path><line x1="3" y1="10" x2="21" y2="10"></line><path d="M16 19h6"></path><path d="M19 16v6"></path></svg>
+        {/* RECENT LEADS */}
+        <motion.div
+          whileHover={{ y: -4 }}
+          className="rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
+        >
+          <RecentLeads />
+        </motion.div>
       </div>
-      <p className="text-gray-500 font-medium max-w-xs">{message}</p>
     </div>
   );
 }

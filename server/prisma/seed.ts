@@ -8,7 +8,15 @@ import { parse } from "csv-parse/sync";
 
 const csvPath = path.resolve("prisma", "seed_data.csv");
 
-// Inicializa o Prisma com adapter pg (igual ao prisma.ts do projeto)
+// ─────────────────────────────────────────────────────────────
+// FLAG DE CONTROLE
+// ─────────────────────────────────────────────────────────────
+// O arquivo abaixo é criado após o seed ser executado com sucesso.
+// Ele fica num volume Docker persistente (seed_flag), então sobrevive
+// a restarts e redeployments. Só é apagado com `docker compose down -v`.
+const SEED_FLAG_PATH = path.resolve("/app/seed_flag/.seed_done");
+
+// Inicializa o Prisma com adapter pg
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não definida!");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -39,11 +47,11 @@ interface CsvRow {
 
 function mapLeadStatus(negotiationStatus: string): string {
   switch (negotiationStatus) {
-    case "Aberto":           return "OPEN";
-    case "Em negociação":    return "IN_PROGRESS";
+    case "Aberto":                return "OPEN";
+    case "Em negociação":         return "IN_PROGRESS";
     case "Finalizado com venda":  return "CLOSED_WON";
     case "Finalizado sem venda":  return "CLOSED_LOST";
-    default:                 return "OPEN";
+    default:                      return "OPEN";
   }
 }
 
@@ -56,6 +64,19 @@ function orNull(value: string): string | null {
 }
 
 async function main() {
+  // ── Checagem do flag ────────────────────────────────────────
+  // Garante que o diretório do volume existe antes de checar o arquivo
+  const flagDir = path.dirname(SEED_FLAG_PATH);
+  if (!fs.existsSync(flagDir)) {
+    fs.mkdirSync(flagDir, { recursive: true });
+  }
+
+  if (fs.existsSync(SEED_FLAG_PATH)) {
+    console.log("⏭️  Seed já foi executado anteriormente. Pulando...");
+    console.log("   Para rodar novamente, execute: docker compose down -v");
+    return;
+  }
+
   console.log("🌱 Iniciando seed...\n");
 
   const csvPath = path.resolve(__dirname, "seed_data.csv");
@@ -186,8 +207,8 @@ async function main() {
   let negotiationsCount = 0;
 
   for (const r of rows) {
-    const teamId     = teamMap.get(r.team_name);
-    const customerId = customerMap.get(r.customer_cpf);
+    const teamId      = teamMap.get(r.team_name);
+    const customerId  = customerMap.get(r.customer_cpf);
     const attendantId = userMap.get(r.user_email) ?? null;
 
     if (!teamId || !customerId) {
@@ -256,7 +277,11 @@ async function main() {
 
   console.log(`  ✓ ${leadsCount} leads criados`);
   console.log(`  ✓ ${negotiationsCount} negociações criadas`);
+
+  // ── Cria o flag de controle ─────────────────────────────────
+  fs.writeFileSync(SEED_FLAG_PATH, new Date().toISOString());
   console.log("\n✅ Seed concluído com sucesso!");
+  console.log("   Flag criado em:", SEED_FLAG_PATH);
 }
 
 main()

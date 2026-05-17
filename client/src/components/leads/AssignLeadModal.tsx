@@ -25,16 +25,21 @@ interface Props {
 // COMPONENTE
 // ─────────────────────────────────────────────
 
-export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }: Props) {
+export default function AssignLeadModal({
+  leadIds,
+  teamId,
+  onClose,
+  onAssigned,
+}: Props) {
   const { assignLead, bulkAssignLeads } = useLeadService();
   const { apiFetch } = useApi();
 
-  const [attendants, setAttendants]       = useState<Attendant[]>([]);
-  const [loadingUsers, setLoadingUsers]   = useState(true);
-  const [selectedId, setSelectedId]       = useState("");
-  const [loading, setLoading]             = useState(false);
-  const [error, setError]                 = useState<string | null>(null);
-  const [success, setSuccess]             = useState(false);
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [selectedId, setSelectedId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const isBulk = leadIds.length > 1;
 
@@ -42,11 +47,15 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
   useEffect(() => {
     async function fetchAttendants() {
       try {
-        const res  = await apiFetch(`/api/users?team_id=${teamId}`);
+        const res = await apiFetch(`/api/users?team_id=${teamId}`);
         const json = await res.json();
         const list = json.data ?? json;
         // Filtra só atendentes
-        setAttendants(list.filter((u: Attendant) => u.role === "ATTENDANT" || u.role === "ATENDENTE"));
+        setAttendants(
+          list.filter(
+            (u: Attendant) => u.role === "ATTENDANT" || u.role === "ATENDENTE",
+          ),
+        );
       } catch {
         setError("Erro ao carregar atendentes.");
       } finally {
@@ -55,7 +64,7 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
     }
 
     if (teamId) fetchAttendants();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId]);
 
   // ── Atribuição ───────────────────────────────
@@ -67,18 +76,20 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
       setError(null);
 
       if (isBulk) {
-        // Atribuição em lote com Promise.allSettled
         const results = await bulkAssignLeads(leadIds, selectedId);
-        const failed  = results.filter((r) => r.status === "rejected").length;
+        const failed = results.filter((r) => r.status === "rejected").length;
 
         if (failed > 0) {
-          setError(`${leadIds.length - failed} atribuídos. ${failed} falharam.`);
+          setError(
+            `${leadIds.length - failed} atribuídos. ${failed} falharam.`,
+          );
         } else {
           setSuccess(true);
-          setTimeout(onClose, 1500);
+          setTimeout(() => {
+            onAssigned({} as Lead);
+          }, 1000);
         }
       } else {
-        // Atribuição individual
         const updated = await assignLead(leadIds[0], selectedId);
         setSuccess(true);
         setTimeout(() => {
@@ -125,26 +136,31 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
             <X size={16} />
           </button>
         </div>
-
         {/* Body */}
         <div className="px-6 py-5">
-
           {/* Loading atendentes */}
           {loadingUsers && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 size={20} className="animate-spin" style={{ color: "#2563EB" }} />
+              <Loader2
+                size={20}
+                className="animate-spin"
+                style={{ color: "#2563EB" }}
+              />
             </div>
           )}
 
           {/* Lista de atendentes */}
           {!loadingUsers && attendants.length === 0 && (
-            <p className="text-sm text-center py-4" style={{ color: "#9CA3AF" }}>
+            <p
+              className="text-sm text-center py-4"
+              style={{ color: "#9CA3AF" }}
+            >
               Nenhum atendente encontrado nesta equipe.
             </p>
           )}
 
           {!loadingUsers && attendants.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
               {attendants.map((a) => (
                 <button
                   key={a.id}
@@ -156,16 +172,28 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
                   }}
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                     style={{ background: "#2563EB" }}
                   >
-                    {a.name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
+                    {a.name
+                      .split(" ")
+                      .slice(0, 2)
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium" style={{ color: "#111827" }}>
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: "#111827" }}
+                  >
                     {a.name}
                   </span>
                   {selectedId === a.id && (
-                    <CheckCircle size={16} className="ml-auto" style={{ color: "#2563EB" }} />
+                    <CheckCircle
+                      size={16}
+                      className="ml-auto"
+                      style={{ color: "#2563EB" }}
+                    />
                   )}
                 </button>
               ))}
@@ -186,13 +214,15 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
           {success && (
             <div
               className="mt-3 text-xs font-medium px-3 py-2 rounded-lg"
-              style={{ background: "#ECFDF5", color: "#059669" }}
+              style={{ background: "#DCFCE7", color: "#16A34A" }}
             >
-              ✅ {isBulk ? "Leads atribuídos com sucesso!" : "Lead atribuído com sucesso!"}
+              {isBulk
+                ? "Leads atribuídos com sucesso!"
+                : "Lead atribuído com sucesso!"}
             </div>
           )}
-        </div>
-
+        </div>{" "}
+        {/* fecha body */}
         {/* Footer */}
         <div
           className="px-6 py-4 border-t flex gap-3"
@@ -200,23 +230,23 @@ export default function AssignLeadModal({ leadIds, teamId, onClose, onAssigned }
         >
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-xl text-sm font-medium border transition-all hover:bg-gray-50"
-            style={{ borderColor: "#E5E7EB", color: "#6B7280" }}
+            className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
           >
             Cancelar
           </button>
           <button
             onClick={handleAssign}
             disabled={!selectedId || loading || success}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{ background: "#2563EB" }}
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
                 Atribuindo...
               </>
-            ) : "Atribuir"}
+            ) : (
+              "Atribuir"
+            )}
           </button>
         </div>
       </div>

@@ -10,12 +10,12 @@ type Props = {
   onClear: () => void;
 };
 
-const stages = ["Todos", "ABERTO", "EM_PROGRESSO", "CLOSED_WON", "CLOSED_LOST"];
-const sources = ["Todos", "Indicação", "Site", "WhatsApp", "Instagram", "Google"];
+const stages = ["Todos", "OPEN", "IN_PROGRESS", "CLOSED_WON", "CLOSED_LOST"];
+const sources = ["Todos", "Instagram", "Indicação", "Loja Física", "WhatsApp", "Mercado Livre", "Facebook"];
 
 const stageLabels: Record<string, string> = {
-  "ABERTO": "Aberto",
-  "EM_PROGRESSO": "Em Progresso",
+  "OPEN": "Aberto",
+  "IN_PROGRESS": "Em Progresso",
   "CLOSED_WON": "Ganho",
   "CLOSED_LOST": "Perdido",
 };

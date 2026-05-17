@@ -48,7 +48,7 @@ export const NegotiationsController = {
 
       // ⚠️ Pega o ID do usuário autenticado no token.
       // Substitua o fallback UUID padrão pelo comportamento esperado caso o usuário não exista (ex: lançar erro).
-      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
+      const userId = (req as any).user?.id || "d290f1ee-6c54-4b01-90e6-d701748f0851";
 
       const negotiation = await NegotiationsService.create({
         ...data,
