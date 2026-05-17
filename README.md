@@ -63,7 +63,7 @@ O projeto é desenvolvido em **3 sprints**, seguindo os princípios do Scrum com
 
 ## 🏃 Sprints
 
-### [Sprint 1 — 24/03 a 14/04/2026](./docs/sprint-1/README.md)
+### [Sprint 1 — 24/03 a 14/04/2026](docs/sprint_1/README.md)
 Primeira entrega incremental do projeto. Foco em documentação, elicitação de requisitos, scaffolding do backend e implementação dos módulos iniciais: Negotiations, StageHistory, Leads, Customers, Users, Auth, Teams e Stores.
 
 ### [Sprint 2 — 15/04 a 21/05/2026](./docs/sprint-2/README.md)
