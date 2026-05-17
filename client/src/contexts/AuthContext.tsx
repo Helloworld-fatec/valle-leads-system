@@ -43,9 +43,6 @@ const MOCK_USER: AuthUser = {
   role: "ATTENDANT",
   team_id: "7027d110-63f5-4424-9169-7756f7000e40", // Também deve ser UUID
 };
-*/
-
-// ─────────────────────────────────────────────
 
 const MOCK_USER: AuthUser = {
   id: "d450a691-e2ea-47c1-9087-ecdd9bbde73c",
@@ -54,6 +51,19 @@ const MOCK_USER: AuthUser = {
   role: "MANAGER",
   team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
 };
+
+*/
+
+// ─────────────────────────────────────────────
+
+const MOCK_USER: AuthUser = {
+  id: "c6fe0f87-5147-4e2d-a19d-fa6d076524b9",
+  name: "Gerente Geral",
+  email: "dev@vallemultimarcas.com.br",
+  role: "GENERAL_MANAGER",
+  team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
+};
+
 
 // ─────────────────────────────────────────────
 

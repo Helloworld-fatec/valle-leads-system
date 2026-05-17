@@ -1,9 +1,11 @@
-// client/src/routes/index.tsx
+// src/routes/index.tsx
 import { Routes, Route, Navigate, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import type { UserRole } from "../contexts/AuthContext";
 
 // Pages
 import Login from "../pages/Login";
-import Dashboard from "../pages/Dashboard";
+import Dashboard from "../pages/Dashboard";          // ← orquestrador de roles
 import Leads from "../pages/Leads";
 import Users from "../pages/Users";
 import Profile from "../pages/Profile";
@@ -18,7 +20,10 @@ import GMLeads from "../pages/GMLeads";
 // Layout
 import MainLayout from "../layouts/MainLayout";
 
+// ─────────────────────────────────────────────
 // Placeholder
+// ─────────────────────────────────────────────
+
 const FunilPlaceholder = ({ onNavigate }: { onNavigate: (p: string) => void }) => (
   <div className="flex flex-col items-center justify-center h-full py-32 text-center">
     <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
@@ -34,6 +39,10 @@ interface AppRoutesProps {
   onLogin: () => void;
   onLogout: () => void;
 }
+
+// ─────────────────────────────────────────────
+// Rotas
+// ─────────────────────────────────────────────
 
 export default function AppRoutes({ isAuthenticated, onLogin, onLogout }: AppRoutesProps) {
   const location = useLocation();

@@ -23,6 +23,81 @@ function formatDate() {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const { auxiliary } = useDashboardService();
+  const navigate = useNavigate(); // 👈 Inicialização do hook de navegação
+
+  // 1. Estados de Navegação e Filtros
+  const [activeTab, setActiveTab] = useState<TabType>("ATTENDANT");
+  const [selectedAttendantId, setSelectedAttendantId] = useState<string>("");
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+
+  // 2. Estados para Listas (Selects)
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [teamsList, setTeamsList] = useState<any[]>([]);
+  const [loadingAux, setLoadingAux] = useState(false);
+
+  // 3. Definição de Permissões
+  const isManagerOrHigher = useMemo(() => 
+    ["MANAGER", "GENERAL_MANAGER", "ADMIN"].includes(user?.role || ""), 
+  [user]);
+  
+  const isGlobalOrHigher = useMemo(() => 
+    ["GENERAL_MANAGER", "ADMIN"].includes(user?.role || ""), 
+  [user]);
+
+  // 4. Inicialização de Abas e IDs Padrão
+  useEffect(() => {
+    if (user) {
+      setSelectedAttendantId(user.id);
+      setSelectedTeamId(user.team_id || "");
+      
+      // Define a aba inicial baseada no maior nível de acesso
+      if (isGlobalOrHigher) setActiveTab("GLOBAL");
+      else if (isManagerOrHigher) setActiveTab("TEAM");
+      else setActiveTab("ATTENDANT");
+    }
+  }, [user, isGlobalOrHigher, isManagerOrHigher]);
+
+  // 5. Busca de Dados Auxiliares para Gestores
+  useEffect(() => {
+    if (!isManagerOrHigher) return;
+
+    async function loadAuxData() {
+      setLoadingAux(true);
+      try {
+        // Colocamos o ': any' para o TypeScript não reclamar das propriedades
+        const usersData: any = await auxiliary.getUsers();
+        
+        const usersArray = Array.isArray(usersData) 
+          ? usersData 
+          : (usersData?.data || usersData?.users || []);
+        
+        setUsersList(usersArray);
+
+        if (isGlobalOrHigher) {
+          // Colocamos o ': any' aqui também
+          const teamsData: any = await auxiliary.getTeams();
+          
+          const teamsArray = Array.isArray(teamsData) 
+            ? teamsData 
+            : (teamsData?.data || teamsData?.teams || []);
+            
+          setTeamsList(teamsArray);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados auxiliares do menu:", err);
+      } finally {
+        setLoadingAux(false);
+      }
+    }
+
+    loadAuxData();
+  }, [isManagerOrHigher, isGlobalOrHigher, auxiliary]);
+
+  // 6. Verificação de segurança inicial
+  if (!user) return <Forbidden onNavigate={navigate} />; // 👈 Corrigido: onNavigate adicionado
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#060816] text-white">
 
