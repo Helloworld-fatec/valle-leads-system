@@ -1,33 +1,92 @@
+// src/modules/leads/lead.routes.ts
 import { Router } from "express";
-import { LeadsController } from "./lead.controller";
-import { CreateLeadSchema, UpdateLeadSchema, QueryLeadSchema } from "./lead.dtos";
+import { LeadsController } from "./lead.controller.js";
+import {
+  CreateLeadSchema,
+  UpdateLeadSchema,
+  QueryLeadSchema,
+  LeadIdParamSchema,
+} from "./lead.dtos.js";
 import {
   validateBody,
   validateQuery,
-} from "../../middlewares/validation/validate.middleware";
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import {
+  checkPermission,
+  checkRole,
+} from "../../middlewares/auth/permission.middleware.js";
 
 // ─────────────────────────────────────────────
 // LEADS ROUTES
 // ─────────────────────────────────────────────
+// Pipeline padrão:
+//   authMiddleware → checkPermission/checkRole → validate* → controller
+//
+// O grosso da autorização (quem pode chamar a rota) fica nos middlewares;
+// regras granulares de escopo (atendente vê apenas os próprios, manager
+// vê apenas dos times que gerencia) ficam no SERVICE — defesa em profundidade.
+// ─────────────────────────────────────────────
 
 const leadsRoutes = Router();
+const controller = new LeadsController();
 
-// ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint
-// leadsRouter.use(authMiddleware);
+// Autenticação obrigatória em todas as rotas
+leadsRoutes.use(authMiddleware);
 
-leadsRoutes.get("/", validateQuery(QueryLeadSchema), LeadsController.findAll);
+// ─── LISTAGEM ──────────────────────────────────────────
+// Todos os perfis podem listar — o service filtra o escopo
+leadsRoutes.get(
+  "/",
+  checkPermission("ATTENDANT"),
+  validateQuery(QueryLeadSchema),
+  controller.findAll
+);
 
-leadsRoutes.get("/:id", LeadsController.findById);
+// ─── LEITURA POR ID ────────────────────────────────────
+leadsRoutes.get(
+  "/:id",
+  checkPermission("ATTENDANT"),
+  validateParams(LeadIdParamSchema),
+  controller.findById
+);
 
-leadsRoutes.post("/", validateBody(CreateLeadSchema), LeadsController.create);
+// ─── CREATE ────────────────────────────────────────────
+// GENERAL_MANAGER não pode criar — usar checkRole (hierarquia não resolve)
+leadsRoutes.post(
+  "/",
+  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  validateBody(CreateLeadSchema),
+  controller.create
+);
 
-// PUT — atualização completa do recurso
-leadsRoutes.put("/:id", validateBody(UpdateLeadSchema), LeadsController.update);
+// ─── UPDATE ────────────────────────────────────────────
+// GENERAL_MANAGER também não edita
+leadsRoutes.put(
+  "/:id",
+  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  validateParams(LeadIdParamSchema),
+  validateBody(UpdateLeadSchema),
+  controller.update
+);
 
-// PATCH — atualização parcial, usa o mesmo schema pois todos os campos já são opcionais
-leadsRoutes.patch("/:id", validateBody(UpdateLeadSchema), LeadsController.update);
+// PATCH usa o mesmo schema (todos os campos já opcionais)
+leadsRoutes.patch(
+  "/:id",
+  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  validateParams(LeadIdParamSchema),
+  validateBody(UpdateLeadSchema),
+  controller.update
+);
 
-// DELETE — soft delete, não remove o registro do banco
-leadsRoutes.delete("/:id", LeadsController.softDelete);
+// ─── SOFT DELETE ───────────────────────────────────────
+// RF02 lista exclusão como exclusiva do ADMIN
+leadsRoutes.delete(
+  "/:id",
+  checkRole("ADMIN"),
+  validateParams(LeadIdParamSchema),
+  controller.softDelete
+);
 
 export default leadsRoutes;
