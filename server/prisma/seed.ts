@@ -1,3 +1,4 @@
+// prisma/seed.ts
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -6,284 +7,345 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 
-const csvPath = path.resolve("prisma", "seed_data.csv");
-
-// ─────────────────────────────────────────────────────────────
-// FLAG DE CONTROLE
-// ─────────────────────────────────────────────────────────────
-// O arquivo abaixo é criado após o seed ser executado com sucesso.
-// Ele fica num volume Docker persistente (seed_flag), então sobrevive
-// a restarts e redeployments. Só é apagado com `docker compose down -v`.
-const SEED_FLAG_PATH = path.resolve("/app/seed_flag/.seed_done");
-
-// Inicializa o Prisma com adapter pg
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não definida!");
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL não definida no .env!");
+}
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-interface CsvRow {
-  lead_id: string;
-  team_name: string;
-  user_name: string;
-  user_email: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  customer_cpf: string;
-  source: string;
-  subject: string;
-  lead_created_at: string;
-  first_interaction_at: string;
-  negotiation_importance: string;
-  negotiation_stage: string;
-  negotiation_status: string;
-  is_open: string;
-  negotiation_created_at: string;
-  negotiation_updated_at: string;
-  finalization_reason: string;
+// ---------------------------------------------------------------------------
+// CSV row types — todos os campos são string (output do csv-parse)
+// ---------------------------------------------------------------------------
+
+interface StoreRow        { id: string; name: string; address: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface TeamRow         { id: string; store_id: string; name: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface UserRow         { id: string; email: string; password_hash: string; name: string; role: string; phone_1_ddd: string; phone_1_number: string; phone_2_ddd: string; phone_2_number: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface UserTeamRow     { id: string; user_id: string; team_id: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string }
+interface CustomerRow     { id: string; name: string; email: string; cpf: string; phone: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string; is_active: string; team_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface InterestItemRow { id: string; reference_code: string; description: string; value: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface LeadRow         { id: string; source: string; status: string; is_active: string; customer_id: string; team_id: string; attendant_id: string; interest_item_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface NegotiationRow  { id: string; team_id: string; lead_id: string; customer_id: string; attendant_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface NegStatusRow    { id: string; status_negotiation: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface NegStageRow     { id: string; old_stage: string; new_stage: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface NegImportRow    { id: string; importance: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const CSV_DIR = path.resolve(__dirname, "csv");
+
+function readCsv<T>(filename: string): T[] {
+  const filePath = path.join(CSV_DIR, filename);
+  const content = fs.readFileSync(filePath, "utf-8");
+  return parse(content, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    bom: true,
+  }) as T[];
 }
 
-function mapLeadStatus(negotiationStatus: string): string {
-  switch (negotiationStatus) {
-    case "Aberto":                return "OPEN";
-    case "Em negociação":         return "IN_PROGRESS";
-    case "Finalizado com venda":  return "CLOSED_WON";
-    case "Finalizado sem venda":  return "CLOSED_LOST";
-    default:                      return "OPEN";
-  }
+function toBool(value: string): boolean {
+  return value?.toLowerCase() === "true";
 }
 
 function toDate(value: string): Date {
   return new Date(value);
 }
 
-function orNull(value: string): string | null {
-  return value?.trim() ? value.trim() : null;
+/** String vazia/ausente → null, caso contrário retorna a string */
+function nullable(value: string): string | null {
+  return value && value.trim() !== "" ? value.trim() : null;
 }
 
+/** String numérica → string com 2 casas decimais, ou null */
+function toDecimal(value: string): string | null {
+  if (!value || value.trim() === "") return null;
+  const num = parseFloat(value);
+  return isNaN(num) ? null : num.toFixed(2);
+}
+
+// ---------------------------------------------------------------------------
+// Seed functions — ordem respeita dependências FK
+// ---------------------------------------------------------------------------
+
+async function seedStores() {
+  const rows = readCsv<StoreRow>("seed_stores.csv");
+  console.log(`  → Inserindo ${rows.length} stores...`);
+
+  await prisma.stores.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      name:                r.name,
+      address:             nullable(r.address),
+      is_active:           toBool(r.is_active),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedTeams() {
+  const rows = readCsv<TeamRow>("seed_teams.csv");
+  console.log(`  → Inserindo ${rows.length} teams...`);
+
+  await prisma.teams.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      store_id:            r.store_id,
+      name:                r.name,
+      is_active:           toBool(r.is_active),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedUsers() {
+  const rows = readCsv<UserRow>("seed_users.csv");
+  console.log(`  → Inserindo ${rows.length} users...`);
+
+  await prisma.users.createMany({
+    data: rows.map((r) => ({
+      id:                    r.id,
+      email:                 r.email,
+      password_hash:         r.password_hash,
+      name:                  r.name,
+      role:                  r.role,
+      phone_1_ddd:           nullable(r.phone_1_ddd),
+      phone_1_number:        nullable(r.phone_1_number),
+      phone_2_ddd:           nullable(r.phone_2_ddd),
+      phone_2_number:        nullable(r.phone_2_number),
+      address_street:        nullable(r.address_street),
+      address_number:        nullable(r.address_number),
+      address_complement:    nullable(r.address_complement),
+      address_neighborhood:  nullable(r.address_neighborhood),
+      address_city:          nullable(r.address_city),
+      address_state:         nullable(r.address_state),
+      address_zip:           nullable(r.address_zip),
+      is_active:             toBool(r.is_active),
+      created_at:            toDate(r.created_at),
+      updated_at:            toDate(r.updated_at),
+      created_by_user_id:    nullable(r.created_by_user_id),
+      updated_by_user_id:    nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedUserTeams() {
+  const rows = readCsv<UserTeamRow>("seed_user_teams.csv");
+  console.log(`  → Inserindo ${rows.length} user_teams...`);
+
+  await prisma.userTeams.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      user_id:             r.user_id,
+      team_id:             r.team_id,
+      is_active:           toBool(r.is_active),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedCustomers() {
+  const rows = readCsv<CustomerRow>("seed_customers.csv");
+  console.log(`  → Inserindo ${rows.length} customers...`);
+
+  await prisma.customers.createMany({
+    data: rows.map((r) => ({
+      id:                    r.id,
+      name:                  r.name,
+      email:                 nullable(r.email),
+      cpf:                   nullable(r.cpf),
+      phone:                 r.phone,
+      address_street:        nullable(r.address_street),
+      address_number:        nullable(r.address_number),
+      address_complement:    nullable(r.address_complement),
+      address_neighborhood:  nullable(r.address_neighborhood),
+      address_city:          nullable(r.address_city),
+      address_state:         nullable(r.address_state),
+      address_zip:           nullable(r.address_zip),
+      is_active:             toBool(r.is_active),
+      team_id:               nullable(r.team_id),
+      created_at:            toDate(r.created_at),
+      updated_at:            toDate(r.updated_at),
+      created_by_user_id:    nullable(r.created_by_user_id),
+      updated_by_user_id:    nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedInterestItems() {
+  const rows = readCsv<InterestItemRow>("seed_interest_items.csv");
+  console.log(`  → Inserindo ${rows.length} interest_items...`);
+
+  await prisma.interestItems.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      reference_code:      nullable(r.reference_code),
+      description:         r.description,
+      value:               toDecimal(r.value),
+      is_active:           toBool(r.is_active),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedLeads() {
+  const rows = readCsv<LeadRow>("seed_leads.csv");
+  console.log(`  → Inserindo ${rows.length} leads...`);
+
+  await prisma.leads.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      source:              nullable(r.source),
+      status:              r.status,
+      is_active:           toBool(r.is_active),
+      customer_id:         r.customer_id,
+      team_id:             r.team_id,
+      attendant_id:        nullable(r.attendant_id),
+      interest_item_id:    nullable(r.interest_item_id),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedNegotiations() {
+  const rows = readCsv<NegotiationRow>("seed_negotiations.csv");
+  console.log(`  → Inserindo ${rows.length} negotiations...`);
+
+  await prisma.negotiations.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      team_id:             r.team_id,
+      lead_id:             r.lead_id,
+      customer_id:         r.customer_id,
+      attendant_id:        nullable(r.attendant_id),
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedNegotiationStatus() {
+  const rows = readCsv<NegStatusRow>("seed_negotiation_status.csv");
+  console.log(`  → Inserindo ${rows.length} negotiation_status_history...`);
+
+  await prisma.negotiationStatus.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      status_negotiation:  r.status_negotiation,
+      notes:               nullable(r.notes),
+      negotiation_id:      r.negotiation_id,
+      lead_id:             r.lead_id,
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedNegotiationStageHistory() {
+  const rows = readCsv<NegStageRow>("seed_negotiation_stage.csv");
+  console.log(`  → Inserindo ${rows.length} negotiation_stage_history...`);
+
+  await prisma.negotiationStageHistory.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      old_stage:           nullable(r.old_stage),
+      new_stage:           r.new_stage,
+      notes:               nullable(r.notes),
+      negotiation_id:      r.negotiation_id,
+      lead_id:             r.lead_id,
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function seedNegotiationImportance() {
+  const rows = readCsv<NegImportRow>("seed_negotiation_importance.csv");
+  console.log(`  → Inserindo ${rows.length} negotiation_importance_history...`);
+
+  await prisma.negotiationImportance.createMany({
+    data: rows.map((r) => ({
+      id:                  r.id,
+      importance:          r.importance,
+      notes:               nullable(r.notes),
+      negotiation_id:      r.negotiation_id,
+      lead_id:             r.lead_id,
+      created_at:          toDate(r.created_at),
+      updated_at:          toDate(r.updated_at),
+      created_by_user_id:  nullable(r.created_by_user_id),
+      updated_by_user_id:  nullable(r.updated_by_user_id),
+    })),
+    skipDuplicates: true,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 async function main() {
-  // ── Checagem do flag ────────────────────────────────────────
-  // Garante que o diretório do volume existe antes de checar o arquivo
-  const flagDir = path.dirname(SEED_FLAG_PATH);
-  if (!fs.existsSync(flagDir)) {
-    fs.mkdirSync(flagDir, { recursive: true });
-  }
-
-  if (fs.existsSync(SEED_FLAG_PATH)) {
-    console.log("⏭️  Seed já foi executado anteriormente. Pulando...");
-    console.log("   Para rodar novamente, execute: docker compose down -v");
-    return;
-  }
-
   console.log("🌱 Iniciando seed...\n");
 
-  const csvPath = path.resolve(__dirname, "seed_data.csv");
-  const fileContent = fs.readFileSync(csvPath, { encoding: "utf-8" });
-  const rows: CsvRow[] = parse(fileContent, {
-    columns: true,
-    skip_empty_lines: true,
-    bom: true,
-  });
+  // Ordem obrigatória respeitando as FKs:
+  // stores → teams → users → user_teams
+  //       → customers → interest_items → leads
+  //                                    → negotiations → históricos
 
-  console.log(`📄 ${rows.length} registros encontrados no CSV\n`);
+  await seedStores();
+  await seedTeams();
+  await seedUsers();
+  await seedUserTeams();
+  await seedCustomers();
+  await seedInterestItems();
+  await seedLeads();
+  await seedNegotiations();
+  await seedNegotiationStatus();
+  await seedNegotiationStageHistory();
+  await seedNegotiationImportance();
 
-  // 1. Stores
-  console.log("🏪 Criando lojas...");
-
-  const storesData = [
-    { key: "SJC",      name: "1000 Valle Multimarcas - São José dos Campos", address: "Av. Cassiopeia, 295 - Jardim Satélite, São José dos Campos - SP, 12230-010" },
-    { key: "Caçapava", name: "1000 Valle Multimarcas - Caçapava",            address: "R. Prof. Edmir Viana de Moura, 68 - Vera Cruz, Caçapava - SP, 12286-710" },
-    { key: "PA",       name: "1000 Valle Multimarcas - Pouso Alegre",        address: "Av. Pinto Cobra, 840 - Santa Cecilia, Pouso Alegre - MG, 37554-142" },
-    { key: "Serramar", name: "1000 Valle Multimarcas Serramar Shopping",     address: "Av. José Herculano, 1086 - LOJA AB 02C - Pontal de Santa Marina, Caraguatatuba - SP, 11672-390" },
-  ];
-
-  const storeMap = new Map<string, string>();
-
-  for (const s of storesData) {
-    let store = await prisma.stores.findFirst({ where: { name: s.name } });
-    if (!store) {
-      store = await prisma.stores.create({ data: { name: s.name, address: s.address } });
-    }
-    storeMap.set(s.key, store.id);
-    console.log(`  ✓ ${s.name}`);
-  }
-
-  // 2. Teams
-  console.log("\n👥 Criando equipes...");
-
-  const teamToStoreKey: Record<string, string> = {
-    "Equipe SJC":      "SJC",
-    "Equipe Caçapava": "Caçapava",
-    "Equipe PA":       "PA",
-  };
-
-  const uniqueTeamNames = [...new Set(rows.map((r) => r.team_name))];
-  const teamMap = new Map<string, string>();
-
-  for (const teamName of uniqueTeamNames) {
-    const storeKey = teamToStoreKey[teamName];
-    if (!storeKey) { console.warn(`  ⚠ Equipe sem loja mapeada: ${teamName}`); continue; }
-    const storeId = storeMap.get(storeKey)!;
-    let team = await prisma.teams.findFirst({ where: { name: teamName, store_id: storeId } });
-    if (!team) {
-      team = await prisma.teams.create({ data: { store_id: storeId, name: teamName, is_active: true } });
-    }
-    teamMap.set(teamName, team.id);
-    console.log(`  ✓ ${teamName} → ${storeKey}`);
-  }
-
-  // 3. Users
-  console.log("\n👤 Criando usuários...");
-
-  const PASSWORD_HASH = "$2a$12$23AXi2.U3ATOdWi7LzW8B.KWlxvGb3a8K9bUy5O4NFel2Sgd5iILG";
-
-  const uniqueUsers = new Map<string, { name: string; email: string; teamName: string }>();
-  for (const r of rows) {
-    if (!uniqueUsers.has(r.user_email)) {
-      uniqueUsers.set(r.user_email, { name: r.user_name, email: r.user_email, teamName: r.team_name });
-    }
-  }
-
-  const userMap = new Map<string, string>();
-
-  for (const [email, u] of uniqueUsers) {
-    const user = await prisma.users.upsert({
-      where: { email },
-      update: {},
-      create: { email, name: u.name, password_hash: PASSWORD_HASH, role: "ATTENDANT", is_active: true },
-    });
-    userMap.set(email, user.id);
-    console.log(`  ✓ ${u.name} (${email})`);
-  }
-
-  // 4. UserTeams
-  console.log("\n🔗 Vinculando usuários às equipes...");
-
-  for (const [email, u] of uniqueUsers) {
-    const userId = userMap.get(email)!;
-    const teamId = teamMap.get(u.teamName);
-    if (!teamId) continue;
-    await prisma.userTeams.upsert({
-      where: { user_id_team_id: { user_id: userId, team_id: teamId } },
-      update: {},
-      create: { user_id: userId, team_id: teamId },
-    });
-    console.log(`  ✓ ${u.name} → ${u.teamName}`);
-  }
-
-  // 5. Customers
-  console.log("\n🧑 Criando clientes...");
-
-  const uniqueCustomers = new Map<string, { name: string; email: string; phone: string; cpf: string; teamName: string }>();
-  for (const r of rows) {
-    if (!uniqueCustomers.has(r.customer_cpf)) {
-      uniqueCustomers.set(r.customer_cpf, {
-        name: r.customer_name, email: r.customer_email,
-        phone: r.customer_phone, cpf: r.customer_cpf, teamName: r.team_name,
-      });
-    }
-  }
-
-  const customerMap = new Map<string, string>();
-
-  for (const [cpf, c] of uniqueCustomers) {
-    const teamId = teamMap.get(c.teamName) ?? null;
-    const customer = await prisma.customers.upsert({
-      where: { cpf },
-      update: {},
-      create: { name: c.name, email: orNull(c.email), cpf, phone: orNull(c.phone), is_active: true, team_id: teamId },
-    });
-    customerMap.set(cpf, customer.id);
-  }
-
-  console.log(`  ✓ ${uniqueCustomers.size} clientes criados`);
-
-  // 6. Leads + Negotiations + históricos
-  console.log("\n📋 Criando leads e negociações...");
-
-  let leadsCount = 0;
-  let negotiationsCount = 0;
-
-  for (const r of rows) {
-    const teamId      = teamMap.get(r.team_name);
-    const customerId  = customerMap.get(r.customer_cpf);
-    const attendantId = userMap.get(r.user_email) ?? null;
-
-    if (!teamId || !customerId) {
-      console.warn(`  ⚠ Lead ${r.lead_id} ignorado — team ou customer não encontrado`);
-      continue;
-    }
-
-    const leadCreatedAt        = toDate(r.lead_created_at);
-    const firstInteractionAt   = toDate(r.first_interaction_at);
-    const negotiationUpdatedAt = toDate(r.negotiation_updated_at);
-
-    const lead = await prisma.leads.create({
-      data: {
-        source: orNull(r.source),
-        status: mapLeadStatus(r.negotiation_status),
-        is_active: r.is_open === "TRUE",
-        vehicle_interest: orNull(r.subject),
-        customer_id: customerId,
-        team_id: teamId,
-        attendant_id: attendantId,
-        created_at: leadCreatedAt,
-        updated_at: negotiationUpdatedAt,
-      },
-    });
-    leadsCount++;
-
-    const negotiation = await prisma.negotiations.create({
-      data: {
-        team_id: teamId,
-        lead_id: lead.id,
-        created_at: firstInteractionAt,
-        updated_at: negotiationUpdatedAt,
-      },
-    });
-    negotiationsCount++;
-
-    await prisma.negotiationStatus.create({
-      data: {
-        negotiation_id: negotiation.id,
-        status_negotiation: r.negotiation_status,
-        notes: orNull(r.finalization_reason),
-        created_at: firstInteractionAt,
-        updated_at: negotiationUpdatedAt,
-      },
-    });
-
-    await prisma.negotiationStageHistory.create({
-      data: {
-        negotiation_id: negotiation.id,
-        old_status: null,
-        new_status: r.negotiation_stage,
-        created_at: firstInteractionAt,
-        updated_at: negotiationUpdatedAt,
-      },
-    });
-
-    await prisma.negotiationImportance.create({
-      data: {
-        negotiation_id: negotiation.id,
-        importance: r.negotiation_importance,
-        created_at: firstInteractionAt,
-        updated_at: negotiationUpdatedAt,
-      },
-    });
-  }
-
-  console.log(`  ✓ ${leadsCount} leads criados`);
-  console.log(`  ✓ ${negotiationsCount} negociações criadas`);
-
-  // ── Cria o flag de controle ─────────────────────────────────
-  fs.writeFileSync(SEED_FLAG_PATH, new Date().toISOString());
   console.log("\n✅ Seed concluído com sucesso!");
-  console.log("   Flag criado em:", SEED_FLAG_PATH);
 }
 
 main()
-  .catch((e) => { console.error("❌ Erro no seed:", e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); await pool.end(); });
+  .catch((e) => {
+    console.error("❌ Erro no seed:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

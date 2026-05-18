@@ -1,20 +1,24 @@
 import { Request, Response, NextFunction } from "express";
-import { LeadsService } from "./lead.service";
-import { QueryLeadSchema, CreateLeadSchema, UpdateLeadSchema } from "./lead.dtos";
+import { InterestItemsService } from "./item.service";
+import {
+  QueryInterestItemSchema,
+  CreateInterestItemSchema,
+  UpdateInterestItemSchema,
+} from "./item.dtos";
 
 // ─────────────────────────────────────────────
-// LEADS CONTROLLER
+// INTEREST ITEMS CONTROLLER
 // ─────────────────────────────────────────────
 
 type ParamsWithId = { id: string };
 
-export const LeadsController = {
+export const InterestItemsController = {
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const filters = QueryLeadSchema.parse(req.query);
-      const leads = await LeadsService.findAll(filters);
+      const filters = QueryInterestItemSchema.parse(req.query);
+      const items = await InterestItemsService.findAll(filters);
 
-      return res.status(200).json({ success: true, data: leads });
+      return res.status(200).json({ success: true, data: items });
     } catch (error) {
       next(error);
     }
@@ -23,9 +27,9 @@ export const LeadsController = {
   async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const lead = await LeadsService.findById(id);
+      const item = await InterestItemsService.findById(id);
 
-      return res.status(200).json({ success: true, data: lead });
+      return res.status(200).json({ success: true, data: item });
     } catch (error) {
       next(error);
     }
@@ -33,10 +37,10 @@ export const LeadsController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = CreateLeadSchema.parse(req.body);
-      const lead = await LeadsService.create(data);
+      const data = CreateInterestItemSchema.parse(req.body);
+      const item = await InterestItemsService.create(data);
 
-      return res.status(201).json({ success: true, data: lead });
+      return res.status(201).json({ success: true, data: item });
     } catch (error) {
       next(error);
     }
@@ -45,10 +49,10 @@ export const LeadsController = {
   async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const data = UpdateLeadSchema.parse(req.body);
-      const lead = await LeadsService.update(id, data);
+      const data = UpdateInterestItemSchema.parse(req.body);
+      const item = await InterestItemsService.update(id, data);
 
-      return res.status(200).json({ success: true, data: lead });
+      return res.status(200).json({ success: true, data: item });
     } catch (error) {
       next(error);
     }
@@ -57,11 +61,11 @@ export const LeadsController = {
   async softDelete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      await LeadsService.softDelete(id);
+      await InterestItemsService.softDelete(id);
 
       return res.status(200).json({
         success: true,
-        message: "Lead desativado com sucesso.",
+        message: "Item de interesse desativado com sucesso.",
       });
     } catch (error) {
       next(error);

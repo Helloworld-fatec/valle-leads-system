@@ -1,0 +1,4 @@
+id,store_id,name,is_active,created_at,updated_at,created_by_user_id,updated_by_user_id
+cec0313d-2230-499a-b971-886f2d19430e,1cb1e601-8983-4845-b183-3a514be9b75b,Equipe PA,True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,
+ed27708f-5641-4644-9bad-33d626208eb6,ce4b5f09-a043-49f2-8c03-471655bd938c,Equipe Caçapava,True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,
+272614b2-2d33-46df-8db7-f41cfa6c6258,e20fb479-56ee-491c-8f03-9c2c2967d3e6,Equipe SJC,True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,

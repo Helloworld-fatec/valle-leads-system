@@ -1,10 +1,17 @@
-// server/src/modules/leads/lead.repository.ts
-import { prisma } from '../../config/prisma';
-import {
-  CreateLeadDTO,
-  UpdateLeadDTO,
-  QueryLeadDTO,
-} from "./lead.dtos";
+import { prisma } from "../../config/prisma";
+import { CreateLeadDTO, UpdateLeadDTO, QueryLeadDTO } from "./lead.dtos";
+
+// ─────────────────────────────────────────────
+// LEADS REPOSITORY
+// ─────────────────────────────────────────────
+
+// Select reutilizável para o atendente — evita expor password_hash
+const attendantSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+} as const;
 
 export const LeadsRepository = {
   async findAll(filters: QueryLeadDTO) {
@@ -13,6 +20,7 @@ export const LeadsRepository = {
       status,
       attendant_id,
       customer_id,
+      interest_item_id,
       is_active,
       page = 1,
       limit = 20,
@@ -24,13 +32,13 @@ export const LeadsRepository = {
         ...(status && { status }),
         ...(attendant_id && { attendant_id }),
         ...(customer_id && { customer_id }),
+        ...(interest_item_id && { interest_item_id }),
         ...(is_active !== undefined && { is_active }),
       },
       include: {
         customers: true,
-        attendant: {
-          select: { id: true, name: true, email: true, role: true },
-        },
+        attendant: { select: attendantSelect },
+        interest_item: true,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -44,9 +52,8 @@ export const LeadsRepository = {
       include: {
         customers: true,
         teams: true,
-        attendant: {
-          select: { id: true, name: true, email: true, role: true },
-        },
+        attendant: { select: attendantSelect },
+        interest_item: true,
         negotiations: true,
       },
     });
@@ -58,11 +65,14 @@ export const LeadsRepository = {
         status: dto.status,
         customer_id: dto.customer_id,
         team_id: dto.team_id,
-
-        // 👇 normalização obrigatória
         source: dto.source ?? null,
-        vehicle_interest: dto.vehicle_interest ?? null,
         attendant_id: dto.attendant_id ?? null,
+        interest_item_id: dto.interest_item_id ?? null,
+      },
+      include: {
+        customers: true,
+        attendant: { select: attendantSelect },
+        interest_item: true,
       },
     });
   },
@@ -73,15 +83,14 @@ export const LeadsRepository = {
       data: {
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.is_active !== undefined && { is_active: dto.is_active }),
-
-        // 👇 normalização obrigatória
         ...(dto.source !== undefined && { source: dto.source ?? null }),
-        ...(dto.vehicle_interest !== undefined && {
-          vehicle_interest: dto.vehicle_interest ?? null,
-        }),
-        ...(dto.attendant_id !== undefined && {
-          attendant_id: dto.attendant_id ?? null,
-        }),
+        ...(dto.attendant_id !== undefined && { attendant_id: dto.attendant_id ?? null }),
+        ...(dto.interest_item_id !== undefined && { interest_item_id: dto.interest_item_id ?? null }),
+      },
+      include: {
+        customers: true,
+        attendant: { select: attendantSelect },
+        interest_item: true,
       },
     });
   },
