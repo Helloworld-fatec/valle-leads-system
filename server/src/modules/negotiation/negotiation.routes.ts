@@ -1,63 +1,113 @@
 // server/src/modules/negotiation/negotiation.routes.ts
 import { Router } from "express";
-import { NegotiationsController } from "./negotiation.controller";
+import { NegotiationsController } from "./negotiation.controller.js";
 import {
   CreateNegotiationSchema,
   UpdateNegotiationSchema,
   QueryNegotiationSchema,
-} from "./negotiation.dto";
-import { 
-  validateBody, 
-  validateQuery 
-} from "../../middlewares/validation/validate.middleware";
+  NegotiationIdParamSchema,
+  BulkAssignAttendantSchema,
+  BulkAssignTeamSchema,
+} from "./negotiation.dto.js";
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import {
+  checkPermission,
+  checkRole,
+} from "../../middlewares/auth/permission.middleware.js";
 
-// ─────────────────────────────────────────────
-// NEGOTIATIONS ROUTES
-// ─────────────────────────────────────────────
+// Pipeline:
+//   authMiddleware     → injeta req.user
+//   checkPermission/   → autoriza pelo role (RBAC grosso)
+//   checkRole
+//   validate*          → garante shape via Zod
+//   controller.handler → orquestra e responde
+//
+// Regras granulares (escopo por times, restrição por campo) ficam no service.
+// Rotas específicas vêm ANTES das genéricas com :id para evitar conflito.
 
 const negotiationsRoutes = Router();
+const controller = new NegotiationsController();
 
-// ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint para garantir que req.user exista
-// negotiationsRoutes.use(authMiddleware);
+// Autenticação obrigatória em todo o módulo
+negotiationsRoutes.use(authMiddleware);
 
-// GET / - Listagem com filtros opcionais via query params (validados pelo Zod)
+// ─── BULK (rotas específicas — antes de /:id) ──────────
+
+// Atribuir atendente em lote — MANAGER e ADMIN
+negotiationsRoutes.post(
+  "/bulk/assign-attendant",
+  checkRole("MANAGER", "ADMIN"),
+  validateBody(BulkAssignAttendantSchema),
+  controller.bulkAssignAttendant
+);
+
+// Transferir entre times em lote — GENERAL_MANAGER e ADMIN
+negotiationsRoutes.post(
+  "/bulk/assign-team",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateBody(BulkAssignTeamSchema),
+  controller.bulkAssignTeam
+);
+
+// ─── LISTAGEM E LEITURA ────────────────────────────────
+
+// Todos os autenticados; service aplica filtro de escopo.
 negotiationsRoutes.get(
   "/",
+  checkPermission("ATTENDANT"),
   validateQuery(QueryNegotiationSchema),
-  NegotiationsController.findAll
+  controller.findAll
 );
 
-// GET /:id - Busca de uma negociação específica pelo ID com todo seu histórico
 negotiationsRoutes.get(
   "/:id",
-  NegotiationsController.findById
+  checkPermission("ATTENDANT"),
+  validateParams(NegotiationIdParamSchema),
+  controller.findById
 );
 
-// POST / - Criação de uma nova negociação (e seus históricos iniciais na transaction)
+// ─── CRIAÇÃO ───────────────────────────────────────────
+
+// Todos os roles podem criar (escopo aplicado no service).
 negotiationsRoutes.post(
   "/",
+  checkPermission("ATTENDANT"),
   validateBody(CreateNegotiationSchema),
-  NegotiationsController.create
+  controller.create
 );
 
-// PUT /:id - Atualização da negociação (ex: mudança de equipe ou lead)
+// ─── ATUALIZAÇÃO ───────────────────────────────────────
+
 negotiationsRoutes.put(
   "/:id",
+  checkPermission("ATTENDANT"),
+  validateParams(NegotiationIdParamSchema),
   validateBody(UpdateNegotiationSchema),
-  NegotiationsController.update
+  controller.update
 );
 
-// PATCH /:id - Atualização parcial (como UpdateNegotiationSchema só tem optionals, funciona igual ao PUT)
 negotiationsRoutes.patch(
   "/:id",
+  checkPermission("ATTENDANT"),
+  validateParams(NegotiationIdParamSchema),
   validateBody(UpdateNegotiationSchema),
-  NegotiationsController.update
+  controller.update
 );
 
-// DELETE /:id - Exclusão física da negociação (deleta históricos em cascata)
+// ─── HARD DELETE (apenas ADMIN) ────────────────────────
+// Negociação não tem campo is_active no schema — só existe exclusão
+// permanente. A forma "soft" de encerrar é criar um status "closed"
+// no histórico (módulo de status).
 negotiationsRoutes.delete(
   "/:id",
-  NegotiationsController.delete
+  checkRole("ADMIN"),
+  validateParams(NegotiationIdParamSchema),
+  controller.hardDelete
 );
 
 export default negotiationsRoutes;

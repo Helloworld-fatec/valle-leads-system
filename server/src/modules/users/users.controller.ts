@@ -1,102 +1,171 @@
-// server/src/modules/users/users.controller.ts
+// src/modules/users/users.controller.ts
 import type { Response, NextFunction } from "express";
 import { UsersService, type ActorContext } from "./users.service.js";
 import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
-import type { UserRole } from "./users.dto.js";
+import type {
+  CreateUserDTO,
+  UpdateUserAdminDTO,
+  UpdateSelfDTO,
+  ListUsersQueryDTO,
+  UserIdParamDTO,
+  UserRole,
+} from "./users.dto.js";
 
 // ─────────────────────────────────────────────
 // USERS CONTROLLER
 // ─────────────────────────────────────────────
-// Camada de apresentação (RNF12). Responsabilidade ÚNICA:
-//   - Receber a request HTTP
-//   - Extrair o ator autenticado (req.user injetado pelo auth.middleware)
-//   - Delegar pro service
-//   - Devolver a resposta HTTP no formato adequado
+// Responsabilidade ÚNICA: extrair dados da request, delegar ao service,
+// devolver a resposta HTTP. Nenhuma regra de negócio aqui.
 //
-// Nenhuma regra de negócio aqui. Validação já aconteceu nos middlewares de Zod.
-// Tratamento de erro também não — basta repassar via next(err).
+// Dois fluxos de update:
+//   PUT/PATCH /:id  com actor.role === "ADMIN"  → updateAdmin (campos completos)
+//   PUT/PATCH /:id  com qualquer role, id=self  → updateSelf  (perfil próprio)
+//
+// O controller escolhe o fluxo; o service aplica as regras de cada um.
 // ─────────────────────────────────────────────
 
+const VALID_USER_ROLES: ReadonlyArray<UserRole> = [
+  "ATTENDANT",
+  "MANAGER",
+  "GENERAL_MANAGER",
+  "ADMIN",
+];
+
+function isUserRole(role: string): role is UserRole {
+  return (VALID_USER_ROLES as ReadonlyArray<string>).includes(role);
+}
+
 export class UsersController {
-  private usersService = new UsersService();
+  private service = new UsersService();
 
-  // Helper — monta o contexto do solicitante a partir do AuthRequest.
-  // O auth.middleware garante que req.user existe; aqui só ajustamos o tipo.
   private getActor(req: AuthRequest): ActorContext {
-    return {
-      id: req.user!.id,
-      role: req.user!.role as UserRole,
-    };
+    const user = req.user!;
+    if (!isUserRole(user.role)) {
+      throw new Error(`Role desconhecido no token: ${user.role}`);
+    }
+    return { id: user.id, role: user.role };
   }
 
-  async create(req: AuthRequest, res: Response, next: NextFunction) {
+  // ─── POST /users ─────────────────────────────────
+  create = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const actor = this.getActor(req);
-      const user = await this.usersService.create(req.body, actor);
-      return res.status(201).json(user);
-    } catch (error) {
-      next(error);
+      const body = req.body as CreateUserDTO;
+      const user = await this.service.create(body, actor);
+      res.status(201).json({ success: true, data: user });
+    } catch (err) {
+      next(err);
     }
-  }
+  };
 
-  async findAll(req: AuthRequest, res: Response, next: NextFunction) {
+  // ─── GET /users ───────────────────────────────────
+  findAll = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const actor = this.getActor(req);
-      // req.query já foi normalizado pelo validateQuery (page e pageSize já são number)
-      const result = await this.usersService.findAll(req.query as any, actor);
-      return res.json(result);
-    } catch (error) {
-      next(error);
+      const query = req.query as unknown as ListUsersQueryDTO;
+      const result = await this.service.findAll(query, actor);
+      res.status(200).json({ success: true, ...result });
+    } catch (err) {
+      next(err);
     }
-  }
+  };
 
-  async findById(req: AuthRequest, res: Response, next: NextFunction) {
+  // ─── GET /users/:id ───────────────────────────────
+  findById = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const actor = this.getActor(req);
-      const user = await this.usersService.findById(req.params.id, actor);
-      return res.json(user);
-    } catch (error) {
-      next(error);
+      const { id } = req.params as unknown as UserIdParamDTO;
+      const user = await this.service.findById(id, actor);
+      res.status(200).json({ success: true, data: user });
+    } catch (err) {
+      next(err);
     }
-  }
+  };
 
-  async findMe(req: AuthRequest, res: Response, next: NextFunction) {
+  // ─── PUT/PATCH /users/:id ─────────────────────────
+  // Lógica de roteamento entre os dois fluxos de update:
+  //   - ADMIN editando qualquer ID   → updateAdmin (campos completos)
+  //   - qualquer role no próprio ID  → updateSelf  (sem campos sensíveis)
+  //   - qualquer outra combinação    → o service de updateAdmin rejeita (403)
+  //
+  // Para não-ADMIN editando id alheio, deixamos cair no updateAdmin que
+  // lança AcessoNaoAutorizadoError imediatamente. Isso evita duplicar a
+  // verificação de "id é o próprio" aqui no controller.
+  update = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const actor = this.getActor(req);
-      const user = await this.usersService.findMe(actor);
-      return res.json(user);
-    } catch (error) {
-      next(error);
-    }
-  }
+      const { id } = req.params as unknown as UserIdParamDTO;
 
-  async update(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const actor = this.getActor(req);
-      const user = await this.usersService.update(req.params.id, req.body, actor);
-      return res.json(user);
-    } catch (error) {
-      next(error);
-    }
-  }
+      if (actor.role === "ADMIN") {
+        // ADMIN sempre usa o fluxo completo, independente de editar o próprio
+        const body = req.body as UpdateUserAdminDTO;
+        const user = await this.service.updateAdmin(id, body, actor);
+        res.status(200).json({ success: true, data: user });
+        return;
+      }
 
-  async updateSelf(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const actor = this.getActor(req);
-      const user = await this.usersService.updateSelf(req.body, actor);
-      return res.json(user);
-    } catch (error) {
-      next(error);
-    }
-  }
+      if (actor.id === id) {
+        // Qualquer role editando o próprio cadastro
+        const body = req.body as UpdateSelfDTO;
+        const user = await this.service.updateSelf(body, actor);
+        res.status(200).json({ success: true, data: user });
+        return;
+      }
 
-  async softDelete(req: AuthRequest, res: Response, next: NextFunction) {
+      // Não-ADMIN tentando editar outro usuário → updateAdmin vai rejeitar com 403
+      const body = req.body as UpdateUserAdminDTO;
+      const user = await this.service.updateAdmin(id, body, actor);
+      res.status(200).json({ success: true, data: user });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ─── DELETE /users/:id ────────────────────────────
+  softDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const actor = this.getActor(req);
-      await this.usersService.softDelete(req.params.id, actor);
-      return res.status(204).send();
-    } catch (error) {
-      next(error);
+      const { id } = req.params as unknown as UserIdParamDTO;
+      await this.service.softDelete(id, actor);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
     }
-  }
+  };
+
+  // ─── DELETE /users/:id/hard ───────────────────────
+  hardDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const actor = this.getActor(req);
+      const { id } = req.params as unknown as UserIdParamDTO;
+      await this.service.hardDelete(id, actor);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 }

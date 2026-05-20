@@ -1,44 +1,97 @@
-// server/src/modules/users-teams/usersTeams.routes.ts
+// src/modules/users-teams/usersTeams.routes.ts
 import { Router } from "express";
 import { UsersTeamsController } from "./usersTeams.controller.js";
-import { validateBody } from "../../middlewares/validation/validate.middleware.js";
-
-import { 
-  createUserTeamSchema, 
-  updateUserTeamSchema 
+import {
+  validateBody,
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
+import {
+  createUserTeamSchema,
+  updateUserTeamSchema,
+  userTeamIdParamSchema,
 } from "./usersTeams.dto.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import {
+  checkPermission,
+  checkRole,
+} from "../../middlewares/auth/permission.middleware.js";
 
-const router = Router();
+// ─────────────────────────────────────────────
+// USERS-TEAMS ROUTES
+// ─────────────────────────────────────────────
+// Regras de acesso:
+//   GET    /users-teams          → qualquer role autenticado
+//   GET    /users-teams/:id      → qualquer role autenticado
+//   POST   /users-teams          → GENERAL_MANAGER ou ADMIN
+//   PUT    /users-teams/:id      → GENERAL_MANAGER ou ADMIN
+//   PATCH  /users-teams/:id      → GENERAL_MANAGER ou ADMIN
+//   DELETE /users-teams/:id/hard → somente ADMIN (hard delete físico)
+//   DELETE /users-teams/:id      → GENERAL_MANAGER ou ADMIN (soft delete)
+//
+// /hard deve vir ANTES de /:id para o Express resolver primeiro.
+// ─────────────────────────────────────────────
+
+const usersTeamsRouter = Router();
 const controller = new UsersTeamsController();
 
-// Handlers seguros
-const findAll = controller.findAll.bind(controller);
-const findById = controller.findById.bind(controller);
-const create = controller.create.bind(controller);
-const update = controller.update.bind(controller);
-const remove = controller.delete.bind(controller);
+// Autenticação obrigatória em todo o módulo
+usersTeamsRouter.use(authMiddleware);
 
-// 🔍 LISTAR TODOS OS VÍNCULOS
-router.get("/", findAll);
-
-// 🔍 BUSCAR VÍNCULO ESPECÍFICO POR ID
-router.get("/:id", findById);
-
-// ➕ VINCULAR UTILIZADOR A UM TIME
-router.post(
+// ─── LEITURA ─────────────────────────────────────────
+// checkPermission("ATTENDANT") aprova todos os 4 roles (nível mínimo hierárquico)
+usersTeamsRouter.get(
   "/",
-  validateBody(createUserTeamSchema),
-  create
+  checkPermission("ATTENDANT"),
+  controller.findAll
 );
 
-// ✏️ ATUALIZAR VÍNCULO
-router.put(
+usersTeamsRouter.get(
   "/:id",
-  validateBody(updateUserTeamSchema),
-  update
+  checkPermission("ATTENDANT"),
+  validateParams(userTeamIdParamSchema),
+  controller.findById
 );
 
-// ❌ REMOVER UTILIZADOR DO TIME (DESVINCULAR)
-router.delete("/:id", remove);
+// ─── CRIAÇÃO ─────────────────────────────────────────
+usersTeamsRouter.post(
+  "/",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateBody(createUserTeamSchema),
+  controller.create
+);
 
-export default router;
+// ─── ATUALIZAÇÃO ─────────────────────────────────────
+usersTeamsRouter.put(
+  "/:id",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateParams(userTeamIdParamSchema),
+  validateBody(updateUserTeamSchema),
+  controller.update
+);
+
+usersTeamsRouter.patch(
+  "/:id",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateParams(userTeamIdParamSchema),
+  validateBody(updateUserTeamSchema),
+  controller.update
+);
+
+// ─── EXCLUSÃO ────────────────────────────────────────
+// Hard delete — rota específica ANTES da genérica /:id
+usersTeamsRouter.delete(
+  "/:id/hard",
+  checkRole("ADMIN"),
+  validateParams(userTeamIdParamSchema),
+  controller.hardDelete
+);
+
+// Soft delete
+usersTeamsRouter.delete(
+  "/:id",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateParams(userTeamIdParamSchema),
+  controller.softDelete
+);
+
+export default usersTeamsRouter;

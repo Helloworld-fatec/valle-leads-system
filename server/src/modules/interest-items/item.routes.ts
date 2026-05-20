@@ -1,54 +1,99 @@
+// server/src/modules/interest-items/item.routes.ts
 import { Router } from "express";
-import { InterestItemsController } from "./item.controller";
-import {
-  CreateInterestItemSchema,
-  UpdateInterestItemSchema,
-  QueryInterestItemSchema,
-} from "./item.dtos";
+import { InterestItemsController } from "./item.controller.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import { checkPermission } from "../../middlewares/auth/permission.middleware.js";
 import {
   validateBody,
   validateQuery,
-} from "../../middlewares/validation/validate.middleware";
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
+import {
+  createInterestItemSchema,
+  updateInterestItemSchema,
+  queryInterestItemSchema,
+  interestItemIdParamSchema,
+} from "./item.dto.js";
 
 // ─────────────────────────────────────────────
 // INTEREST ITEMS ROUTES
 // ─────────────────────────────────────────────
+// Regras de acesso:
+//   GET    /interest-items          → qualquer role autenticado
+//   GET    /interest-items/:id      → qualquer role autenticado
+//   POST   /interest-items          → GENERAL_MANAGER ou ADMIN
+//   PUT    /interest-items/:id      → GENERAL_MANAGER ou ADMIN
+//   PATCH  /interest-items/:id      → GENERAL_MANAGER ou ADMIN
+//   DELETE /interest-items/:id      → GENERAL_MANAGER ou ADMIN (soft delete)
+//   DELETE /interest-items/:id/hard → somente ADMIN (hard delete físico)
+//
+// Pipeline padrão:
+//   authMiddleware → [checkPermission/checkRole] → [validateParams] → [validateBody/Query] → controller
+// ─────────────────────────────────────────────
 
-const interestItemsRoutes = Router();
+const router = Router();
 
-// ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint
-// interestItemsRoutes.use(authMiddleware);
+// Aplica authMiddleware em todas as rotas deste router de uma vez
+router.use(authMiddleware);
 
-// Listagem com filtros: ?description=civic&is_active=true&page=1&limit=20
-interestItemsRoutes.get(
+// ─── Rotas abertas a qualquer role autenticado ────────
+
+router.get(
   "/",
-  validateQuery(QueryInterestItemSchema),
+  validateQuery(queryInterestItemSchema),
   InterestItemsController.findAll
 );
 
-interestItemsRoutes.get("/:id", InterestItemsController.findById);
+router.get(
+  "/:id",
+  validateParams(interestItemIdParamSchema),
+  InterestItemsController.findById
+);
 
-interestItemsRoutes.post(
+// ─── Rotas restritas a GENERAL_MANAGER ou ADMIN ──────
+// checkPermission("GENERAL_MANAGER") usa a hierarquia — GENERAL_MANAGER (3)
+// e ADMIN (4) passam; MANAGER (2) e ATTENDANT (1) recebem 403.
+
+router.post(
   "/",
-  validateBody(CreateInterestItemSchema),
+  checkPermission("GENERAL_MANAGER"),
+  validateBody(createInterestItemSchema),
   InterestItemsController.create
 );
 
-// PUT — atualização completa do recurso
-interestItemsRoutes.put(
+router.put(
   "/:id",
-  validateBody(UpdateInterestItemSchema),
+  checkPermission("GENERAL_MANAGER"),
+  validateParams(interestItemIdParamSchema),
+  validateBody(updateInterestItemSchema),
   InterestItemsController.update
 );
 
-// PATCH — atualização parcial, usa o mesmo schema pois todos os campos já são opcionais
-interestItemsRoutes.patch(
+// PATCH usa o mesmo schema do PUT — todos os campos já são opcionais
+router.patch(
   "/:id",
-  validateBody(UpdateInterestItemSchema),
+  checkPermission("GENERAL_MANAGER"),
+  validateParams(interestItemIdParamSchema),
+  validateBody(updateInterestItemSchema),
   InterestItemsController.update
 );
 
-// DELETE — soft delete, não remove o registro do banco
-interestItemsRoutes.delete("/:id", InterestItemsController.softDelete);
+// Soft delete — GENERAL_MANAGER ou ADMIN
+router.delete(
+  "/:id",
+  checkPermission("GENERAL_MANAGER"),
+  validateParams(interestItemIdParamSchema),
+  InterestItemsController.softDelete
+);
 
-export default interestItemsRoutes;
+// ─── Rota restrita a ADMIN ────────────────────────────
+// Declarada antes de "/:id" para o Express não interpretar
+// "hard" como um UUID de parâmetro.
+router.delete(
+  "/:id/hard",
+  checkPermission("ADMIN"),
+  validateParams(interestItemIdParamSchema),
+  InterestItemsController.hardDelete
+);
+
+export default router;

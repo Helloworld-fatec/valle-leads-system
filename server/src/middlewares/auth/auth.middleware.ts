@@ -1,5 +1,6 @@
 // server/src/middlewares/auth/auth.middleware.ts
 import type { Request, Response, NextFunction } from "express";
+import type { ParamsDictionary } from "express-serve-static-core";
 import jwt, { type SignOptions, type JwtPayload } from "jsonwebtoken";
 import { AcessoNaoAutorizadoError } from "../errors/domainErrors.middleware.js";
 
@@ -16,20 +17,28 @@ import { AcessoNaoAutorizadoError } from "../errors/domainErrors.middleware.js";
 //   - optionalAuthMiddleware              → autenticação opcional
 //   - AuthRequest                         → tipagem do req.user pros controllers
 //
-// O `login.service` consome as funções de assinar/verificar daqui — não
-// duplica nada. Isso mantém o JWT como uma "capacidade" centralizada do
-// middleware, e o service apenas a usa quando precisa.
-//
-// Payload do JWT (mesmo em access e refresh):
-//   { id, email, role, team_ids, type: "access" | "refresh" }
-//
 // Decisões de segurança:
 //   - Dois segredos DIFERENTES (ACCESS e REFRESH) — invalidar um não
 //     compromete o outro.
 //   - Claim `type` embarcada → defesa contra reuso de refresh como access.
-//   - Erros do `jsonwebtoken` (TokenExpiredError etc.) são traduzidos em
-//     AcessoNaoAutorizadoError → globalErrorHandler responde 403.
+//   - Erros do `jsonwebtoken` são traduzidos em AcessoNaoAutorizadoError
+//     → globalErrorHandler responde 403.
 // ─────────────────────────────────────────────
+
+// ─── MODULE AUGMENTATION ──────────────────────────────
+// Estende o namespace global do Express para que `req.user` seja tipado
+// corretamente em TODOS os lugares sem criar uma interface filha que
+// conflita com `Request` quando `exactOptionalPropertyTypes: true` está ativo.
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      email: string;
+      role: string;
+      team_ids: string[];
+    }
+  }
+}
 
 // ─── ENV VARS (validadas uma única vez no boot) ───────
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
@@ -63,15 +72,22 @@ export interface FullPayload extends TokenPayload {
   type: TokenKind;
 }
 
-// Interface que estende Request — usada pelos controllers pra tipar req.user.
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-    team_ids: string[];
-  };
-}
+// AuthRequest repassa o parâmetro genérico de Params do Express.
+// Isso permite que os controllers usem AuthRequest<{ id: string }>
+// para tipar req.params sem intersections manuais, mantendo req.user
+// garantido via module augmentation acima.
+//
+// Parâmetros do genérico de Request (na ordem):
+//   P  = Params    (req.params)
+//   B  = ReqBody   (req.body)   — não usamos; deixamos never p/ forçar cast explícito
+//   Q  = ReqQuery  (req.query)  — idem
+//   L  = Locals    (res.locals) — idem
+export type AuthRequest<
+  P = ParamsDictionary,
+  B = unknown,
+  Q = qs.ParsedQs,
+  L extends Record<string, unknown> = Record<string, unknown>,
+> = Request<P, unknown, B, Q, L>;
 
 // Configuração exposta pra quem precisar (ex.: controller devolvendo `expires_in`)
 export const TOKEN_CONFIG = {
@@ -90,18 +106,23 @@ export function signRefreshToken(payload: TokenPayload): string {
 }
 
 function signToken(payload: TokenPayload, kind: TokenKind): string {
-  const secret = kind === "access" ? ACCESS_TOKEN_SECRET! : REFRESH_TOKEN_SECRET!;
+  const secret =
+    kind === "access" ? ACCESS_TOKEN_SECRET! : REFRESH_TOKEN_SECRET!;
+
+  // Com `exactOptionalPropertyTypes: true`, montar um objeto `SignOptions`
+  // inline falha porque `expiresIn` é `number | StringValue | undefined` na
+  // definição do tipo — e `undefined` não é assignable quando a flag está ativa.
+  // Solução: passar as opções diretamente no jwt.sign com cast pontual,
+  // evitando a criação de um objeto intermediário tipado como SignOptions.
   const expiresIn =
     kind === "access" ? ACCESS_TOKEN_EXPIRES_IN : REFRESH_TOKEN_EXPIRES_IN;
 
   const fullPayload: FullPayload = { ...payload, type: kind };
 
-  const options: SignOptions = {
-    expiresIn: expiresIn as SignOptions["expiresIn"],
+  return jwt.sign(fullPayload, secret, {
+    expiresIn,
     subject: payload.id,
-  };
-
-  return jwt.sign(fullPayload, secret, options);
+  } as SignOptions);
 }
 
 // ─── VERIFY ────────────────────────────────────────────
@@ -111,7 +132,10 @@ function signToken(payload: TokenPayload, kind: TokenKind): string {
  * Lança AcessoNaoAutorizadoError em qualquer falha — globalErrorHandler
  * responde com HTTP 403 e mensagem padronizada.
  */
-export function verifyToken(token: string, expectedKind: TokenKind): FullPayload {
+export function verifyToken(
+  token: string,
+  expectedKind: TokenKind
+): FullPayload {
   const secret =
     expectedKind === "access" ? ACCESS_TOKEN_SECRET! : REFRESH_TOKEN_SECRET!;
 
@@ -156,7 +180,7 @@ function extractBearerToken(req: Request): string | null {
  * Usado em todas as rotas protegidas.
  */
 export function authMiddleware(
-  req: AuthRequest,
+  req: Request,
   _res: Response,
   next: NextFunction
 ): void {
@@ -190,7 +214,7 @@ export function authMiddleware(
  * conforme o usuário esteja autenticado ou não.
  */
 export function optionalAuthMiddleware(
-  req: AuthRequest,
+  req: Request,
   _res: Response,
   next: NextFunction
 ): void {

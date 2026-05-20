@@ -1,6 +1,5 @@
 // server/src/middlewares/auth/permission.middleware.ts
-import type { Response, NextFunction, RequestHandler } from "express";
-import type { AuthRequest } from "./auth.middleware.js";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { AcessoNaoAutorizadoError } from "../errors/domainErrors.middleware.js";
 
 // ─────────────────────────────────────────────
@@ -13,21 +12,23 @@ import { AcessoNaoAutorizadoError } from "../errors/domainErrors.middleware.js";
 // Dois modos de uso:
 //
 //   1) checkPermission(level)  — verificação HIERÁRQUICA
-//      "tem nível pelo menos X". Útil quando a regra é monotônica
-//      (quem tem mais privilégios também tem os menores).
+//      "tem nível pelo menos X". Útil quando a regra é monotônica.
 //      Ex.: GET /users   → checkPermission("MANAGER")
-//           qualquer um a partir de MANAGER lê (MANAGER, GENERAL_MANAGER, ADMIN)
+//           MANAGER, GENERAL_MANAGER e ADMIN passam; ATTENDANT recebe 403.
 //
 //   2) checkRole(...roles)     — verificação EXPLÍCITA
 //      "tem QUALQUER UM destes roles". Útil quando a hierarquia
 //      não resolve — por exemplo, GENERAL_MANAGER NÃO pode criar
-//      usuários, mas MANAGER e ADMIN podem. Hierarquia pura falha aqui.
+//      usuários, mas MANAGER e ADMIN podem.
 //      Ex.: POST /users  → checkRole("MANAGER", "ADMIN")
 //
 // Importante: estes middlewares fazem o "grosso" da filtragem;
 // os services ainda aplicam regras granulares (escopo por times,
-// edição apenas do próprio team etc.) — defesa em profundidade,
-// conforme implementado na Etapa 1.
+// edição apenas do próprio team etc.) — defesa em profundidade.
+//
+// Nota: `AuthRequest` foi removido deste arquivo. O tipo `req.user` é
+// resolvido via module augmentation em auth.middleware.ts, então `Request`
+// já carrega a tipagem correta de `user` em todo o projeto.
 // ─────────────────────────────────────────────
 
 // Hierarquia dos 4 perfis do desafio (RF02).
@@ -56,7 +57,7 @@ export function checkPermission(requiredLevel: AccessLevel): RequestHandler {
   const requiredRank = ACCESS_LEVELS_RANKING[requiredLevel];
 
   // Salvaguarda de configuração — se alguém passar um nível inexistente,
-  // retorna um middleware que SEMPRE bloqueia (com 500), para que o erro
+  // retorna um middleware que SEMPRE bloqueia com 500, para que o erro
   // apareça já na primeira chamada e não passe despercebido.
   if (!requiredRank) {
     console.error(`Nível de permissão inválido configurado: ${requiredLevel}`);
@@ -68,9 +69,9 @@ export function checkPermission(requiredLevel: AccessLevel): RequestHandler {
     };
   }
 
-  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     // 1. Sanidade: authMiddleware deveria ter rodado antes
-    if (!req.user || !req.user.role) {
+    if (!req.user?.role) {
       next(new AcessoNaoAutorizadoError("Autenticação necessária."));
       return;
     }
@@ -80,11 +81,7 @@ export function checkPermission(requiredLevel: AccessLevel): RequestHandler {
 
     if (!userRank) {
       // Token traz role desconhecida — trata como negação por segurança
-      next(
-        new AcessoNaoAutorizadoError(
-          "Perfil de acesso inválido."
-        )
-      );
+      next(new AcessoNaoAutorizadoError("Perfil de acesso inválido."));
       return;
     }
 
@@ -136,8 +133,8 @@ export function checkRole(...allowedRoles: AccessLevel[]): RequestHandler {
     };
   }
 
-  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
-    if (!req.user || !req.user.role) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user?.role) {
       next(new AcessoNaoAutorizadoError("Autenticação necessária."));
       return;
     }

@@ -1,120 +1,103 @@
-// server/src/modules/stores/stores.controller.ts
-import type { Request, Response, NextFunction } from "express";
+// src/modules/stores/stores.controller.ts
+import type { Response, NextFunction } from "express";
 import { StoresService } from "./store.service.js";
-
-const service = new StoresService();
-
-// Função auxiliar para garantir que o parâmetro seja uma string simples
-function getParam(param: string | string[] | undefined): string | null {
-  if (!param || Array.isArray(param)) return null;
-  return param;
-}
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
+import type {
+  CreateStoreDTO,
+  UpdateStoreDTO,
+  StoreIdParamDTO,
+} from "./stores.dto.js";
 
 export class StoresController {
+  private service = new StoresService();
 
-  // 🔍 LISTAR TODAS AS STORES (Refatorado para coincidir com service.findAll)
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  // GET /stores
+  findAll = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const stores = await service.findAll();
-
-      return res.status(200).json({
-        success: true,
-        data: stores
-      });
-
+      const stores = await this.service.findAll();
+      res.status(200).json({ success: true, data: stores });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  // 🔍 BUSCAR POR ID
-  async findById(req: Request, res: Response, next: NextFunction) {
+  // GET /stores/:id
+  findById = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = getParam(req.params.id);
-
-      if (!id) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid id" 
-        });
-      }
-
-      const store = await service.findById(id);
-
-      if (!store) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Store not found" 
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        data: store
-      });
-
+      const { id } = req.params as unknown as StoreIdParamDTO;
+      const store = await this.service.findById(id);
+      res.status(200).json({ success: true, data: store });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  // ➕ CRIAR STORE
-  async create(req: Request, res: Response, next: NextFunction) {
+  // POST /stores
+  create = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const store = await service.create(req.body);
-
-      return res.status(201).json({
-        success: true,
-        data: store
-      });
-
+      const body = req.body as CreateStoreDTO;
+      const store = await this.service.create(body, req.user!.id);
+      res.status(201).json({ success: true, data: store });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  // ✏️ ATUALIZAR STORE
-  async update(req: Request, res: Response, next: NextFunction) {
+  // PUT/PATCH /stores/:id
+  update = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = getParam(req.params.id);
-
-      if (!id) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid id" 
-        });
-      }
-
-      const store = await service.update(id, req.body);
-
-      return res.status(200).json({
-        success: true,
-        data: store
-      });
-
+      const { id } = req.params as unknown as StoreIdParamDTO;
+      const body = req.body as UpdateStoreDTO;
+      const store = await this.service.update(id, body, req.user!.id);
+      res.status(200).json({ success: true, data: store });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  // ❌ DELETAR STORE (SOFT DELETE)
-  async delete(req: Request, res: Response, next: NextFunction) {
+  // DELETE /stores/:id (soft)
+  softDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = getParam(req.params.id);
-
-      if (!id) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid id" 
-        });
-      }
-
-      await service.delete(id);
-
-      return res.status(204).send(); // 204 No Content é o padrão ideal para deleções com sucesso sem payload
-
+      const { id } = req.params as unknown as StoreIdParamDTO;
+      await this.service.softDelete(id, req.user!.id);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }
-  }
+  };
+
+  // DELETE /stores/:id/hard
+  hardDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params as unknown as StoreIdParamDTO;
+      await this.service.hardDelete(id, req.user!.id);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 }

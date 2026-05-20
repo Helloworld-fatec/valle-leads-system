@@ -1,9 +1,10 @@
-// server/src/modules/users/users.service.ts
+// src/modules/users/users.service.ts
 import bcrypt from "bcrypt";
-import { UsersRepository, type SafeUser } from "./users.repository.js";
+import { Prisma } from "../../config/prisma.js";
+import { UsersRepository, type SafeUser, type ListUsersFilters } from "./users.repository.js";
 import type {
   CreateUserDTO,
-  UpdateUserDTO,
+  UpdateUserAdminDTO,
   UpdateSelfDTO,
   ListUsersQueryDTO,
   UserRole,
@@ -19,91 +20,79 @@ import {
 // ─────────────────────────────────────────────
 // USERS SERVICE
 // ─────────────────────────────────────────────
-// Responsabilidade: regras de negócio do módulo de usuários.
-// - Faz hash de senha (RNF02)
-// - Garante unicidade de e-mail
-// - Aplica regras de RBAC (RF02) sobre QUEM pode fazer O QUÊ
-// - Lança erros de domínio (interceptados pelo globalErrorHandler — RNF05)
-// - Nunca devolve password_hash pro caller
+// Responsabilidade: regras de negócio e RBAC do módulo de usuários.
+//
+// Separação clara de dois fluxos de update:
+//   - updateAdmin(id, data, actor): ADMIN edita qualquer usuário com campos completos
+//   - updateSelf(data, actor):      qualquer autenticado edita o próprio perfil,
+//                                   sem campos sensíveis (role, is_active, team_ids)
+//
+// O controller escolhe qual chamar com base na rota e no actor.role.
 // ─────────────────────────────────────────────
 
 const BCRYPT_ROUNDS = 10;
 
-// Contexto do solicitante — injetado pelo controller a partir do AuthRequest
 export interface ActorContext {
   id: string;
   role: UserRole;
 }
 
 export class UsersService {
-  private usersRepository = new UsersRepository();
+  private repo = new UsersRepository();
 
   // ─── CREATE ───────────────────────────────────────
-
-  /**
-   * Cria um usuário. Apenas ADMIN pode criar usuários de qualquer perfil.
-   * MANAGER pode criar apenas ATTENDANTs e somente vinculá-los aos próprios times.
-   */
+  // Somente ADMIN pode criar usuários (RF02).
   async create(data: CreateUserDTO, actor: ActorContext): Promise<SafeUser> {
-    // RBAC: quem pode criar?
-    if (actor.role !== "ADMIN" && actor.role !== "MANAGER") {
+    if (actor.role !== "ADMIN") {
       throw new AcessoNaoAutorizadoError(
-        "Apenas administradores ou gerentes podem criar usuários."
+        "Apenas administradores podem criar usuários."
       );
     }
 
-    if (actor.role === "MANAGER") {
-      // Manager só cria atendente
-      if (data.role !== "ATTENDANT") {
-        throw new AcessoNaoAutorizadoError(
-          "Gerentes podem criar apenas atendentes."
-        );
-      }
-      // E só pode vincular aos próprios times
-      if (data.team_ids && data.team_ids.length > 0) {
-        const managerTeams = await this.usersRepository.findActiveTeamIds(actor.id);
-        const invalid = data.team_ids.filter((id) => !managerTeams.includes(id));
-        if (invalid.length > 0) {
-          throw new AcessoNaoAutorizadoError(
-            "Você só pode vincular atendentes aos times que gerencia."
-          );
-        }
-      }
-    }
-
-    // Unicidade de e-mail
-    const existing = await this.usersRepository.findByEmail(data.email);
+    const existing = await this.repo.findByEmail(data.email);
     if (existing) {
       throw new ConflitoDeDadosError("E-mail já cadastrado.");
     }
 
-    // Hash da senha
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
-    // Monta o payload Prisma (separa team_ids e password do resto)
-    const { password, team_ids, ...rest } = data;
-
-    return this.usersRepository.create({
+    // Campos opcionais do Prisma são `string | null`, não `string | undefined`.
+    // Com exactOptionalPropertyTypes, o spread do DTO passaria `undefined` onde
+    // o Prisma exige `null` — por isso construímos o objeto explicitamente.
+    return this.repo.create({
       data: {
-        ...rest,
+        name: data.name,
+        email: data.email,
+        role: data.role,
         password_hash,
+        phone_1_ddd: data.phone_1_ddd ?? null,
+        phone_1_number: data.phone_1_number ?? null,
+        phone_2_ddd: data.phone_2_ddd ?? null,
+        phone_2_number: data.phone_2_number ?? null,
+        address_street: data.address_street ?? null,
+        address_number: data.address_number ?? null,
+        address_complement: data.address_complement ?? null,
+        address_neighborhood: data.address_neighborhood ?? null,
+        address_city: data.address_city ?? null,
+        address_state: data.address_state ?? null,
+        address_zip: data.address_zip ?? null,
         created_by_user_id: actor.id,
         updated_by_user_id: actor.id,
       },
-      team_ids,
+      ...(data.team_ids !== undefined && { team_ids: data.team_ids }),
       actorId: actor.id,
     });
   }
 
-  // ─── READ ─────────────────────────────────────────
-
-  /**
-   * Lista usuários respeitando o escopo do solicitante:
-   *   - ADMIN / GENERAL_MANAGER: vê todos
-   *   - MANAGER: vê apenas usuários dos próprios times
-   *   - ATTENDANT: não pode listar usuários
-   */
-  async findAll(filters: ListUsersQueryDTO, actor: ActorContext) {
+  // ─── FIND ALL ─────────────────────────────────────
+  // MANAGER vê apenas usuários dos próprios times.
+  // GENERAL_MANAGER e ADMIN veem todos.
+  // ATTENDANT não tem acesso (route já bloqueia via checkPermission("MANAGER"),
+  // mas o service reaplica como defesa em profundidade).
+  async findAll(
+    filters: ListUsersQueryDTO,
+    actor: ActorContext
+  ): Promise<{ data: SafeUser[]; total: number; page: number; pageSize: number }> {
     if (actor.role === "ATTENDANT") {
       throw new AcessoNaoAutorizadoError(
         "Atendentes não podem listar usuários."
@@ -111,30 +100,40 @@ export class UsersService {
     }
 
     let team_ids_scope: string[] | undefined;
+
     if (actor.role === "MANAGER") {
-      team_ids_scope = await this.usersRepository.findActiveTeamIds(actor.id);
-      // Se o manager não está em nenhum time, lista vazia
+      team_ids_scope = await this.repo.findActiveTeamIds(actor.id);
       if (team_ids_scope.length === 0) {
         return { data: [], total: 0, page: filters.page, pageSize: filters.pageSize };
       }
     }
 
-    const { data, total } = await this.usersRepository.findMany({
-      ...filters,
-      team_ids_scope,
-    });
+    // Monta o objeto de filtros sem passar undefined explicitamente
+    // (compatibilidade com exactOptionalPropertyTypes).
+    const repoFilters: ListUsersFilters = {
+      page: filters.page,
+      pageSize: filters.pageSize,
+    };
+
+    if (filters.role !== undefined) repoFilters.role = filters.role;
+    if (filters.team_id !== undefined) repoFilters.team_id = filters.team_id;
+    if (filters.search !== undefined) repoFilters.search = filters.search;
+    if (filters.is_active !== undefined) repoFilters.is_active = filters.is_active;
+    if (team_ids_scope !== undefined) repoFilters.team_ids_scope = team_ids_scope;
+
+    const { data, total } = await this.repo.findMany(repoFilters);
 
     return { data, total, page: filters.page, pageSize: filters.pageSize };
   }
 
-  /**
-   * Busca por ID respeitando escopo:
-   *   - ADMIN / GENERAL_MANAGER: qualquer um
-   *   - MANAGER: apenas usuários que dividem time com ele
-   *   - ATTENDANT: apenas o próprio cadastro
-   */
+  // ─── FIND BY ID ───────────────────────────────────
+  // Qualquer autenticado pode buscar. Escopo:
+  //   ATTENDANT:       apenas o próprio cadastro
+  //   MANAGER:         apenas usuários que dividem time com ele (+ si mesmo)
+  //   GENERAL_MANAGER: qualquer um
+  //   ADMIN:           qualquer um
   async findById(id: string, actor: ActorContext): Promise<SafeUser> {
-    const user = await this.usersRepository.findById(id);
+    const user = await this.repo.findById(id);
     if (!user) {
       throw new RecursoNaoEncontradoError("Usuário não encontrado.");
     }
@@ -146,7 +145,7 @@ export class UsersService {
     }
 
     if (actor.role === "MANAGER" && actor.id !== id) {
-      const managerTeams = await this.usersRepository.findActiveTeamIds(actor.id);
+      const managerTeams = await this.repo.findActiveTeamIds(actor.id);
       const targetTeams = user.user_teams.map((ut) => ut.team_id);
       const sharesTeam = targetTeams.some((t) => managerTeams.includes(t));
       if (!sharesTeam) {
@@ -159,76 +158,27 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * Retorna o cadastro do próprio solicitante (rota GET /me).
-   */
-  async findMe(actor: ActorContext): Promise<SafeUser> {
-    const user = await this.usersRepository.findById(actor.id);
-    if (!user) {
-      throw new RecursoNaoEncontradoError("Usuário autenticado não encontrado.");
-    }
-    return user;
-  }
-
-  // ─── UPDATE ───────────────────────────────────────
-
-  /**
-   * Atualiza dados administrativos de um usuário (role, times, ativação, perfil).
-   * Apenas ADMIN tem acesso total. MANAGER pode editar atendentes do próprio time
-   * (sem alterar role nem retirar do escopo).
-   */
-  async update(
+  // ─── UPDATE ADMIN ─────────────────────────────────
+  // ADMIN edita qualquer usuário com acesso completo a todos os campos,
+  // incluindo role, is_active e team_ids.
+  async updateAdmin(
     id: string,
-    data: UpdateUserDTO,
+    data: UpdateUserAdminDTO,
     actor: ActorContext
   ): Promise<SafeUser> {
-    const target = await this.usersRepository.findById(id);
+    if (actor.role !== "ADMIN") {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas administradores podem usar esta operação."
+      );
+    }
+
+    const target = await this.repo.findById(id);
     if (!target) {
       throw new RecursoNaoEncontradoError("Usuário não encontrado.");
     }
 
-    // RBAC
-    if (actor.role !== "ADMIN" && actor.role !== "MANAGER") {
-      throw new AcessoNaoAutorizadoError(
-        "Apenas administradores ou gerentes podem editar usuários."
-      );
-    }
-
-    if (actor.role === "MANAGER") {
-      // Manager não pode alterar role
-      if (data.role !== undefined) {
-        throw new AcessoNaoAutorizadoError(
-          "Gerentes não podem alterar o perfil de acesso."
-        );
-      }
-      // Manager só edita atendente do próprio time
-      if (target.role !== "ATTENDANT") {
-        throw new AcessoNaoAutorizadoError(
-          "Gerentes só podem editar usuários do tipo atendente."
-        );
-      }
-      const managerTeams = await this.usersRepository.findActiveTeamIds(actor.id);
-      const targetTeams = target.user_teams.map((ut) => ut.team_id);
-      const sharesTeam = targetTeams.some((t) => managerTeams.includes(t));
-      if (!sharesTeam) {
-        throw new AcessoNaoAutorizadoError(
-          "Você só pode editar usuários dos seus times."
-        );
-      }
-      // Se vier team_ids, valida que todos estão entre os times do manager
-      if (data.team_ids) {
-        const invalid = data.team_ids.filter((t) => !managerTeams.includes(t));
-        if (invalid.length > 0) {
-          throw new AcessoNaoAutorizadoError(
-            "Você só pode vincular usuários aos times que gerencia."
-          );
-        }
-      }
-    }
-
-    // Se o e-mail foi alterado, valida unicidade
-    if (data.email && data.email !== target.email) {
-      const emailInUse = await this.usersRepository.findByEmail(data.email);
+    if (data.email !== undefined && data.email !== target.email) {
+      const emailInUse = await this.repo.findByEmail(data.email);
       if (emailInUse) {
         throw new ConflitoDeDadosError("E-mail já cadastrado.");
       }
@@ -236,32 +186,62 @@ export class UsersService {
 
     const { team_ids, ...rest } = data;
 
-    return this.usersRepository.update({
+    // Monta o UpdateInput sem campos undefined (exactOptionalPropertyTypes).
+    const updateData: Prisma.UsersUpdateInput = {
+      updated_by_user_id: actor.id,
+    };
+
+    if (rest.name !== undefined) updateData.name = rest.name;
+    if (rest.email !== undefined) updateData.email = rest.email;
+    if (rest.role !== undefined) updateData.role = rest.role;
+    if (rest.is_active !== undefined) updateData.is_active = rest.is_active;
+    if (rest.phone_1_ddd !== undefined) updateData.phone_1_ddd = rest.phone_1_ddd;
+    if (rest.phone_1_number !== undefined) updateData.phone_1_number = rest.phone_1_number;
+    if (rest.phone_2_ddd !== undefined) updateData.phone_2_ddd = rest.phone_2_ddd;
+    if (rest.phone_2_number !== undefined) updateData.phone_2_number = rest.phone_2_number;
+    if (rest.address_street !== undefined) updateData.address_street = rest.address_street;
+    if (rest.address_number !== undefined) updateData.address_number = rest.address_number;
+    if (rest.address_complement !== undefined) updateData.address_complement = rest.address_complement;
+    if (rest.address_neighborhood !== undefined) updateData.address_neighborhood = rest.address_neighborhood;
+    if (rest.address_city !== undefined) updateData.address_city = rest.address_city;
+    if (rest.address_state !== undefined) updateData.address_state = rest.address_state;
+    if (rest.address_zip !== undefined) updateData.address_zip = rest.address_zip;
+
+    return this.repo.update({
       id,
-      data: {
-        ...rest,
-        updated_by_user_id: actor.id,
-      },
-      team_ids,
+      data: updateData,
+      // Spread condicional: omite a propriedade inteiramente quando undefined,
+      // satisfazendo exactOptionalPropertyTypes (team_ids?: string[] não aceita undefined explícito).
+      ...(team_ids !== undefined && { team_ids }),
       actorId: actor.id,
     });
   }
 
-  /**
-   * Atualização do próprio perfil (RF01).
-   * Permite mudar nome, e-mail, telefones, endereço e senha (com confirmação da atual).
-   * NÃO permite mudar role, is_active nem team_ids.
-   */
+  // ─── UPDATE SELF ──────────────────────────────────
+  // Qualquer autenticado edita o próprio /:id.
+  // Campos proibidos (role, is_active, team_ids) não existem no UpdateSelfDTO,
+  // então nunca chegam aqui — o schema Zod já os exclui no controller.
+  // Para troca de senha exige confirmação da senha atual.
   async updateSelf(data: UpdateSelfDTO, actor: ActorContext): Promise<SafeUser> {
-    const target = await this.usersRepository.findByIdWithPassword(actor.id);
+    const target = await this.repo.findByIdWithPassword(actor.id);
     if (!target) {
       throw new RecursoNaoEncontradoError("Usuário autenticado não encontrado.");
     }
 
-    const updateData: Record<string, unknown> = {};
+    if (data.email !== undefined && data.email !== target.email) {
+      const emailInUse = await this.repo.findByEmail(data.email);
+      if (emailInUse) {
+        throw new ConflitoDeDadosError("E-mail já cadastrado.");
+      }
+    }
 
-    // Campos simples
+    // Monta o UpdateInput com tipagem Prisma — sem Record<string, unknown>.
+    const updateData: Prisma.UsersUpdateInput = {
+      updated_by_user_id: actor.id,
+    };
+
     if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
     if (data.phone_1_ddd !== undefined) updateData.phone_1_ddd = data.phone_1_ddd;
     if (data.phone_1_number !== undefined) updateData.phone_1_number = data.phone_1_number;
     if (data.phone_2_ddd !== undefined) updateData.phone_2_ddd = data.phone_2_ddd;
@@ -274,23 +254,17 @@ export class UsersService {
     if (data.address_state !== undefined) updateData.address_state = data.address_state;
     if (data.address_zip !== undefined) updateData.address_zip = data.address_zip;
 
-    // E-mail (com unicidade)
-    if (data.email && data.email !== target.email) {
-      const emailInUse = await this.usersRepository.findByEmail(data.email);
-      if (emailInUse) {
-        throw new ConflitoDeDadosError("E-mail já cadastrado.");
-      }
-      updateData.email = data.email;
-    }
-
-    // Senha — exige senha atual
+    // Troca de senha
     if (data.new_password) {
       if (!data.current_password) {
         throw new RequisicaoInvalidaError(
           "É necessário informar a senha atual para alterá-la."
         );
       }
-      const matches = await bcrypt.compare(data.current_password, target.password_hash);
+      const matches = await bcrypt.compare(
+        data.current_password,
+        target.password_hash
+      );
       if (!matches) {
         throw new RequisicaoInvalidaError("Senha atual incorreta.");
       }
@@ -299,41 +273,32 @@ export class UsersService {
           "A nova senha deve ser diferente da senha atual."
         );
       }
-      updateData.password_hash = await bcrypt.hash(data.new_password, BCRYPT_ROUNDS);
+      updateData.password_hash = await bcrypt.hash(
+        data.new_password,
+        BCRYPT_ROUNDS
+      );
     }
 
-    if (Object.keys(updateData).length === 0) {
-      throw new RequisicaoInvalidaError("Nenhuma alteração válida foi enviada.");
-    }
-
-    updateData.updated_by_user_id = actor.id;
-
-    return this.usersRepository.update({
+    return this.repo.update({
       id: actor.id,
       data: updateData,
       actorId: actor.id,
     });
   }
 
-  // ─── DELETE ───────────────────────────────────────
-
-  /**
-   * Soft delete. Apenas ADMIN pode desativar usuários.
-   * Não permite que o usuário se autodesative (regra de negócio).
-   */
+  // ─── SOFT DELETE ──────────────────────────────────
+  // Somente ADMIN. Não permite autodesativação.
   async softDelete(id: string, actor: ActorContext): Promise<void> {
     if (actor.role !== "ADMIN") {
       throw new AcessoNaoAutorizadoError(
-        "Apenas administradores podem excluir usuários."
+        "Apenas administradores podem desativar usuários."
       );
     }
-    if (id === actor.id) {
-      throw new BusinessRuleError(
-        "Você não pode excluir o próprio usuário."
-      );
+    if (actor.id === id) {
+      throw new BusinessRuleError("Você não pode desativar o próprio usuário.");
     }
 
-    const target = await this.usersRepository.findById(id);
+    const target = await this.repo.findById(id);
     if (!target) {
       throw new RecursoNaoEncontradoError("Usuário não encontrado.");
     }
@@ -341,6 +306,33 @@ export class UsersService {
       throw new BusinessRuleError("Usuário já está inativo.");
     }
 
-    await this.usersRepository.softDelete({ id, actorId: actor.id });
+    await this.repo.softDelete({ id, actorId: actor.id });
+  }
+
+  // ─── HARD DELETE ──────────────────────────────────
+  // Somente ADMIN. Exclusão física — o schema propaga:
+  //   UserTeams     → onDelete: Cascade   (apagados junto)
+  //   Leads         → attendant_id: SetNull
+  //   Negotiations  → attendant_id: SetNull
+  //   SystemLogs    → user_id: SetNull
+  // Não há FK com Restrict em Users, então o Prisma não vai rejeitar.
+  async hardDelete(id: string, actor: ActorContext): Promise<void> {
+    if (actor.role !== "ADMIN") {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas administradores podem excluir usuários permanentemente."
+      );
+    }
+    if (actor.id === id) {
+      throw new BusinessRuleError(
+        "Você não pode excluir permanentemente o próprio usuário."
+      );
+    }
+
+    const target = await this.repo.findById(id);
+    if (!target) {
+      throw new RecursoNaoEncontradoError("Usuário não encontrado.");
+    }
+
+    await this.repo.hardDelete(id);
   }
 }

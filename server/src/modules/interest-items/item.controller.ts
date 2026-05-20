@@ -1,72 +1,117 @@
-import { Request, Response, NextFunction } from "express";
-import { InterestItemsService } from "./item.service";
-import {
-  QueryInterestItemSchema,
-  CreateInterestItemSchema,
-  UpdateInterestItemSchema,
-} from "./item.dtos";
+// server/src/modules/interest-items/item.controller.ts
+import type { Response, NextFunction } from "express";
+import { InterestItemsService } from "./item.service.js";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
+import type {
+  CreateInterestItemDTO,
+  UpdateInterestItemDTO,
+  QueryInterestItemDTO,
+  InterestItemIdParamDTO,
+} from "./item.dto.js";
 
 // ─────────────────────────────────────────────
 // INTEREST ITEMS CONTROLLER
 // ─────────────────────────────────────────────
-
-type ParamsWithId = { id: string };
+// Extrai dados do request, delega ao service e formata a response.
+// Sem regras de negócio aqui.
+//
+// req.user é garantido pelo authMiddleware em todas as rotas
+// deste módulo — o "!" é seguro nesse contexto.
+// ─────────────────────────────────────────────
 
 export const InterestItemsController = {
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  // GET /interest-items — qualquer role autenticado
+  async findAll(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const filters = QueryInterestItemSchema.parse(req.query);
+      const filters = req.query as unknown as QueryInterestItemDTO;
       const items = await InterestItemsService.findAll(filters);
-
-      return res.status(200).json({ success: true, data: items });
+      res.status(200).json({ success: true, data: items });
     } catch (error) {
       next(error);
     }
   },
 
-  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  // GET /interest-items/:id — qualquer role autenticado
+  async findById(
+    req: AuthRequest<InterestItemIdParamDTO>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const { id } = req.params;
       const item = await InterestItemsService.findById(id);
-
-      return res.status(200).json({ success: true, data: item });
+      res.status(200).json({ success: true, data: item });
     } catch (error) {
       next(error);
     }
   },
 
-  async create(req: Request, res: Response, next: NextFunction) {
+  // POST /interest-items — GENERAL_MANAGER ou ADMIN
+  async create(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const data = CreateInterestItemSchema.parse(req.body);
-      const item = await InterestItemsService.create(data);
-
-      return res.status(201).json({ success: true, data: item });
+      const body = req.body as CreateInterestItemDTO;
+      const actorId = req.user!.id;
+      const item = await InterestItemsService.create(body, actorId);
+      res.status(201).json({ success: true, data: item });
     } catch (error) {
       next(error);
     }
   },
 
-  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const data = UpdateInterestItemSchema.parse(req.body);
-      const item = await InterestItemsService.update(id, data);
-
-      return res.status(200).json({ success: true, data: item });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async softDelete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  // PUT/PATCH /interest-items/:id — GENERAL_MANAGER ou ADMIN
+  async update(
+    req: AuthRequest<InterestItemIdParamDTO>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const { id } = req.params;
-      await InterestItemsService.softDelete(id);
+      const body = req.body as UpdateInterestItemDTO;
+      const actorId = req.user!.id;
+      const item = await InterestItemsService.update(id, body, actorId);
+      res.status(200).json({ success: true, data: item });
+    } catch (error) {
+      next(error);
+    }
+  },
 
-      return res.status(200).json({
+  // DELETE /interest-items/:id — GENERAL_MANAGER ou ADMIN (soft delete)
+  async softDelete(
+    req: AuthRequest<InterestItemIdParamDTO>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      const actorId = req.user!.id;
+      await InterestItemsService.softDelete(id, actorId);
+      res.status(200).json({
         success: true,
         message: "Item de interesse desativado com sucesso.",
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // DELETE /interest-items/:id/hard — somente ADMIN (hard delete)
+  async hardDelete(
+    req: AuthRequest<InterestItemIdParamDTO>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      await InterestItemsService.hardDelete(id);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

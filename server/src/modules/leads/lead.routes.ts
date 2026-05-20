@@ -6,6 +6,8 @@ import {
   UpdateLeadSchema,
   QueryLeadSchema,
   LeadIdParamSchema,
+  BulkAssignAttendantSchema,
+  BulkAssignTeamSchema,
 } from "./lead.dtos.js";
 import {
   validateBody,
@@ -18,25 +20,49 @@ import {
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
 
-// ─────────────────────────────────────────────
-// LEADS ROUTES
-// ─────────────────────────────────────────────
-// Pipeline padrão:
-//   authMiddleware → checkPermission/checkRole → validate* → controller
+// Estrutura da pipeline em cada rota:
+//   authMiddleware     → exige access token válido + injeta req.user
+//   checkPermission/   → autoriza pelo role (RBAC "grosso")
+//   checkRole
+//   validate*          → garante shape dos dados via Zod
+//   controller.handler → orquestra e responde
 //
-// O grosso da autorização (quem pode chamar a rota) fica nos middlewares;
-// regras granulares de escopo (atendente vê apenas os próprios, manager
-// vê apenas dos times que gerencia) ficam no SERVICE — defesa em profundidade.
-// ─────────────────────────────────────────────
+// A autorização granular (escopo por times, escopo por atendente, restrições
+// por campo como reativar/mover entre times) é feita no SERVICE — defesa em
+// profundidade. Os middlewares filtram "quem pode chamar"; o service decide
+// "o que ele pode fazer com qual recurso".
+//
+// Importante: rotas mais específicas vêm ANTES das genéricas com `:id` para
+// o Express resolvê-las primeiro (ex.: /bulk/* antes de /:id).
 
 const leadsRoutes = Router();
 const controller = new LeadsController();
 
-// Autenticação obrigatória em todas as rotas
+// Autenticação obrigatória em todo o módulo
 leadsRoutes.use(authMiddleware);
 
-// ─── LISTAGEM ──────────────────────────────────────────
-// Todos os perfis podem listar — o service filtra o escopo
+// ─── BULK (rotas específicas — vêm antes de /:id) ──────
+
+// Atribuir atendente em lote (MANAGER e ADMIN)
+leadsRoutes.post(
+  "/bulk/assign-attendant",
+  checkRole("MANAGER", "ADMIN"),
+  validateBody(BulkAssignAttendantSchema),
+  controller.bulkAssignAttendant
+);
+
+// Atribuir/transferir leads para outro time em lote (GENERAL_MANAGER e ADMIN)
+leadsRoutes.post(
+  "/bulk/assign-team",
+  checkRole("GENERAL_MANAGER", "ADMIN"),
+  validateBody(BulkAssignTeamSchema),
+  controller.bulkAssignTeam
+);
+
+// ─── LISTAGEM E LEITURA ────────────────────────────────
+
+// Lista — todos os autenticados; service aplica filtro de escopo e força
+// is_active=true para quem não pode ver inativos.
 leadsRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
@@ -44,7 +70,6 @@ leadsRoutes.get(
   controller.findAll
 );
 
-// ─── LEITURA POR ID ────────────────────────────────────
 leadsRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
@@ -52,39 +77,51 @@ leadsRoutes.get(
   controller.findById
 );
 
-// ─── CREATE ────────────────────────────────────────────
-// GENERAL_MANAGER não pode criar — usar checkRole (hierarquia não resolve)
+// ─── CRIAÇÃO ───────────────────────────────────────────
+
+// Todos os roles podem criar agora (inclusive GENERAL_MANAGER).
 leadsRoutes.post(
   "/",
-  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  checkPermission("ATTENDANT"),
   validateBody(CreateLeadSchema),
   controller.create
 );
 
-// ─── UPDATE ────────────────────────────────────────────
-// GENERAL_MANAGER também não edita
+// ─── ATUALIZAÇÃO ───────────────────────────────────────
+
+// Todos podem editar com escopo aplicado no service.
+// Restrições por campo (reativar, trocar time) também ficam no service.
 leadsRoutes.put(
   "/:id",
-  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
   validateBody(UpdateLeadSchema),
   controller.update
 );
 
-// PATCH usa o mesmo schema (todos os campos já opcionais)
 leadsRoutes.patch(
   "/:id",
-  checkRole("ATTENDANT", "MANAGER", "ADMIN"),
+  checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
   validateBody(UpdateLeadSchema),
   controller.update
 );
 
-// ─── SOFT DELETE ───────────────────────────────────────
-// RF02 lista exclusão como exclusiva do ADMIN
+// ─── EXCLUSÃO ──────────────────────────────────────────
+
+// Hard delete — rota separada, só ADMIN. Rota específica vem antes de /:id genérica
+// não é problema aqui porque o path é diferente (/:id/permanent vs /:id).
+leadsRoutes.delete(
+  "/:id/permanent",
+  checkRole("ADMIN"),
+  validateParams(LeadIdParamSchema),
+  controller.hardDelete
+);
+
+// Soft delete — todos os autenticados, escopo aplicado no service.
 leadsRoutes.delete(
   "/:id",
-  checkRole("ADMIN"),
+  checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
   controller.softDelete
 );

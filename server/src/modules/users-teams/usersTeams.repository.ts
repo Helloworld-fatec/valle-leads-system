@@ -1,74 +1,93 @@
-import { prisma } from "../../config/prisma.js";
+// src/modules/users-teams/usersTeams.repository.ts
+import { prisma, Prisma } from "../../config/prisma.js";
 import type { CreateUserTeamDTO, UpdateUserTeamDTO } from "./usersTeams.dto.js";
 
+// ─── Include padrão ───────────────────────────────────
+// Traz dados resumidos do usuário e do time para evitar joins desnecessários.
+const userTeamInclude = {
+  user: {
+    select: { id: true, name: true, email: true, role: true, is_active: true },
+  },
+  team: {
+    select: { id: true, name: true, is_active: true },
+  },
+} as const satisfies Prisma.UserTeamsInclude;
+
+export type UserTeamWithRelations = Prisma.UserTeamsGetPayload<{
+  include: typeof userTeamInclude;
+}>;
+
 export class UsersTeamsRepository {
-  
-  // 🔍 Buscar todos os vínculos (trazendo informações resumidas do user e do team)
-  async findAll() {
+  // ─── LISTAR ─────────────────────────────────────────
+  async findAll(): Promise<UserTeamWithRelations[]> {
     return prisma.userTeams.findMany({
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        team: {
-          select: { id: true, name: true, is_active: true },
-        },
-      },
+      include: userTeamInclude,
+      orderBy: { created_at: "desc" },
     });
   }
 
-  // 🔍 Buscar vínculo específico por ID
-  async findById(id: string) {
+  // ─── BUSCAR POR ID ───────────────────────────────────
+  async findById(id: string): Promise<UserTeamWithRelations | null> {
     return prisma.userTeams.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        team: {
-          select: { id: true, name: true, is_active: true },
-        },
-      },
+      include: userTeamInclude,
     });
   }
 
-  // 🔍 Buscar vínculo por Usuário e Time (Útil para evitar duplicidade no Service)
-  async findByUserAndTeam(user_id: string, team_id: string) {
+  // ─── BUSCAR POR USER + TEAM (para verificar duplicidade) ─
+  async findByUserAndTeam(
+    user_id: string,
+    team_id: string
+  ): Promise<{ id: string; is_active: boolean } | null> {
     return prisma.userTeams.findUnique({
-      where: {
-        user_id_team_id: {
-          user_id,
-          team_id,
-        },
-      },
+      where: { user_id_team_id: { user_id, team_id } },
+      select: { id: true, is_active: true },
     });
   }
 
-  // ➕ Criar novo vínculo entre usuário e time
-  async create(data: CreateUserTeamDTO) {
+  // ─── CRIAR ──────────────────────────────────────────
+  async create(params: {
+    dto: CreateUserTeamDTO;
+    actorId: string;
+  }): Promise<UserTeamWithRelations> {
+    const { dto, actorId } = params;
+
     return prisma.userTeams.create({
-      data,
+      data: {
+        user_id: dto.user_id,
+        team_id: dto.team_id,
+        created_by_user_id: actorId,
+      },
+      include: userTeamInclude,
     });
   }
 
- // ✏️ Atualizar um vínculo existente
-  async update(id: string, data: UpdateUserTeamDTO) {
-    // 1. Remove qualquer propriedade que seja 'undefined'
-    const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined)
-    );
+  // ─── ATUALIZAR (is_active) ───────────────────────────
+  async update(params: {
+    id: string;
+    dto: UpdateUserTeamDTO;
+  }): Promise<UserTeamWithRelations> {
+    const { id, dto } = params;
 
-    // 2. Passa o objeto limpo para o Prisma
     return prisma.userTeams.update({
       where: { id },
-      data: cleanData, 
+      data: { is_active: dto.is_active },
+      include: userTeamInclude,
     });
   }
 
-  // ❌ Deletar vínculo (Hard delete, pois a tabela pivô não possui is_active)
-  async delete(id: string) {
-    return prisma.userTeams.delete({
+  // ─── SOFT DELETE ────────────────────────────────────
+  async softDelete(id: string): Promise<UserTeamWithRelations> {
+    return prisma.userTeams.update({
       where: { id },
+      data: { is_active: false },
+      include: userTeamInclude,
     });
+  }
+
+  // ─── HARD DELETE ────────────────────────────────────
+  // onDelete: Cascade em user e team — sem restrições de FK no sentido inverso.
+  async hardDelete(id: string): Promise<void> {
+    await prisma.userTeams.delete({ where: { id } });
   }
 }

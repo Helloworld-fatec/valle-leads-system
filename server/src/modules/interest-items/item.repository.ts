@@ -1,12 +1,16 @@
-import { prisma } from "../../config/prisma";
-import {
+// server/src/modules/interest-items/item.repository.ts
+import { prisma } from "../../config/prisma.js";
+import type {
   CreateInterestItemDTO,
   UpdateInterestItemDTO,
   QueryInterestItemDTO,
-} from "./item.dtos";
+} from "./item.dto.js";
 
 // ─────────────────────────────────────────────
 // INTEREST ITEMS REPOSITORY
+// ─────────────────────────────────────────────
+// Camada de acesso a dados — sem regras de negócio.
+// Campos de auditoria recebidos prontos do service.
 // ─────────────────────────────────────────────
 
 export const InterestItemsRepository = {
@@ -47,34 +51,54 @@ export const InterestItemsRepository = {
     });
   },
 
-  async create(dto: CreateInterestItemDTO) {
+  async create(
+    dto: CreateInterestItemDTO & { created_by_user_id: string }
+  ) {
+    const { created_by_user_id, ...fields } = dto;
     return prisma.interestItems.create({
       data: {
-        description: dto.description,
-        reference_code: dto.reference_code ?? null,
-        value: dto.value ?? null,
+        description: fields.description,
+        reference_code: fields.reference_code ?? null,
+        value: fields.value ?? null,
+        created_by_user_id,
+        updated_by_user_id: created_by_user_id,
       },
     });
   },
 
-  async update(id: string, dto: UpdateInterestItemDTO) {
+  async update(
+    id: string,
+    dto: UpdateInterestItemDTO & { updated_by_user_id: string }
+  ) {
+    const { updated_by_user_id, ...fields } = dto;
     return prisma.interestItems.update({
       where: { id },
       data: {
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.reference_code !== undefined && {
-          reference_code: dto.reference_code ?? null,
+        ...(fields.description !== undefined && {
+          description: fields.description,
         }),
-        ...(dto.value !== undefined && { value: dto.value ?? null }),
-        ...(dto.is_active !== undefined && { is_active: dto.is_active }),
+        ...(fields.reference_code !== undefined && {
+          reference_code: fields.reference_code ?? null,
+        }),
+        ...(fields.value !== undefined && { value: fields.value ?? null }),
+        ...(fields.is_active !== undefined && { is_active: fields.is_active }),
+        updated_by_user_id,
       },
     });
   },
 
-  async softDelete(id: string) {
+  // Soft delete — marca como inativo, preserva o registro
+  async softDelete(id: string, updated_by_user_id: string) {
     return prisma.interestItems.update({
       where: { id },
-      data: { is_active: false },
+      data: { is_active: false, updated_by_user_id },
+    });
+  },
+
+  // Hard delete — remoção física, exclusivo para ADMIN
+  async hardDelete(id: string) {
+    return prisma.interestItems.delete({
+      where: { id },
     });
   },
 };
