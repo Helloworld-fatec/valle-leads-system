@@ -35,7 +35,7 @@ export default function ConversionsByPeriodChart({ data, loading }: ConversionsB
 
   if (!data.length) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[220px]">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-55">
         <p className="text-sm font-medium" style={{ color: "#6B7280" }}>
           Nenhum dado no período
         </p>

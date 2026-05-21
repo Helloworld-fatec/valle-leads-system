@@ -39,7 +39,7 @@ export default function SalesFunnel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
+      <div className="flex items-center justify-center h-full min-h-100">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-gray-500">Carregando funil de vendas...</span>
@@ -50,7 +50,7 @@ export default function SalesFunnel() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
+      <div className="flex items-center justify-center h-full min-h-100">
         <div className="text-center">
           <p className="text-red-500 text-sm font-medium">{error}</p>
           <button
@@ -79,7 +79,7 @@ export default function SalesFunnel() {
 
       {/* Board */}
       {negotiations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[300px] text-center">
+        <div className="flex flex-col items-center justify-center min-h-75 text-center">
           <p className="text-gray-400 text-sm">Nenhuma negociação encontrada.</p>
         </div>
       ) : (

@@ -55,7 +55,7 @@ export default function KanbanColumn({
       </div>
 
       {/* Cards */}
-      <div className="flex flex-col gap-2 p-3 min-h-[120px]">
+      <div className="flex flex-col gap-2 p-3 min-h-30">
         {negotiations.length === 0 ? (
           <p className="text-xs text-center text-gray-400 mt-6">
             Nenhuma negociação

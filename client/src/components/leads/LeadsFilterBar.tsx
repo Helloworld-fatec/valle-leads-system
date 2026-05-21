@@ -34,7 +34,7 @@ export default function LeadsFilterBar({
       style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
     >
       {/* Search */}
-      <div className="relative flex-1 min-w-[200px]">
+      <div className="relative flex-1 min-w-50">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9CA3AF" }} />
         <input
           type="text"

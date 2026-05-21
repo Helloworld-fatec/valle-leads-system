@@ -75,7 +75,7 @@ export default function NegotiationCard({ negotiation, color, isDragging = false
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ background: avatarColors[idx] }}
             >
               {initials(clientName)}
@@ -92,7 +92,7 @@ export default function NegotiationCard({ negotiation, color, isDragging = false
 
           {/* Badge de importância */}
           <div
-            className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
+            className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full shrink-0"
             style={{ background: imp.bg, color: imp.color }}
           >
             {imp.icon}
