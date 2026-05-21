@@ -32,7 +32,6 @@ model Teams {
   created_by_user_id String?
   updated_by_user_id String?
   user_teams   UserTeams[]
-  customers    Customers[]
   leads        Leads[]
   negotiations Negotiations[]
   @@index([store_id])
@@ -100,15 +99,12 @@ model Customers {
   address_state        String?
   address_zip          String?
   is_active            Boolean  @default(false)
-  team_id              String?
-  teams                Teams?   @relation(fields: [team_id], references: [id], onDelete: Restrict)
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
   created_by_user_id   String?
   updated_by_user_id   String?
   leads        Leads[]
   negotiations Negotiations[]
-  @@index([team_id])
   @@index([created_at])
   @@map("customers")
 }
@@ -132,7 +128,7 @@ model InterestItems {
 model Leads {
   id                 String         @id @default(uuid())
   source             String?
-  status             String
+  status             String         @default("new")
   is_active          Boolean        @default(true)
   customer_id        String
   customers          Customers      @relation(fields: [customer_id], references: [id], onDelete: Restrict)

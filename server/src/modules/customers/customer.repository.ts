@@ -9,13 +9,7 @@ import type {
 // ─────────────────────────────────────────────
 // CUSTOMER REPOSITORY
 // ─────────────────────────────────────────────
-// Usa Prisma.CustomersUncheckedCreateInput / UncheckedUpdateInput para poder
-// passar team_id como string direta (FK escalar), em vez de precisar do
-// objeto de relação { teams: { connect: { id } } } exigido pelo CreateInput.
-// Com exactOptionalPropertyTypes, spreads de DTOs com campos opcionais
-// passariam `undefined` onde o Prisma exige `string | null` — por isso
-// cada campo é atribuído explicitamente com ?? null.
-// ─────────────────────────────────────────────
+
 
 // Select padrão — sem campos pesados
 const customerSelect = {
@@ -32,7 +26,6 @@ const customerSelect = {
   address_state: true,
   address_zip: true,
   is_active: true,
-  team_id: true,
   created_at: true,
   updated_at: true,
   created_by_user_id: true,
@@ -46,7 +39,6 @@ export type CustomerRow = Prisma.CustomersGetPayload<{
 // Tipo rico — retornado pelo findById (inclui leads)
 const customerInclude = {
   leads: true,
-  teams: { select: { id: true, name: true, is_active: true } },
 } as const satisfies Prisma.CustomersInclude;
 
 export type CustomerWithRelations = Prisma.CustomersGetPayload<{
@@ -56,8 +48,6 @@ export type CustomerWithRelations = Prisma.CustomersGetPayload<{
 export const CustomersRepository = {
   async findAll(filters: QueryCustomerDTO): Promise<CustomerRow[]> {
     const where: Prisma.CustomersWhereInput = {};
-
-    if (filters.team_id !== undefined) where.team_id = filters.team_id;
     if (filters.is_active !== undefined) where.is_active = filters.is_active;
     if (filters.cpf !== undefined) where.cpf = filters.cpf;
     if (filters.name !== undefined) {
@@ -110,14 +100,12 @@ export const CustomersRepository = {
   }): Promise<CustomerRow> {
     const { dto, actorId } = params;
 
-    // UncheckedCreateInput: team_id passado como scalar string (não como objeto de relação).
     // Campos String? exigem string | null — usamos ?? null para converter undefined.
     const data: Prisma.CustomersUncheckedCreateInput = {
       name: dto.name,
       phone: dto.phone,
       email: dto.email ?? null,
       cpf: dto.cpf ?? null,
-      team_id: dto.team_id ?? null,
       address_street: dto.address_street ?? null,
       address_number: dto.address_number ?? null,
       address_complement: dto.address_complement ?? null,
@@ -149,8 +137,6 @@ export const CustomersRepository = {
     if (dto.cpf !== undefined) data.cpf = dto.cpf ?? null;
     if (dto.phone !== undefined) data.phone = dto.phone;
     if (dto.is_active !== undefined) data.is_active = dto.is_active;
-    // team_id aceita null para desvincular o cliente de um time
-    if (dto.team_id !== undefined) data.team_id = dto.team_id ?? null;
     if (dto.address_street !== undefined) data.address_street = dto.address_street ?? null;
     if (dto.address_number !== undefined) data.address_number = dto.address_number ?? null;
     if (dto.address_complement !== undefined) data.address_complement = dto.address_complement ?? null;

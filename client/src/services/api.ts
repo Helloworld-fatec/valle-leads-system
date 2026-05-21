@@ -1,5 +1,5 @@
 // src/services/api.ts
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hook/useAuth";
 
@@ -57,94 +57,155 @@ export const useApi = () => {
   const navigate = useNavigate();
   const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
-  // Monta e executa a requisição HTTP com o token informado
-  const makeRequest = async (
-    url: string,
-    options: RequestInit = {},
-    token: string | null
-  ): Promise<Response> => {
-    const headers: Record<string, string> = {
-      ...(options.headers as Record<string, string>),
-    };
-
-    if (!(options.body instanceof FormData)) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    return fetch(`${BASE_URL}${url}`, { ...options, headers });
-  };
-
   /**
-   * Fetch personalizado com:
-   * - Injeção automática do Bearer token
-   * - Renovação automática via refresh token em caso de 401
-   * - Erros HTTP convertidos em `ApiError` com status, campo e tipo
+   * Ref que guarda a Promise de refresh em andamento.
+   * Garante que requisições paralelas que recebem 401 ao mesmo tempo
+   * aguardem o mesmo refresh, sem disparar múltiplas chamadas ao backend.
    */
-  const apiFetch = useCallback(
-    async (url: string, options: RequestInit = {}): Promise<Response> => {
-      const currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshPromiseRef = useRef<Promise<string> | null>(null);
 
-      let response = await makeRequest(url, options, accessToken);
+  // ─── Montagem da requisição HTTP ─────────────────────────────────
+  const makeRequest = useCallback(
+    (url: string, options: RequestInit, token: string | null): Promise<Response> => {
+      const headers: Record<string, string> = {
+        ...(options.headers as Record<string, string>),
+      };
 
-      // ── 401: tenta renovar o access token ──────────────────────────
-      if (response.status === 401 && currentRefreshToken) {
-        console.warn("🔁 Access Token expirado. Tentando renovar...");
-        try {
-          const refreshResponse = await fetch(`${BASE_URL}/api/auth/refresh`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refresh_token: currentRefreshToken }),
-          });
+      if (!(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+      }
 
-          if (refreshResponse.ok) {
-            const data = await refreshResponse.json();
-            const newAccessToken: string = data.access_token;
-            const newRefreshToken: string = data.refresh_token ?? currentRefreshToken;
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
 
-            // Atualiza localStorage e contexto
-            localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
-            localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
-            login(user!, newAccessToken, newRefreshToken);
+      return fetch(`${BASE_URL}${url}`, { ...options, headers });
+    },
+    [BASE_URL]
+  );
 
-            // Repete a requisição original com o novo token
-            response = await makeRequest(url, options, newAccessToken);
-          } else {
-            console.error("❌ Refresh Token inválido ou expirado. Forçando logout.");
-            logout();
-            navigate("/login");
-            throw new ApiError({
-              message: "Sessão expirada. Faça login novamente.",
-              status: 401,
-              type: "auth",
-            });
-          }
-        } catch (error) {
-          if (error instanceof ApiError) throw error;
-          console.error("💥 Erro inesperado durante renovação do token:", error);
-          logout();
-          navigate("/login");
-          throw new ApiError({
-            message: "Sessão expirada. Faça login novamente.",
-            status: 401,
-            type: "auth",
-          });
-        }
-      } else if (response.status === 401 && !currentRefreshToken) {
-        console.error("❌ Sem token de sessão. Redirecionando para login.");
-        logout();
-        navigate("/login");
+  // ─── Renovação do access token via refresh token ──────────────────
+  /**
+   * Chama POST /api/auth/refresh com o refresh token do localStorage.
+   * - Persiste o novo par de tokens no localStorage e no contexto.
+   * - Retorna o novo access token para a requisição original ser repetida.
+   * - Múltiplas chamadas simultâneas compartilham a mesma Promise (via ref),
+   *   evitando race condition de refresh duplicado.
+   */
+  const refreshAccessToken = useCallback((): Promise<string> => {
+    // Se já há um refresh em andamento, reutiliza a mesma Promise
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    const doRefresh = async (): Promise<string> => {
+      const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+      if (!storedRefreshToken) {
         throw new ApiError({
-          message: "Acesso não autorizado. Faça login.",
+          message: "Sessão encerrada. Faça login novamente.",
           status: 401,
           type: "auth",
         });
       }
 
-      // ── Qualquer outro erro HTTP ────────────────────────────────────
+      const refreshResponse = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: storedRefreshToken }),
+      });
+
+      if (!refreshResponse.ok) {
+        throw new ApiError({
+          message: "Sessão expirada. Faça login novamente.",
+          status: 401,
+          type: "auth",
+        });
+      }
+
+      const data = await refreshResponse.json();
+
+      const newAccessToken: string = data.access_token;
+      // O backend rotaciona o refresh token — sempre use o novo.
+      // Se por algum motivo não vier (não deveria acontecer), mantém o atual.
+      const newRefreshToken: string = data.refresh_token ?? storedRefreshToken;
+
+      // Persiste os novos tokens
+      localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+
+      // Atualiza o contexto React com os dados frescos do usuário vindos do backend
+      const freshUser = data.user ?? user;
+      if (!freshUser) {
+        throw new ApiError({
+          message: "Não foi possível recuperar os dados do usuário.",
+          status: 401,
+          type: "auth",
+        });
+      }
+      login(freshUser, newAccessToken, newRefreshToken);
+
+      return newAccessToken;
+    };
+
+    refreshPromiseRef.current = doRefresh().finally(() => {
+      // Limpa a ref ao terminar (com sucesso ou erro) para que o próximo
+      // 401 real (depois que o novo token também expirar) dispare um novo refresh
+      refreshPromiseRef.current = null;
+    });
+
+    return refreshPromiseRef.current;
+  }, [BASE_URL, user, login]);
+
+  // ─── Força logout e redireciona ──────────────────────────────────
+  const forceLogout = useCallback(
+    (message: string) => {
+      logout();
+      navigate("/login");
+      throw new ApiError({ message, status: 401, type: "auth" });
+    },
+    [logout, navigate]
+  );
+
+  // ─────────────────────────────────────────────────────────────────
+  /**
+   * Fetch personalizado com:
+   * - Injeção automática do Bearer token (do contexto de autenticação)
+   * - Renovação automática via refresh token em caso de 401
+   * - Retry automático da requisição original após refresh bem-sucedido
+   * - Deduplicação de refreshes paralelos (sem race condition)
+   * - Erros HTTP convertidos em `ApiError` tipado
+   */
+  const apiFetch = useCallback(
+    async (url: string, options: RequestInit = {}): Promise<Response> => {
+      // Lê o accessToken do contexto (atualizado pelo AuthProvider)
+      let response = await makeRequest(url, options, accessToken);
+
+      // ── 401: tenta renovar e repetir ────────────────────────────
+      if (response.status === 401) {
+        const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+        if (!storedRefreshToken) {
+          forceLogout("Acesso não autorizado. Faça login.");
+        }
+
+        console.warn("🔁 Access token expirado. Renovando...");
+
+        let newAccessToken: string;
+        try {
+          newAccessToken = await refreshAccessToken();
+        } catch (error) {
+          // Refresh falhou (token inválido, expirado, rede, etc.)
+          forceLogout("Sessão expirada. Faça login novamente.");
+          // forceLogout sempre lança — linha abaixo só satisfaz o TS
+          throw error;
+        }
+
+        // Repete a requisição original com o token renovado
+        response = await makeRequest(url, options, newAccessToken);
+      }
+
+      // ── Qualquer outro erro HTTP ─────────────────────────────────
       if (!response.ok) {
         let errorBody: { message?: string; field?: string } = {};
         try {
@@ -158,7 +219,7 @@ export const useApi = () => {
         const message =
           status >= 500
             ? "Ocorreu um erro interno. Tente novamente em instantes."
-            : errorBody.message ?? `Erro ${status} na requisição.`;
+            : (errorBody.message ?? `Erro ${status} na requisição.`);
         const field = errorBody.field ?? null;
 
         throw new ApiError({ message, status, field, type });
@@ -166,8 +227,7 @@ export const useApi = () => {
 
       return response;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accessToken, user, login, logout, navigate, BASE_URL]
+    [accessToken, makeRequest, refreshAccessToken, forceLogout]
   );
 
   return { apiFetch };

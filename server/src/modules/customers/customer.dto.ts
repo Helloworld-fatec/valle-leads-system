@@ -5,7 +5,6 @@ import { z } from "zod";
 // CUSTOMER — DTOs
 // ─────────────────────────────────────────────
 // phone é String (obrigatório e único) no schema Prisma.
-// team_id é String? (opcional) — FK para Teams.
 // ─────────────────────────────────────────────
 
 const addressFields = {
@@ -37,7 +36,6 @@ export const createCustomerSchema = z.object({
   phone: z
     .string()
     .regex(/^\d{10,11}$/, "Telefone deve conter 10 ou 11 dígitos numéricos"),
-  team_id: z.string().uuid("team_id deve ser um UUID válido").optional(),
   ...addressFields,
 });
 
@@ -55,7 +53,6 @@ export const updateCustomerSchema = z
       .regex(/^\d{10,11}$/, "Telefone deve ter 10 ou 11 dígitos")
       .optional(),
     is_active: z.boolean().optional(),
-    team_id: z.string().uuid("team_id deve ser um UUID válido").nullable().optional(),
     ...addressFields,
   })
   .refine((data) => Object.keys(data).length > 0, {
@@ -64,7 +61,6 @@ export const updateCustomerSchema = z
 
 // ─── QUERY ────────────────────────────────────────────
 export const queryCustomerSchema = z.object({
-  team_id: z.string().uuid().optional(),
   is_active: z
     .string()
     .optional()

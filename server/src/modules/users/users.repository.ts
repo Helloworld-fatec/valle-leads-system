@@ -113,12 +113,19 @@ export class UsersRepository {
       where.AND = teamConditions;
     }
 
+    // Fallback explícito: Prisma 7 não aceita skip=undefined quando take
+    // está presente — NaN também é rejeitado. Garante valores válidos mesmo
+    // que o caller não tenha aplicado defaults antes de chamar o repository.
+    const page     = filters.page     ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const skip     = (page - 1) * pageSize;
+
     const [data, total] = await Promise.all([
       prisma.users.findMany({
         where,
         select: safeUserSelect,
-        skip: (filters.page - 1) * filters.pageSize,
-        take: filters.pageSize,
+        skip,
+        take: pageSize,
         orderBy: { created_at: "desc" },
       }),
       prisma.users.count({ where }),
