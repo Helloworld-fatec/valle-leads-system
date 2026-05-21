@@ -1,7 +1,9 @@
 // src/components/leads/AssignTeamModal.tsx
 import { useEffect, useState } from "react";
-import { Lead, useLeadsService } from "../../services/leadService";
-import { Team, useTeamsService } from "../../services/teamService";
+import { useLeadService } from "../../services/leadService";
+import type { Lead } from "../../services/leadService";
+import { useTeamsService } from "../../services/teamService";
+import type { Team } from "../../services/teamService";
 
 interface AssignTeamModalProps {
   lead: Lead;
@@ -10,23 +12,30 @@ interface AssignTeamModalProps {
 }
 
 export default function AssignTeamModal({ lead, onClose, onSuccess }: AssignTeamModalProps) {
-  const { assignTeam } = useLeadsService();
-  const { getTeams } = useTeamsService();
+  const { updateLead } = useLeadService();
+  const { getTeams }   = useTeamsService();
 
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [teams, setTeams]                   = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(lead.team_id ?? "");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]               = useState(false);
+  const [fetching, setFetching]             = useState(true);
+  const [error, setError]                   = useState<string | null>(null);
 
   useEffect(() => {
     getTeams()
       .then(setTeams)
-      .catch(() => setError("Erro ao carregar equipes."));
+      .catch(() => setError("Erro ao carregar equipes."))
+      .finally(() => setFetching(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSave = async () => {
+  async function handleSave() {
     if (!selectedTeamId) {
       setError("Selecione uma equipe.");
+      return;
+    }
+    if (selectedTeamId === lead.team_id) {
+      onClose();
       return;
     }
 
@@ -34,7 +43,11 @@ export default function AssignTeamModal({ lead, onClose, onSuccess }: AssignTeam
     setError(null);
 
     try {
-      await assignTeam(lead.id, { team_id: selectedTeamId });
+      // O UpdateLeadSchema do backend aceita team_id.
+      // O servidor zera attendant_id automaticamente ao trocar de time.
+      // Não é necessário usar userTeamsService aqui — esse service gerencia
+      // o vínculo usuário↔time (tabela pivô), não lead↔time.
+      await updateLead(lead.id, { team_id: selectedTeamId });
       onSuccess();
       onClose();
     } catch {
@@ -42,39 +55,45 @@ export default function AssignTeamModal({ lead, onClose, onSuccess }: AssignTeam
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  // lead.name não existe — o nome do cliente está em lead.customers?.name
+  const clientName = lead.customers?.name ?? "—";
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 flex flex-col gap-5">
 
-        {/* Título */}
         <div>
           <h2 className="text-lg font-bold text-gray-900">Atribuir Equipe</h2>
-          <p className="text-sm text-gray-500 mt-1">Lead: <span className="font-medium text-gray-700">{lead.name}</span></p>
+          <p className="text-sm text-gray-500 mt-1">
+            Lead: <span className="font-medium text-gray-700">{clientName}</span>
+          </p>
         </div>
 
-        {/* Select de equipe */}
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">Equipe</label>
-          <select
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-          >
-            <option value="">Selecione uma equipe</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name} {team.store_name ? `— ${team.store_name}` : ""}
-              </option>
-            ))}
-          </select>
+          {fetching ? (
+            <p className="text-sm text-gray-400">Carregando equipes...</p>
+          ) : (
+            <select
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+              <option value="">Selecione uma equipe</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                  {team.store_name ? ` — ${team.store_name}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* Erro */}
         {error && <p className="text-sm text-red-500">{error}</p>}
 
-        {/* Botões */}
         <div className="flex gap-3 mt-2">
           <button
             onClick={onClose}
@@ -84,7 +103,7 @@ export default function AssignTeamModal({ lead, onClose, onSuccess }: AssignTeam
           </button>
           <button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || fetching}
             className="flex-1 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl py-2 transition-colors"
           >
             {loading ? "Salvando..." : "Confirmar"}

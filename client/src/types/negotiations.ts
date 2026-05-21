@@ -1,8 +1,14 @@
 // src/types/negotiations.ts
+// Fonte canônica de todos os tipos do módulo de negociações.
+// Os serviços e componentes importam daqui — sem duplicação.
 
-export type ImportanceLevel = "frio" | "morno" | "quente";
+// ─────────────────────────────────────────────
+// Enums (espelham os DTOs do servidor)
+// ─────────────────────────────────────────────
 
+// negotiationStageHistory.dto.ts → NegotiationStageEnum
 export type NegotiationStage =
+  | "qualificacao"
   | "contato_inicial"
   | "visita"
   | "proposta"
@@ -10,44 +16,104 @@ export type NegotiationStage =
   | "fechamento_com_venda"
   | "fechamento_sem_venda";
 
-export interface NegotiationStatusEntry {
+// importance.dto.ts → ImportanceEnum
+export type ImportanceLevel = "frio" | "morno" | "quente";
+
+// status.dto.ts → StatusEnum
+export type NegotiationStatusValue = "open" | "closed";
+
+// ─────────────────────────────────────────────
+// Entidades relacionadas
+// ─────────────────────────────────────────────
+
+export interface StageHistoryItem {
   id: string;
-  status_negotiation: string; // ← nome real do campo no schema
+  negotiation_id: string;
+  old_stage: NegotiationStage | null;
+  new_stage: NegotiationStage;
   notes: string | null;
   created_at: string;
 }
 
-export interface NegotiationStageEntry {
+export interface ImportanceItem {
   id: string;
-  old_status: NegotiationStage | null;
-  new_status: NegotiationStage;
-  notes: string | null;
-  created_at: string;
-}
-
-export interface NegotiationImportanceEntry {
-  id: string;
+  negotiation_id: string;
   importance: ImportanceLevel;
+  notes: string | null;
   created_at: string;
 }
+
+export interface StatusHistoryItem {
+  id: string;
+  negotiation_id: string;
+  status_negotiation: NegotiationStatusValue;
+  notes: string | null;
+  created_at: string;
+}
+
+// ─────────────────────────────────────────────
+// Negociação
+// ─────────────────────────────────────────────
 
 export interface Negotiation {
   id: string;
   lead_id: string;
   team_id: string;
-  created_at: string;
-  // Dados do Lead (via join do backend)
+  customer_id: string;
+  attendant_id?: string | null;
   lead?: {
-    vehicle_interest: string | null;
-    attendant_id: string | null;
+    id: string;
+    source?: string;
+    vehicle_interest?: string | null;
+    attendant_id?: string | null;
     customers?: {
+      id: string;
       name: string;
+      cpf?: string;
+      phone?: string;
+      email?: string;
     };
   };
-  // Último registro de cada histórico (via join do backend)
-  current_stage?: NegotiationStage;       // backend precisa calcular isso
-  current_status?: string;                // backend precisa calcular isso
-  status_history?: NegotiationStatusEntry[];
-  stage_history?: NegotiationStageEntry[];
-  importance_history?: NegotiationImportanceEntry[];
+  attendant?: {
+    id: string;
+    name: string;
+  };
+  stage_history?: StageHistoryItem[];
+  importance_history?: ImportanceItem[];
+  status_history?: StatusHistoryItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ─────────────────────────────────────────────
+// DTOs de query e criação
+// ─────────────────────────────────────────────
+
+export interface QueryNegotiationDTO {
+  team_id?: string;
+  lead_id?: string;
+  customer_id?: string;
+  attendant_id?: string;
+  is_open?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateStageHistoryDTO {
+  negotiation_id: string;
+  old_stage?: NegotiationStage | null;
+  new_stage: NegotiationStage;
+  notes?: string;
+}
+
+export interface CreateImportanceDTO {
+  negotiation_id: string;
+  importance: ImportanceLevel;
+  notes?: string;
+}
+
+export interface CreateStatusDTO {
+  negotiation_id: string;
+  status_negotiation: NegotiationStatusValue;
+  notes?: string;
 }

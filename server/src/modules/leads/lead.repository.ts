@@ -6,9 +6,6 @@ import type {
   QueryLeadDTO,
 } from "./lead.dtos.js";
 
-// Select padronizado para o atendente embutido nos retornos.
-// Mantemos const + satisfies para que o TS infira o tipo exato (sem alargar
-// para Prisma.UsersSelect "genérico"), permitindo derivar o payload depois.
 const attendantSelect = {
   id: true,
   name: true,
@@ -16,9 +13,6 @@ const attendantSelect = {
   role: true,
 } as const satisfies Prisma.UsersSelect;
 
-// Include reutilizado por todos os retornos de leitura.
-// Marcar como const + satisfies dá ao TS o tipo exato deste include,
-// o que nos permite derivar LeadWithIncludes via Prisma.LeadsGetPayload.
 const leadInclude = {
   customers: true,
   teams: true,
@@ -26,14 +20,11 @@ const leadInclude = {
   interest_item: true,
 } as const satisfies Prisma.LeadsInclude;
 
-// Versão com include de negociações — só usada em findById.
 const leadIncludeWithNegotiations = {
   ...leadInclude,
   negotiations: true,
 } as const satisfies Prisma.LeadsInclude;
 
-// Tipos derivados do Prisma: nos dão o shape exato do retorno, evitando
-// `any` em qualquer ponto da camada de aplicação.
 export type LeadWithIncludes = Prisma.LeadsGetPayload<{
   include: typeof leadInclude;
 }>;
@@ -41,18 +32,12 @@ export type LeadWithNegotiations = Prisma.LeadsGetPayload<{
   include: typeof leadIncludeWithNegotiations;
 }>;
 
-// Filtros aceitos pela listagem.
-// Os campos *_scope são INJETADOS PELO SERVICE conforme o role do actor;
-// nunca chegam do cliente. Isso garante que a restrição de escopo não pode
-// ser burlada via query string.
 export interface FindAllLeadsParams extends QueryLeadDTO {
   attendant_id_scope?: string;
   team_ids_scope?: string[];
-  // Força is_active=true ignorando o que veio na query (para ATTENDANT/MANAGER).
   force_active_only?: boolean;
 }
 
-// Resultado paginado padrão.
 export interface PaginatedLeads {
   data: LeadWithIncludes[];
   total: number;
@@ -61,17 +46,21 @@ export interface PaginatedLeads {
 }
 
 export class LeadsRepository {
-  // Lê uma página de leads aplicando todos os filtros do service.
   async findAll(filters: FindAllLeadsParams): Promise<PaginatedLeads> {
     const where = this.buildWhere(filters);
-    const page = filters.page;
-    const limit = filters.limit;
+
+    // Fallback explícito: mesmo que o Zod já defina defaults, o repository
+    // garante valores numéricos válidos para que skip nunca seja NaN/undefined
+    // (Prisma 7 não aceita skip undefined quando take está presente).
+    const page  = filters.page  ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip  = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       prisma.leads.findMany({
         where,
         include: leadInclude,
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
         orderBy: { created_at: "desc" },
       }),
@@ -81,38 +70,30 @@ export class LeadsRepository {
     return { data, total, page, limit };
   }
 
-  // Monta o WHERE combinando filtros do cliente e restrições de escopo.
-  // Lógica importante: o escopo SEMPRE vence sobre o filtro livre.
-  // Se um ATTENDANT pedir ?attendant_id=outro, o escopo sobrescreve.
   private buildWhere(filters: FindAllLeadsParams): Prisma.LeadsWhereInput {
     const where: Prisma.LeadsWhereInput = {};
 
-    if (filters.status) where.status = filters.status;
-    if (filters.customer_id) where.customer_id = filters.customer_id;
-    if (filters.interest_item_id)
-      where.interest_item_id = filters.interest_item_id;
+    if (filters.status)           where.status           = filters.status;
+    if (filters.customer_id)      where.customer_id      = filters.customer_id;
+    if (filters.interest_item_id) where.interest_item_id = filters.interest_item_id;
 
-    // is_active: força true para perfis sem permissão de ver inativos,
-    // caso contrário respeita o filtro do cliente.
     if (filters.force_active_only) {
       where.is_active = true;
     } else if (filters.is_active !== undefined) {
       where.is_active = filters.is_active;
     }
 
-    // Escopo de atendente (ATTENDANT) sobrepõe filtro livre.
     if (filters.attendant_id_scope) {
       where.attendant_id = filters.attendant_id_scope;
     } else if (filters.attendant_id) {
       where.attendant_id = filters.attendant_id;
     }
 
-    // Escopo de times (MANAGER): intersecta com filtro livre se houver.
     if (filters.team_ids_scope && filters.team_ids_scope.length > 0) {
       if (filters.team_id) {
         where.team_id = filters.team_ids_scope.includes(filters.team_id)
           ? filters.team_id
-          : { in: [] }; // pediu time fora do escopo → resultado vazio
+          : { in: [] };
       } else {
         where.team_id = { in: filters.team_ids_scope };
       }
@@ -123,7 +104,6 @@ export class LeadsRepository {
     return where;
   }
 
-  // Busca individual com include rico (inclui negociações).
   async findById(id: string): Promise<LeadWithNegotiations | null> {
     return prisma.leads.findUnique({
       where: { id },
@@ -131,12 +111,8 @@ export class LeadsRepository {
     });
   }
 
-  // Busca em lote para validações de operações bulk (sem includes pesados).
   async findManyByIds(ids: string[]): Promise<
-    Pick<
-      LeadWithIncludes,
-      "id" | "team_id" | "attendant_id" | "is_active"
-    >[]
+    Pick<LeadWithIncludes, "id" | "team_id" | "attendant_id" | "is_active">[]
   > {
     return prisma.leads.findMany({
       where: { id: { in: ids } },
@@ -149,7 +125,6 @@ export class LeadsRepository {
     });
   }
 
-  // Cria um lead já com campos de auditoria preenchidos pelo service.
   async create(params: {
     dto: CreateLeadDTO;
     actorId: string;
@@ -170,8 +145,6 @@ export class LeadsRepository {
     });
   }
 
-  // Atualização parcial. Só copia o que veio no DTO (preserva o restante).
-  // attendant_id e interest_item_id aceitam null explícito para desvincular.
   async update(params: {
     id: string;
     dto: UpdateLeadDTO;
@@ -183,12 +156,10 @@ export class LeadsRepository {
       updated_by_user_id: actorId,
     };
 
-    if (dto.status !== undefined) data.status = dto.status;
-    if (dto.is_active !== undefined) data.is_active = dto.is_active;
-    if (dto.source !== undefined) data.source = dto.source ?? null;
+    if (dto.status      !== undefined) data.status    = dto.status;
+    if (dto.is_active   !== undefined) data.is_active = dto.is_active;
+    if (dto.source      !== undefined) data.source    = dto.source ?? null;
 
-    // Relacionamentos: usamos connect/disconnect porque attendant é opcional
-    // e queremos suportar desvincular (null) com tipagem correta.
     if (dto.attendant_id !== undefined) {
       data.attendant =
         dto.attendant_id === null
@@ -212,7 +183,6 @@ export class LeadsRepository {
     });
   }
 
-  // Soft delete: marca is_active=false e registra quem fez.
   async softDelete(params: {
     id: string;
     actorId: string;
@@ -220,24 +190,15 @@ export class LeadsRepository {
     const { id, actorId } = params;
     return prisma.leads.update({
       where: { id },
-      data: {
-        is_active: false,
-        updated_by_user_id: actorId,
-      },
+      data: { is_active: false, updated_by_user_id: actorId },
       include: leadInclude,
     });
   }
 
-  // Exclusão permanente. Em cascata pelo schema: status_history,
-  // stage_history e importance_history são apagados; negociações têm
-  // onDelete: Restrict, então o Prisma vai recusar a exclusão se existirem
-  // negociações vinculadas — o service trata e devolve mensagem clara.
   async hardDelete(id: string): Promise<void> {
     await prisma.leads.delete({ where: { id } });
   }
 
-  // Atribuição em lote de atendente. Faz UPDATE direto no banco para
-  // performance — uma única instrução SQL em vez de N updates.
   async bulkAssignAttendant(params: {
     leadIds: string[];
     attendantId: string;
@@ -246,17 +207,11 @@ export class LeadsRepository {
     const { leadIds, attendantId, actorId } = params;
     const result = await prisma.leads.updateMany({
       where: { id: { in: leadIds } },
-      data: {
-        attendant_id: attendantId,
-        updated_by_user_id: actorId,
-      },
+      data: { attendant_id: attendantId, updated_by_user_id: actorId },
     });
     return { count: result.count };
   }
 
-  // Atribuição em lote de equipe. Ao mover entre times, zera o attendant
-  // (atendente antigo pode não pertencer ao novo time — fica inconsistente).
-  // O reatribuir vira responsabilidade do manager do novo time.
   async bulkAssignTeam(params: {
     leadIds: string[];
     teamId: string;
@@ -265,16 +220,11 @@ export class LeadsRepository {
     const { leadIds, teamId, actorId } = params;
     const result = await prisma.leads.updateMany({
       where: { id: { in: leadIds } },
-      data: {
-        team_id: teamId,
-        attendant_id: null,
-        updated_by_user_id: actorId,
-      },
+      data: { team_id: teamId, attendant_id: null, updated_by_user_id: actorId },
     });
     return { count: result.count };
   }
 
-  // Lookup leve de team para validação no service (sem trazer dados pesados).
   async findTeamForValidation(
     teamId: string
   ): Promise<{ id: string; is_active: boolean } | null> {
@@ -284,14 +234,8 @@ export class LeadsRepository {
     });
   }
 
-  // Lookup leve de atendente para validar role, atividade e pertinência ao time.
   async findAttendantForValidation(attendantId: string): Promise<
-    | {
-        id: string;
-        role: string;
-        is_active: boolean;
-        user_teams: { team_id: string }[];
-      }
+    | { id: string; role: string; is_active: boolean; user_teams: { team_id: string }[] }
     | null
   > {
     return prisma.users.findUnique({
