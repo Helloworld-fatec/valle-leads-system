@@ -1,46 +1,54 @@
+// src/pages/Login.tsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { Eye, EyeOff, LogIn, AlertCircle, ArrowRight } from "lucide-react";
+import { useAuth } from "../hook/useAuth";
+import { loginRequest } from "../services/loginService";
 
-import {
-  Eye,
-  EyeOff,
-  LogIn,
-  AlertCircle,
-  ArrowRight,
-} from "lucide-react";
+export default function Login() {
+  const { login } = useAuth();
 
-interface LoginProps {
-  onLogin: () => void;
-}
-
-export default function Login({ onLogin }: LoginProps) {
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-  });
-
+  const [form, setForm] = useState({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.background = "#050816";
+    return () => {
+      document.body.style.background = "";
+    };
   }, []);
 
-  function handleSubmit() {
-    setError(false);
+  async function handleSubmit() {
+    setError(null);
 
     if (!form.email || !form.password) {
-      setError(true);
+      setError("Preencha todos os campos.");
       return;
     }
 
     setLoading(true);
+    try {
+      const { user, accessToken, refreshToken } = await loginRequest({
+        email: form.email,
+        password: form.password,
+      });
 
-    setTimeout(() => {
+      // Persiste no contexto + localStorage (AuthProvider cuida disso)
+      login(user, accessToken, refreshToken);
+
+      // O redirect é automático — PublicOnlyRoute detecta isAuthenticated=true
+      // e redireciona para /dashboard via Navigate
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao fazer login. Tente novamente.");
+    } finally {
       setLoading(false);
-      onLogin();
-    }, 1200);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSubmit();
   }
 
   return (
@@ -48,16 +56,9 @@ export default function Login({ onLogin }: LoginProps) {
 
       {/* BACKGROUND */}
       <div className="absolute inset-0 overflow-hidden">
-
-        {/* gradient */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563EB_0%,transparent_30%),radial-gradient(circle_at_bottom_right,#DC2626_0%,transparent_25%),linear-gradient(135deg,#050816_0%,#081127_45%,#0B1431_100%)]" />
-
-        {/* glow */}
         <div className="absolute top-[-150px] left-[-120px] w-[450px] h-[450px] rounded-full bg-blue-500/25 blur-[140px] animate-pulse" />
-
         <div className="absolute bottom-[-180px] right-[-120px] w-[450px] h-[450px] rounded-full bg-red-500/20 blur-[140px] animate-pulse" />
-
-        {/* grid */}
         <div
           className="absolute inset-0 opacity-[0.06]"
           style={{
@@ -70,8 +71,6 @@ export default function Login({ onLogin }: LoginProps) {
 
       {/* LEFT SIDE */}
       <div className="hidden lg:flex w-1/2 relative z-10 flex-col justify-between px-16 py-14">
-
-        {/* TOP */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -83,106 +82,61 @@ export default function Login({ onLogin }: LoginProps) {
             alt="Valle Leads"
             className="w-16 h-16 object-contain drop-shadow-[0_0_20px_rgba(59,130,246,0.35)]"
           />
-
           <div>
-            <h1 className="text-white font-black text-2xl tracking-tight">
-              Valle
-            </h1>
-
-            <p className="text-blue-300 text-sm tracking-[0.30em] uppercase">
-              Leads System
-            </p>
+            <h1 className="text-white font-black text-2xl tracking-tight">Valle</h1>
+            <p className="text-blue-300 text-sm tracking-[0.30em] uppercase">Leads System</p>
           </div>
         </motion.div>
 
-        {/* HERO */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.9 }}
           className="max-w-xl"
         >
-
-          {/* badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.05] backdrop-blur-xl mb-8">
-
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-
-            <span className="text-sm text-white/70">
-              Plataforma online em tempo real
-            </span>
+            <span className="text-sm text-white/70">Plataforma online em tempo real</span>
           </div>
 
-          {/* title */}
           <h1 className="text-6xl font-black leading-[1] tracking-tight text-white">
-
             Transforme
             <br />
-
             <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-white bg-clip-text text-transparent">
               oportunidades
             </span>
-
             <br />
-
             em resultados.
           </h1>
 
-          {/* subtitle */}
           <p className="mt-8 text-lg leading-relaxed text-white/60 max-w-lg">
-            Controle leads, acompanhe negociações e visualize métricas
-            em uma experiência moderna, rápida e visualmente incrível.
+            Controle leads, acompanhe negociações e visualize métricas em uma experiência
+            moderna, rápida e visualmente incrível.
           </p>
 
-          {/* cards */}
           <div className="grid grid-cols-3 gap-5 mt-12">
-
             {[
-              {
-                value: "1.2K+",
-                label: "Leads",
-              },
-              {
-                value: "98%",
-                label: "Performance",
-              },
-              {
-                value: "3x",
-                label: "Conversão",
-              },
+              { value: "1.2K+", label: "Leads" },
+              { value: "98%", label: "Performance" },
+              { value: "3x", label: "Conversão" },
             ].map((item) => (
               <motion.div
                 whileHover={{ y: -8 }}
                 key={item.label}
                 className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] backdrop-blur-xl p-5 transition-all duration-500 hover:bg-white/[0.08]"
               >
-
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-500/10 to-cyan-400/10" />
-
-                <h2 className="relative text-3xl font-black text-white">
-                  {item.value}
-                </h2>
-
-                <p className="relative mt-1 text-sm text-white/50">
-                  {item.label}
-                </p>
+                <h2 className="relative text-3xl font-black text-white">{item.value}</h2>
+                <p className="relative mt-1 text-sm text-white/50">{item.label}</p>
               </motion.div>
             ))}
-
           </div>
         </motion.div>
 
-        {/* FOOTER */}
         <div className="flex items-center justify-between">
-
-          <p className="text-white/30 text-sm">
-            © {new Date().getFullYear()} Valle Leads System
-          </p>
-
+          <p className="text-white/30 text-sm">© {new Date().getFullYear()} Valle Leads System</p>
           <div className="flex items-center gap-2 text-white/40 text-sm">
-
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-
             Sistema operacional
           </div>
         </div>
@@ -193,21 +147,14 @@ export default function Login({ onLogin }: LoginProps) {
 
         {/* MOBILE LOGO */}
         <div className="absolute top-8 left-8 flex items-center gap-3 lg:hidden">
-
           <img
             src="/logo.jpeg"
             alt="Valle Leads"
             className="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.35)]"
           />
-
           <div>
-            <h1 className="text-white font-black text-xl">
-              Valle
-            </h1>
-
-            <p className="text-blue-300 text-xs uppercase tracking-[0.25em]">
-              Leads
-            </p>
+            <h1 className="text-white font-black text-xl">Valle</h1>
+            <p className="text-blue-300 text-xs uppercase tracking-[0.25em]">Leads</p>
           </div>
         </div>
 
@@ -218,25 +165,14 @@ export default function Login({ onLogin }: LoginProps) {
           transition={{ duration: 0.8 }}
           className="w-full max-w-md relative"
         >
-
-          {/* glow */}
           <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full scale-110" />
 
-          {/* card */}
           <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.06] backdrop-blur-2xl p-8 shadow-[0_0_80px_rgba(37,99,235,0.15)]">
-
-            {/* top line */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-red-500" />
 
             <div className="mb-8">
-
-              <h2 className="text-4xl font-black text-white tracking-tight">
-                Entrar
-              </h2>
-
-              <p className="text-white/50 mt-2">
-                Continue para acessar sua plataforma.
-              </p>
+              <h2 className="text-4xl font-black text-white tracking-tight">Entrar</h2>
+              <p className="text-white/50 mt-2">Continue para acessar sua plataforma.</p>
             </div>
 
             {/* ERROR */}
@@ -247,26 +183,18 @@ export default function Login({ onLogin }: LoginProps) {
                 className="flex items-center gap-3 p-4 mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-200 text-sm"
               >
                 <AlertCircle size={18} />
-                Preencha todos os campos.
+                {error}
               </motion.div>
             )}
 
             {/* EMAIL */}
             <div className="mb-5">
-
-              <label className="block text-sm font-medium text-white/70 mb-2">
-                E-mail
-              </label>
-
+              <label className="block text-sm font-medium text-white/70 mb-2">E-mail</label>
               <input
                 type="email"
                 value={form.email}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    email: e.target.value,
-                  })
-                }
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onKeyDown={handleKeyDown}
                 placeholder="seu@email.com"
                 className="w-full h-14 px-5 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
               />
@@ -274,13 +202,8 @@ export default function Login({ onLogin }: LoginProps) {
 
             {/* PASSWORD */}
             <div className="mb-7">
-
               <div className="flex items-center justify-between mb-2">
-
-                <label className="text-sm font-medium text-white/70">
-                  Senha
-                </label>
-
+                <label className="text-sm font-medium text-white/70">Senha</label>
                 <button
                   type="button"
                   className="text-xs text-blue-300 hover:text-cyan-300 transition-colors"
@@ -288,34 +211,22 @@ export default function Login({ onLogin }: LoginProps) {
                   Esqueceu a senha?
                 </button>
               </div>
-
               <div className="relative">
-
                 <input
                   type={showPass ? "text" : "password"}
                   value={form.password}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      password: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onKeyDown={handleKeyDown}
                   placeholder="••••••••"
                   className="w-full h-14 px-5 pr-14 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
                 />
-
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
                 >
-                  {showPass ? (
-                    <EyeOff size={20} />
-                  ) : (
-                    <Eye size={20} />
-                  )}
+                  {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
-
               </div>
             </div>
 
@@ -323,33 +234,22 @@ export default function Login({ onLogin }: LoginProps) {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="group relative w-full h-14 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white font-bold text-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+              className="group relative w-full h-14 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white font-bold text-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/10" />
-
               {loading ? (
                 <div className="w-6 h-6 mx-auto rounded-full border-2 border-white/30 border-t-white animate-spin" />
               ) : (
                 <div className="relative flex items-center justify-center gap-2">
-
                   <LogIn size={20} />
-
                   Entrar na plataforma
-
-                  <ArrowRight
-                    size={18}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
+                  <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
                 </div>
               )}
             </button>
 
-            {/* bottom */}
             <div className="mt-8 flex items-center justify-center gap-2 text-xs text-white/30">
-
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-
               Plataforma operacional estável
             </div>
           </div>

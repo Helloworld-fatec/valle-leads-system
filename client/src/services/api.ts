@@ -1,4 +1,4 @@
-// src/service/api.ts
+// src/services/api.ts
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hook/useAuth";
@@ -46,6 +46,7 @@ function resolveErrorType(status: number): ApiErrorOptions["type"] {
 // ─────────────────────────────────────────────
 
 const REFRESH_TOKEN_KEY = "refreshToken";
+const ACCESS_TOKEN_KEY = "accessToken";
 
 // ─────────────────────────────────────────────
 // Hook principal
@@ -66,7 +67,6 @@ export const useApi = () => {
       ...(options.headers as Record<string, string>),
     };
 
-    // Não define Content-Type para FormData (o browser define automaticamente com boundary)
     if (!(options.body instanceof FormData)) {
       headers["Content-Type"] = "application/json";
     }
@@ -83,11 +83,6 @@ export const useApi = () => {
    * - Injeção automática do Bearer token
    * - Renovação automática via refresh token em caso de 401
    * - Erros HTTP convertidos em `ApiError` com status, campo e tipo
-   *
-   * Exemplo de uso num service:
-   *   const { apiFetch } = useApi();
-   *   const res = await apiFetch("/leads", { method: "GET" });
-   *   const data = await res.json();
    */
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
@@ -99,22 +94,23 @@ export const useApi = () => {
       if (response.status === 401 && currentRefreshToken) {
         console.warn("🔁 Access Token expirado. Tentando renovar...");
         try {
-          const refreshResponse = await fetch(`${BASE_URL}/api/login/refresh-token`, {
+          const refreshResponse = await fetch(`${BASE_URL}/api/auth/refresh`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentRefreshToken}`,
-            },
-            body: JSON.stringify({}),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: currentRefreshToken }),
           });
 
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
-            const newAccessToken: string = data.newAccessToken;
-            const newRefreshToken: string = data.newRefreshToken ?? currentRefreshToken;
+            const newAccessToken: string = data.access_token;
+            const newRefreshToken: string = data.refresh_token ?? currentRefreshToken;
 
-            // Atualiza contexto e repete a requisição original com o novo token
+            // Atualiza localStorage e contexto
+            localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
+            localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
             login(user!, newAccessToken, newRefreshToken);
+
+            // Repete a requisição original com o novo token
             response = await makeRequest(url, options, newAccessToken);
           } else {
             console.error("❌ Refresh Token inválido ou expirado. Forçando logout.");
@@ -127,9 +123,7 @@ export const useApi = () => {
             });
           }
         } catch (error) {
-          // Se já é ApiError (lançado acima), apenas repassa
           if (error instanceof ApiError) throw error;
-
           console.error("💥 Erro inesperado durante renovação do token:", error);
           logout();
           navigate("/login");
@@ -156,7 +150,7 @@ export const useApi = () => {
         try {
           errorBody = await response.json();
         } catch {
-          // Body não é JSON (ex: 502 Bad Gateway em HTML) — ignora
+          // Body não é JSON — ignora
         }
 
         const status = response.status;

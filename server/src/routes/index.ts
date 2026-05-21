@@ -16,6 +16,8 @@ import negotiationStageHistoryRoutes from '../modules/negotiation-stage-history/
 import dashboardAttendantRoutes from '../modules/dashboards/attendant/dashboardAttendant.routes.js';
 import dashboardManagerRoutes from '../modules/dashboards/manager/dashboardManager.routes.js';
 import dashboardGeneralManagerRoutes from '../modules/dashboards/general-manager/dashboardGeneralManager.routes.js';
+import loginRoutes from '../modules/auth/login/login.routes.js';
+
 
 const mainRouter = Router();
 
@@ -56,5 +58,8 @@ mainRouter.use('/negotiations-status', negotiationStatusRoutes);
 mainRouter.use('/dashboards/attendant', dashboardAttendantRoutes);
 mainRouter.use('/dashboards/manager', dashboardManagerRoutes);
 mainRouter.use('/dashboards/general-manager', dashboardGeneralManagerRoutes);
+
+// Login
+mainRouter.use('/auth', loginRoutes);
 
 export default mainRouter;
