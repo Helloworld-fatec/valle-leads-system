@@ -1,10 +1,9 @@
+// src/modules/leads/lead.dtos.ts
 import { z } from "zod";
 
-// ─────────────────────────────────────────────
-// LEADS DTOS
-// ─────────────────────────────────────────────
-
-// Enum centralizado para reutilizar nos schemas de create, update e query
+// Lista canônica de status que um lead pode assumir.
+// Mantemos como enum Zod para que tanto a entrada quanto a tipagem
+// derivada (via z.infer) usem exatamente os mesmos valores.
 export const LeadStatusEnum = z.enum([
   "novo",
   "em_atendimento",
@@ -13,42 +12,121 @@ export const LeadStatusEnum = z.enum([
   "perdido",
 ]);
 
+// Schema de criação de lead.
+// attendant_id é opcional: para ATTENDANT o service força o próprio id;
+// para os demais perfis o atendente pode ser informado ou deixado em branco.
 export const CreateLeadSchema = z.object({
-  source: z.string().optional(),
-  // Status obrigatório na criação — deve ser um dos valores do enum acima
+  source: z.string().trim().max(100).optional(),
   status: LeadStatusEnum,
-  vehicle_interest: z.string().optional(),
-  // customer_id obrigatório — o service valida se o customer existe e está ativo
   customer_id: z.string().uuid("customer_id deve ser um UUID válido"),
-  // team_id obrigatório — o service valida se o team existe (via TeamsRepository do Pedro)
   team_id: z.string().uuid("team_id deve ser um UUID válido"),
-  // attendant_id opcional — lead pode ser criado sem atendente e atribuído depois
-  attendant_id: z.string().uuid("attendant_id deve ser um UUID válido").optional(),
+  attendant_id: z
+    .string()
+    .uuid("attendant_id deve ser um UUID válido")
+    .optional(),
+  interest_item_id: z
+    .string()
+    .uuid("interest_item_id deve ser um UUID válido")
+    .optional(),
 });
 
-export const UpdateLeadSchema = z.object({
-  // Todos os campos opcionais — atualiza apenas o que for enviado
-  source: z.string().optional(),
-  status: LeadStatusEnum.optional(),
-  // is_active permite reativar um lead via update
-  is_active: z.boolean().optional(),
-  vehicle_interest: z.string().optional(),
-  attendant_id: z.string().uuid("attendant_id deve ser um UUID válido").optional(),
-});
+// Schema de atualização.
+// Todos os campos são opcionais, mas a validação de RBAC sobre QUAL campo
+// cada role pode mexer fica no service:
+//   - is_active=true (reativar): apenas GENERAL_MANAGER e ADMIN
+//   - team_id (mover entre times): apenas GENERAL_MANAGER e ADMIN
+//   - attendant_id (reatribuir): MANAGER no escopo do seu time, ADMIN sempre
+// O refine garante que pelo menos um campo foi enviado.
+export const UpdateLeadSchema = z
+  .object({
+    source: z.string().trim().max(100).optional(),
+    status: LeadStatusEnum.optional(),
+    is_active: z.boolean().optional(),
+    team_id: z.string().uuid("team_id deve ser um UUID válido").optional(),
+    attendant_id: z
+      .string()
+      .uuid("attendant_id deve ser um UUID válido")
+      .nullable()
+      .optional(),
+    interest_item_id: z
+      .string()
+      .uuid("interest_item_id deve ser um UUID válido")
+      .nullable()
+      .optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Nenhum campo enviado para atualização",
+  });
 
-// Query params chegam como string na URL — os transforms convertem para os tipos corretos
+// Schema da query string da listagem.
+// Campos chegam como string e usamos transform + pipe para converter e
+// validar o tipo final: "abc" em ?page=abc é rejeitado, não vira NaN.
+// is_active aceita "true"/"false" e ignora qualquer outro valor.
 export const QueryLeadSchema = z.object({
   team_id: z.string().uuid().optional(),
   status: LeadStatusEnum.optional(),
   attendant_id: z.string().uuid().optional(),
   customer_id: z.string().uuid().optional(),
-  // "true" → true, qualquer outro valor → false
-  is_active: z.string().transform((v) => v === "true").optional(),
-  // Paginação com transform de string para number
-  page: z.string().transform(Number).optional(),
-  limit: z.string().transform(Number).optional(),
+  interest_item_id: z.string().uuid().optional(),
+  is_active: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (v === "true") return true;
+      if (v === "false") return false;
+      return undefined;
+    })
+    .pipe(z.boolean().optional()),
+  page: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : 1))
+    .pipe(z.number().int().min(1)),
+  limit: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : 20))
+    .pipe(z.number().int().min(1).max(100)),
 });
 
+// Schema do parâmetro de rota :id — garante UUID válido antes do Prisma.
+export const LeadIdParamSchema = z.object({
+  id: z.string().uuid("id deve ser um UUID válido"),
+});
+
+// Atribuição em lote de atendente.
+// Usado por MANAGER (atribui atendentes do próprio time aos leads do time)
+// e ADMIN (sem restrição). O service valida pertinência do atendente ao time
+// de cada lead.
+export const BulkAssignAttendantSchema = z.object({
+  lead_ids: z
+    .array(z.string().uuid("lead_id deve ser um UUID válido"))
+    .min(1, "Informe ao menos um lead")
+    .max(500, "Limite de 500 leads por operação"),
+  attendant_id: z.string().uuid("attendant_id deve ser um UUID válido"),
+});
+
+// Atribuição em lote de equipe — move leads entre times.
+// Usado por GENERAL_MANAGER (move livremente) e ADMIN.
+// Ao trocar de time, o attendant_id é zerado pois pode ficar incoerente
+// com o novo time (regra implementada no service).
+export const BulkAssignTeamSchema = z.object({
+  lead_ids: z
+    .array(z.string().uuid("lead_id deve ser um UUID válido"))
+    .min(1, "Informe ao menos um lead")
+    .max(500, "Limite de 500 leads por operação"),
+  team_id: z.string().uuid("team_id deve ser um UUID válido"),
+});
+
+// Tipos derivados — fonte única de verdade entre runtime (Zod) e TypeScript.
 export type CreateLeadDTO = z.infer<typeof CreateLeadSchema>;
 export type UpdateLeadDTO = z.infer<typeof UpdateLeadSchema>;
 export type QueryLeadDTO = z.infer<typeof QueryLeadSchema>;
+export type LeadIdParamDTO = z.infer<typeof LeadIdParamSchema>;
+export type BulkAssignAttendantDTO = z.infer<typeof BulkAssignAttendantSchema>;
+export type BulkAssignTeamDTO = z.infer<typeof BulkAssignTeamSchema>;
+
+// União dos status string-puros — útil quando o service precisa comparar
+// sem instanciar o enum Zod.
+export type LeadStatus = z.infer<typeof LeadStatusEnum>;

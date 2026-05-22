@@ -98,8 +98,8 @@ export default function LeadsTable({ leads, sortKey, sortDir, onSort }: Props) {
         <table className="w-full border-collapse">
           <thead>
             <tr style={{ borderBottom: "1px solid #F1F5F9", background: "#F8FAFC" }}>
-              <Th label="Lead"        col="name"      sortKey={sortKey} sortDir={sortDir} onSort={onSort} className="min-w-[200px]" />
-              <Th label="Contato"     col={null}      sortKey={sortKey} sortDir={sortDir} onSort={onSort} className="min-w-[200px]" />
+              <Th label="Lead"        col="name"      sortKey={sortKey} sortDir={sortDir} onSort={onSort} className="min-w-50" />
+              <Th label="Contato"     col={null}      sortKey={sortKey} sortDir={sortDir} onSort={onSort} className="min-w-50" />
               <Th label="CPF"         col="cpf"       sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               <Th label="Origem"      col="source"    sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               <Th label="Etapa"       col="stage"     sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -125,7 +125,7 @@ export default function LeadsTable({ leads, sortKey, sortDir, onSort }: Props) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                         style={{ background: av }}
                       >
                         {initials(lead.name)}

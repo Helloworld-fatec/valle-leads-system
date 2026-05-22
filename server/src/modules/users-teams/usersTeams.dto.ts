@@ -1,19 +1,27 @@
-// server/src/modules/users-teams/usersTeams.dto.ts
+// src/modules/users-teams/usersTeams.dto.ts
 import { z } from "zod";
 
-// Schema para vincular um usuário a um time
+// ─── CREATE ───────────────────────────────────────────
+// Vincula um usuário a um time. Ambos os IDs são obrigatórios.
 export const createUserTeamSchema = z.object({
   user_id: z.string().uuid("user_id deve ser um UUID válido"),
   team_id: z.string().uuid("team_id deve ser um UUID válido"),
 });
 
-// Schema para atualizar um vínculo (caso precise mudar o time de um registro específico, 
-// embora em tabelas pivô muitas vezes seja mais comum deletar e recriar)
+// ─── UPDATE ───────────────────────────────────────────
+// Em tabelas pivô não faz sentido trocar user_id ou team_id
+// (seria deletar e recriar o vínculo). O único campo mutável aqui é is_active,
+// que permite reativar um vínculo sem precisar recriar o registro.
 export const updateUserTeamSchema = z.object({
-  user_id: z.string().uuid("user_id deve ser um UUID válido").optional(),
-  team_id: z.string().uuid("team_id deve ser um UUID válido").optional(),
+  is_active: z.boolean(),
 });
 
-// Tipos inferidos automaticamente para o TypeScript usar no Service e Repository
+// ─── PARAMS (:id) ─────────────────────────────────────
+export const userTeamIdParamSchema = z.object({
+  id: z.string().uuid("id deve ser um UUID válido"),
+});
+
+// ─── Tipos derivados ──────────────────────────────────
 export type CreateUserTeamDTO = z.infer<typeof createUserTeamSchema>;
 export type UpdateUserTeamDTO = z.infer<typeof updateUserTeamSchema>;
+export type UserTeamIdParamDTO = z.infer<typeof userTeamIdParamSchema>;

@@ -1,5 +1,5 @@
-// src/context/AuthContext.tsx
-import { createContext, useState, useEffect, ReactNode } from "react";
+// src/contexts/AuthContext.tsx
+import { createContext, useState, useEffect, useContext, ReactNode } from "react";
 
 // ─────────────────────────────────────────────
 // Tipos
@@ -12,7 +12,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
-  team_id: string | null;
+  team_ids: string[]; // array — usuário pode pertencer a múltiplos times
 }
 
 interface AuthContextData {
@@ -24,50 +24,12 @@ interface AuthContextData {
 }
 
 // ─────────────────────────────────────────────
-// Usuário mockado
-// Troque o `role` conforme a tela que está desenvolvendo:
-//   "ATTENDANT"       → visão atendente
-//   "MANAGER"         → visão gerente
-//   "GENERAL_MANAGER" → visão gerente geral
+// Chaves do localStorage
 // ─────────────────────────────────────────────
 
-
-// ─────────────────────────────────────────────
-//Para testar com um usuário com outro 'role', basta descomentar o bloco correspondente e comentar o atual.
-
-/*
-const MOCK_USER: AuthUser = {
-  id: "d290f1ee-6c54-4b01-90e6-d701748f0851", // Use exatamente este ID
-  name: "Dev Local",
-  email: "dev@vallemultimarcas.com.br",
-  role: "ATTENDANT",
-  team_id: "7027d110-63f5-4424-9169-7756f7000e40", // Também deve ser UUID
-};
-
-const MOCK_USER: AuthUser = {
-  id: "d450a691-e2ea-47c1-9087-ecdd9bbde73c",
-  name: "Gerente Local",
-  email: "dev@vallemultimarcas.com.br",
-  role: "MANAGER",
-  team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
-};
-
-*/
-
-// ─────────────────────────────────────────────
-
-const MOCK_USER: AuthUser = {
-  id: "c6fe0f87-5147-4e2d-a19d-fa6d076524b9",
-  name: "Gerente Geral",
-  email: "dev@vallemultimarcas.com.br",
-  role: "GENERAL_MANAGER",
-  team_id: "33fc73b5-38da-4cc0-9906-69f2ea0610c0",
-};
-
-
-// ─────────────────────────────────────────────
-
-const MOCK_TOKEN = "mock-access-token";
+const ACCESS_TOKEN_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
+const USER_KEY = "authUser";
 
 // ─────────────────────────────────────────────
 // Context
@@ -85,41 +47,74 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<AuthUser | null>(MOCK_USER);
-  const [accessToken, setAccessToken] = useState<string | null>(MOCK_TOKEN);
+// ─────────────────────────────────────────────
+// Helpers de persistência
+// ─────────────────────────────────────────────
 
-  // TESTE
+function loadFromStorage(): { user: AuthUser | null; accessToken: string | null } {
+  try {
+    const rawUser = localStorage.getItem(USER_KEY);
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const user: AuthUser | null = rawUser ? JSON.parse(rawUser) : null;
+    return { user, accessToken };
+  } catch {
+    return { user: null, accessToken: null };
+  }
+}
+
+function saveToStorage(user: AuthUser, accessToken: string, refreshToken: string) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+function clearStorage() {
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+// ─────────────────────────────────────────────
+// Provider
+// ─────────────────────────────────────────────
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // Hidrata o estado a partir do localStorage na montagem
   useEffect(() => {
-    if (!localStorage.getItem("accessToken")) {
-      localStorage.setItem("accessToken", MOCK_TOKEN);
+    const { user: storedUser, accessToken: storedToken } = loadFromStorage();
+    if (storedUser && storedToken) {
+      setUser(storedUser);
+      setAccessToken(storedToken);
     }
+    setInitialized(true);
   }, []);
 
-  // TESTE
-  if (typeof window !== "undefined" && !localStorage.getItem("accessToken")) {
-    localStorage.setItem("accessToken", MOCK_TOKEN);
-    localStorage.setItem("refreshToken", "mock-refresh-token");
-  }
-
   function login(userData: AuthUser, token: string, refreshToken: string) {
-    localStorage.setItem("refreshToken", refreshToken);
+    saveToStorage(userData, token, refreshToken);
     setUser(userData);
     setAccessToken(token);
   }
 
   function logout() {
-    localStorage.removeItem("refreshToken");
+    clearStorage();
     setUser(null);
     setAccessToken(null);
   }
+
+  // Não renderiza nada até a hidratação estar completa
+  // (evita flash de redirect para /login quando o usuário já está logado)
+  if (!initialized) return null;
 
   return (
     <AuthContext.Provider
       value={{
         user,
         accessToken,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !!accessToken,
         login,
         logout,
       }}

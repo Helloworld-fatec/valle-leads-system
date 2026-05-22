@@ -1,329 +1,486 @@
-import {
-  ClipboardList,
-  Activity,
-  CheckCircle2,
-  DollarSign,
-  TrendingUp,
-} from "lucide-react";
+// src/pages/Dashboard.tsx
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import DashboardAttendant from "./DashboardAttendant";
+import DashboardManager from "./DashboardManager";
+import DashboardGeneralManager from "./DashboardGeneralManager";
+import Forbidden from "./Forbidden";
 
-import { motion } from "framer-motion";
+/**
+ * Orquestra qual dashboard renderizar conforme o role do usuário autenticado.
+ *
+ * ATTENDANT       → DashboardAttendant  (só vê a própria performance)
+ * MANAGER         → DashboardManager    (vê equipe + todos os atendentes da equipe)
+ *                   → passa automaticamente o primeiro team_id do token como filtro
+ *                      (evita o 400 "ID da equipa é obrigatório")
+ * GENERAL_MANAGER → DashboardGeneralManager (visão global) + abas para:
+ *                   • visão por equipe (seleciona teamId → DashboardManager)
+ *                   • visão por atendente (seleciona attendantId → DashboardAttendant)
+ * ADMIN           → idêntico ao GENERAL_MANAGER
+ * qualquer outro  → Forbidden (403)
+ */
 
-import MetricCard from "../components/dashboard/MetricCard";
-import FunnelChart from "../components/dashboard/FunnelChart";
-import RecentLeads from "../components/dashboard/RecentLeads";
-import PipelineSummary from "../components/dashboard/PipelineSummary";
+// ── Tipos de visão ─────────────────────────────────────────────────────
+type GmView   = "global" | "team" | "attendant";
+type ManagerView = "team" | "attendant";
 
-function formatDate() {
-  return new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+// ── Tipo mínimo para itens de seleção ───────────────────────────────────
+interface SelectOption {
+  id: string;
+  name: string;
 }
 
-export default function Dashboard() {
+// ────────────────────────────────────────────────────────────────────────
+// Sub-wrapper para MANAGER
+// Duas abas: "Equipe" e "Atendentes".
+// - Equipe:      DashboardManager com o teamId do próprio token (nunca outro)
+// - Atendentes:  lista só os usuários das equipes do token; ao selecionar
+//                um, abre DashboardAttendant com targetAttendantId
+// ────────────────────────────────────────────────────────────────────────
+function ManagerWrapper() {
   const { user } = useAuth();
-  const { auxiliary } = useDashboardService();
-  const navigate = useNavigate(); // 👈 Inicialização do hook de navegação
+  const teamIds: string[] = user?.team_ids ?? [];
+  const [view, setView] = useState<ManagerView>("team");
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teamIds[0] ?? "");
+  const [selectedAttendant, setSelectedAttendant] = useState<SelectOption | null>(null);
 
-  // 1. Estados de Navegação e Filtros
-  const [activeTab, setActiveTab] = useState<TabType>("ATTENDANT");
-  const [selectedAttendantId, setSelectedAttendantId] = useState<string>("");
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  if (teamIds.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-400 text-sm">
+          Você não está associado a nenhuma equipe. Contate o administrador.
+        </p>
+      </div>
+    );
+  }
 
-  // 2. Estados para Listas (Selects)
-  const [usersList, setUsersList] = useState<any[]>([]);
-  const [teamsList, setTeamsList] = useState<any[]>([]);
-  const [loadingAux, setLoadingAux] = useState(false);
-
-  // 3. Definição de Permissões
-  const isManagerOrHigher = useMemo(() => 
-    ["MANAGER", "GENERAL_MANAGER", "ADMIN"].includes(user?.role || ""), 
-  [user]);
-  
-  const isGlobalOrHigher = useMemo(() => 
-    ["GENERAL_MANAGER", "ADMIN"].includes(user?.role || ""), 
-  [user]);
-
-  // 4. Inicialização de Abas e IDs Padrão
-  useEffect(() => {
-    if (user) {
-      setSelectedAttendantId(user.id);
-      setSelectedTeamId(user.team_id || "");
-      
-      // Define a aba inicial baseada no maior nível de acesso
-      if (isGlobalOrHigher) setActiveTab("GLOBAL");
-      else if (isManagerOrHigher) setActiveTab("TEAM");
-      else setActiveTab("ATTENDANT");
-    }
-  }, [user, isGlobalOrHigher, isManagerOrHigher]);
-
-  // 5. Busca de Dados Auxiliares para Gestores
-  useEffect(() => {
-    if (!isManagerOrHigher) return;
-
-    async function loadAuxData() {
-      setLoadingAux(true);
-      try {
-        // Colocamos o ': any' para o TypeScript não reclamar das propriedades
-        const usersData: any = await auxiliary.getUsers();
-        
-        const usersArray = Array.isArray(usersData) 
-          ? usersData 
-          : (usersData?.data || usersData?.users || []);
-        
-        setUsersList(usersArray);
-
-        if (isGlobalOrHigher) {
-          // Colocamos o ': any' aqui também
-          const teamsData: any = await auxiliary.getTeams();
-          
-          const teamsArray = Array.isArray(teamsData) 
-            ? teamsData 
-            : (teamsData?.data || teamsData?.teams || []);
-            
-          setTeamsList(teamsArray);
-        }
-      } catch (err) {
-        console.error("Erro ao carregar dados auxiliares do menu:", err);
-      } finally {
-        setLoadingAux(false);
-      }
-    }
-
-    loadAuxData();
-  }, [isManagerOrHigher, isGlobalOrHigher, auxiliary]);
-
-  // 6. Verificação de segurança inicial
-  if (!user) return <Forbidden onNavigate={navigate} />; // 👈 Corrigido: onNavigate adicionado
+  const managerTabs: { key: ManagerView; label: string }[] = [
+    { key: "team",      label: "Minha Equipe" },
+    { key: "attendant", label: "Atendentes"   },
+  ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#060816] text-white">
-
-      {/* BACKGROUND */}
-      <div className="absolute inset-0 overflow-hidden">
-
-        {/* base gradient */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563EB_0%,transparent_26%),radial-gradient(circle_at_bottom_right,#7C3AED_0%,transparent_22%),linear-gradient(135deg,#050816_0%,#081120_45%,#0B1730_100%)]" />
-
-        {/* animated glow */}
-        <motion.div
-          animate={{
-            x: [0, 40, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute top-[-120px] left-[-120px] w-[380px] h-[380px] rounded-full bg-blue-500/20 blur-[120px]"
-        />
-
-        <motion.div
-          animate={{
-            x: [0, -30, 0],
-            y: [0, 40, 0],
-          }}
-          transition={{
-            duration: 12,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute bottom-[-150px] right-[-120px] w-[350px] h-[350px] rounded-full bg-violet-500/20 blur-[120px]"
-        />
-
-        {/* grid */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
-            backgroundSize: "42px 42px",
-          }}
-        />
-
-        {/* floating dots */}
-        <div className="absolute top-24 left-1/3 w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-        <div className="absolute bottom-32 right-1/4 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-      </div>
-
-      {/* CONTENT */}
-      <div className="relative z-10 p-5 sm:p-7 lg:p-9">
-
-        {/* TOP HEADER */}
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-10"
-        >
-
-          {/* LEFT */}
-          <div>
-
-            {/* status badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur-xl mb-6 shadow-[0_0_25px_rgba(37,99,235,0.08)]">
-
-              <div className="relative flex items-center justify-center">
-                <div className="absolute w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <div className="relative w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              </div>
-
-              <span className="text-[12px] tracking-wide text-white/65">
-                Sistema operacional • tempo real
-              </span>
-            </div>
-
-            {/* title */}
-            <h1 className="text-[32px] sm:text-[38px] font-semibold tracking-[-0.03em] leading-tight text-white">
-              Dashboard comercial
-            </h1>
-
-            {/* subtitle */}
-            <p className="mt-3 text-sm text-white/45 max-w-xl leading-relaxed">
-              Visualize métricas, acompanhe negociações e monitore o
-              desempenho da equipe em uma experiência moderna e dinâmica.
-            </p>
-
-            {/* date */}
-            <div className="mt-5 flex items-center gap-3 text-white/35 text-sm">
-
-              <div className="h-[1px] w-10 bg-white/10" />
-
-              <span className="capitalize tracking-wide">
-                {formatDate()}
-              </span>
-            </div>
-          </div>
-
-          {/* RIGHT INFO */}
-          <motion.div
-            animate={{
-              y: [0, -6, 0],
-            }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            className="rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl px-6 py-5 shadow-[0_0_50px_rgba(37,99,235,0.08)]"
-          >
-
-            <div className="flex items-center gap-4">
-
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-[0_0_35px_rgba(59,130,246,0.35)]">
-                <TrendingUp size={24} />
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-white/35">
-                  Receita mensal
-                </p>
-
-                <h2 className="text-2xl font-semibold mt-1">
-                  R$ 6,1M
-                </h2>
-
-                <p className="text-emerald-400 text-sm mt-1">
-                  +21% este mês
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* METRICS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-
-          {[
-            {
-              title: "Total de Leads",
-              value: "731",
-              icon: <ClipboardList size={20} />,
-              iconBg: "#2563EB",
-              trend: 12,
-              trendLabel: "vs mês anterior",
-            },
-            {
-              title: "Leads Ativos",
-              value: "489",
-              icon: <Activity size={20} />,
-              iconBg: "#8B5CF6",
-              trend: 8,
-              trendLabel: "negociação ativa",
-            },
-            {
-              title: "Negócios Fechados",
-              value: "38",
-              icon: <CheckCircle2 size={20} />,
-              iconBg: "#10B981",
-              trend: -3,
-              trendLabel: "vs mês anterior",
-            },
-            {
-              title: "Valor Fechado",
-              value: "R$ 6,1M",
-              icon: <DollarSign size={20} />,
-              iconBg: "#F97316",
-              trend: 21,
-              trendLabel: "receita mensal",
-            },
-          ].map((card, i) => (
-            <motion.div
-              key={card.title}
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: i * 0.08,
-                duration: 0.45,
+    <div className="flex flex-col gap-0">
+      {/* Tab bar */}
+      <div className="px-6 pt-5 pb-0 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="flex gap-1">
+          {managerTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setView(tab.key);
+                // Volta para a lista ao trocar de aba
+                if (tab.key === "attendant") setSelectedAttendant(null);
               }}
-              whileHover={{
-                y: -6,
-              }}
-              className="group relative overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl shadow-[0_0_50px_rgba(37,99,235,0.06)]"
+              className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all border-b-2 -mb-px ${
+                view === tab.key
+                  ? "border-blue-600 text-blue-600 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
             >
-
-              {/* glow hover */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-500/10 to-cyan-400/5" />
-
-              {/* border shine */}
-              <div className="absolute inset-0 rounded-[30px] p-[1px] bg-gradient-to-br from-white/10 to-transparent opacity-50" />
-
-              <div className="relative z-10">
-                <MetricCard {...card} />
-              </div>
-            </motion.div>
+              {tab.label}
+            </button>
           ))}
         </div>
+      </div>
 
-        {/* CHARTS */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 mb-8">
-
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="xl:col-span-3 rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
-          >
-            <FunnelChart />
-          </motion.div>
-
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="xl:col-span-2 rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
-          >
-            <PipelineSummary />
-          </motion.div>
+      {/* Aba: Equipe — só as equipes do próprio token */}
+      {view === "team" && (
+        <div className="flex flex-col gap-0">
+          {teamIds.length > 1 && (
+            <div className="px-6 pt-4 pb-2 flex items-center gap-3 border-b border-gray-100">
+              <span className="text-sm text-gray-500 font-medium">Equipe:</span>
+              <div className="flex gap-2 flex-wrap">
+                {teamIds.map((tid) => (
+                  <button
+                    key={tid}
+                    onClick={() => setSelectedTeamId(tid)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      selectedTeamId === tid
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {tid}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <DashboardManager targetTeamId={selectedTeamId} />
         </div>
+      )}
 
-        {/* RECENT LEADS */}
-        <motion.div
-          whileHover={{ y: -4 }}
-          className="rounded-[32px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-5 shadow-[0_0_60px_rgba(37,99,235,0.06)]"
+      {/* Aba: Atendentes — filtrados pelas equipes do token */}
+      {view === "attendant" && (
+        <ManagerAttendantDrillDown
+          teamIds={teamIds}
+          selectedAttendant={selectedAttendant}
+          onSelectAttendant={setSelectedAttendant}
+        />
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Drill-down de atendente para MANAGER
+// Usa /api/users filtrando pelo primeiro team_id do manager — o backend
+// já aplica o escopo do token, então nunca retorna usuários de outras equipes.
+// ────────────────────────────────────────────────────────────────────────
+function ManagerAttendantDrillDown({
+  teamIds,
+  selectedAttendant,
+  onSelectAttendant,
+}: {
+  teamIds: string[];
+  selectedAttendant: SelectOption | null;
+  onSelectAttendant: (a: SelectOption | null) => void;
+}) {
+  const dashSvc = useDashboardService();
+  const [attendants, setAttendants] = useState<SelectOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Busca usuários — o backend filtra pelo escopo do token do manager,
+    // então não precisamos (nem devemos) passar team_id de outra equipe.
+    dashSvc.auxiliary
+      .getUsers()
+      .then((data: any[]) =>
+        setAttendants(
+          data
+            .filter((u) => u.role === "ATTENDANT" && u.is_active !== false)
+            .map((u) => ({ id: u.id, name: u.name }))
+        )
+      )
+      .catch(() => setAttendants([]))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) return <LoadingSpinner label="Carregando atendentes..." />;
+
+  if (!selectedAttendant) {
+    return (
+      <div className="p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-4">
+          Selecione um atendente para ver o desempenho
+        </h2>
+        {attendants.length === 0 ? (
+          <p className="text-sm text-gray-400">Nenhum atendente encontrado na sua equipe.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {attendants.map((att) => (
+              <button
+                key={att.id}
+                onClick={() => onSelectAttendant(att)}
+                className="p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center mb-3 group-hover:bg-indigo-100 transition-colors">
+                  <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-gray-800 leading-tight">{att.name}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0">
+      <div className="px-6 py-3 flex items-center gap-2 bg-gray-50 border-b border-gray-200">
+        <button
+          onClick={() => onSelectAttendant(null)}
+          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
         >
-          <RecentLeads />
-        </motion.div>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Todos os atendentes
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-sm font-medium text-gray-700">{selectedAttendant.name}</span>
+      </div>
+      <DashboardAttendant targetAttendantId={selectedAttendant.id} />
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Sub-wrapper para GENERAL_MANAGER / ADMIN
+// Oferece 3 visões: Global, Por Equipe, Por Atendente
+// ────────────────────────────────────────────────────────────────────────
+function GeneralManagerWrapper() {
+  const [view, setView] = useState<GmView>("global");
+  const [selectedTeam, setSelectedTeam] = useState<SelectOption | null>(null);
+  const [selectedAttendant, setSelectedAttendant] = useState<SelectOption | null>(null);
+
+  const tabs: { key: GmView; label: string }[] = [
+    { key: "global", label: "Visão Global" },
+    { key: "team", label: "Por Equipe" },
+    { key: "attendant", label: "Por Atendente" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-0">
+      {/* Tab bar */}
+      <div className="px-6 pt-5 pb-0 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="flex gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setView(tab.key)}
+              className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all border-b-2 -mb-px ${
+                view === tab.key
+                  ? "border-blue-600 text-blue-600 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Conteúdo por aba */}
+      {view === "global" && (
+        <DashboardGeneralManager />
+      )}
+
+      {view === "team" && (
+        <TeamDrillDown
+          selectedTeam={selectedTeam}
+          onSelectTeam={setSelectedTeam}
+        />
+      )}
+
+      {view === "attendant" && (
+        <AttendantDrillDown
+          selectedAttendant={selectedAttendant}
+          onSelectAttendant={setSelectedAttendant}
+        />
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Drill-down de equipe para GM/Admin
+// Carrega a lista de equipes via auxiliary.getTeams() e renderiza
+// DashboardManager com o teamId selecionado.
+// ────────────────────────────────────────────────────────────────────────
+import { useEffect } from "react";
+import { useDashboardService } from "../services/dashboardService";
+
+function TeamDrillDown({
+  selectedTeam,
+  onSelectTeam,
+}: {
+  selectedTeam: SelectOption | null;
+  onSelectTeam: (t: SelectOption | null) => void;
+}) {
+  const dashSvc = useDashboardService();
+  const [teams, setTeams] = useState<SelectOption[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(true);
+
+  useEffect(() => {
+    dashSvc.auxiliary
+      .getTeams()
+      .then((data: any[]) =>
+        setTeams(data.map((t) => ({ id: t.id, name: t.name })))
+      )
+      .catch(() => setTeams([]))
+      .finally(() => setLoadingTeams(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loadingTeams) {
+    return <LoadingSpinner label="Carregando equipes..." />;
+  }
+
+  if (!selectedTeam) {
+    return (
+      <div className="p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-4">
+          Selecione uma equipe para ver o dashboard
+        </h2>
+        {teams.length === 0 ? (
+          <p className="text-sm text-gray-400">Nenhuma equipe encontrada.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {teams.map((team) => (
+              <button
+                key={team.id}
+                onClick={() => onSelectTeam(team)}
+                className="p-4 rounded-xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-gray-800 leading-tight">{team.name}</p>
+                <p className="text-xs text-gray-400 mt-1 truncate">{team.id}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0">
+      {/* Breadcrumb / voltar */}
+      <div className="px-6 py-3 flex items-center gap-2 bg-gray-50 border-b border-gray-200">
+        <button
+          onClick={() => onSelectTeam(null)}
+          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Todas as equipes
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-sm font-medium text-gray-700">{selectedTeam.name}</span>
+      </div>
+      <DashboardManager targetTeamId={selectedTeam.id} />
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Drill-down de atendente para GM/Admin
+// Carrega a lista de usuários com role ATTENDANT e renderiza
+// DashboardAttendant com o attendantId selecionado.
+// ────────────────────────────────────────────────────────────────────────
+function AttendantDrillDown({
+  selectedAttendant,
+  onSelectAttendant,
+}: {
+  selectedAttendant: SelectOption | null;
+  onSelectAttendant: (a: SelectOption | null) => void;
+}) {
+  const dashSvc = useDashboardService();
+  const [attendants, setAttendants] = useState<SelectOption[]>([]);
+  const [loadingAttendants, setLoadingAttendants] = useState(true);
+
+  useEffect(() => {
+    dashSvc.auxiliary
+      .getUsers()
+      .then((data: any[]) =>
+        setAttendants(
+          data
+            .filter((u) => u.role === "ATTENDANT" && u.is_active !== false)
+            .map((u) => ({ id: u.id, name: u.name }))
+        )
+      )
+      .catch(() => setAttendants([]))
+      .finally(() => setLoadingAttendants(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loadingAttendants) {
+    return <LoadingSpinner label="Carregando atendentes..." />;
+  }
+
+  if (!selectedAttendant) {
+    return (
+      <div className="p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-4">
+          Selecione um atendente para ver o dashboard
+        </h2>
+        {attendants.length === 0 ? (
+          <p className="text-sm text-gray-400">Nenhum atendente encontrado.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {attendants.map((att) => (
+              <button
+                key={att.id}
+                onClick={() => onSelectAttendant(att)}
+                className="p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center mb-3 group-hover:bg-indigo-100 transition-colors">
+                  <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-gray-800 leading-tight">{att.name}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0">
+      {/* Breadcrumb / voltar */}
+      <div className="px-6 py-3 flex items-center gap-2 bg-gray-50 border-b border-gray-200">
+        <button
+          onClick={() => onSelectAttendant(null)}
+          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Todos os atendentes
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-sm font-medium text-gray-700">{selectedAttendant.name}</span>
+      </div>
+      <DashboardAttendant targetAttendantId={selectedAttendant.id} />
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Spinner reutilizável
+// ────────────────────────────────────────────────────────────────────────
+function LoadingSpinner({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-7 h-7 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-gray-400">{label}</span>
       </div>
     </div>
   );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Componente raiz
+// ────────────────────────────────────────────────────────────────────────
+export default function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  if (!user) return null;
+
+  switch (user.role) {
+    case "ATTENDANT":
+      // Atendente sempre vê o próprio dashboard; targetAttendantId não é
+      // necessário porque o backend aplica o escopo pelo token.
+      return <DashboardAttendant />;
+
+    case "MANAGER":
+      // ManagerWrapper injeta automaticamente o team_id do token,
+      // corrigindo o 400 "ID da equipa é obrigatório".
+      return <ManagerWrapper />;
+
+    case "GENERAL_MANAGER":
+    case "ADMIN":
+      // GeneralManagerWrapper oferece abas: Global / Por Equipe / Por Atendente
+      return <GeneralManagerWrapper />;
+
+    default:
+      return <Forbidden onNavigate={navigate} />;
+  }
 }

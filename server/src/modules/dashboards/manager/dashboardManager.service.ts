@@ -28,9 +28,16 @@ export class DashboardManagerService {
     // 1. Admin e Gerente Geral têm acesso a qualquer equipa.
     if (requester.role === 'ADMIN' || requester.role === 'GENERAL_MANAGER') return;
 
-    // 2. Gerente (MANAGER) só pode ver a sua própria equipa.
+    // 2. Gerente (MANAGER) só pode ver as suas próprias equipas.
+    // O token carrega team_ids (array) — nunca team_id (singular).
     if (requester.role === 'MANAGER') {
-      if (requester.team_id !== targetTeamId) {
+      const managerTeamIds: string[] = Array.isArray(requester.team_ids)
+        ? requester.team_ids
+        : requester.team_id
+          ? [requester.team_id]   // fallback defensivo para tokens legados
+          : [];
+
+      if (!managerTeamIds.includes(targetTeamId)) {
         throw new AcessoNaoAutorizadoError('Não tem permissão para visualizar dados de outra equipa.');
       }
       return;

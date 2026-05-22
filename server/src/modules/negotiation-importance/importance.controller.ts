@@ -1,95 +1,132 @@
 // server/src/modules/negotiation-importance/importance.controller.ts
-import { Request, Response, NextFunction } from "express";
+import type { Response, NextFunction } from "express";
 import { NegotiationImportanceService } from "./importance.service";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware";
+import type {
+  CreateNegotiationImportanceDTO,
+  UpdateNegotiationImportanceDTO,
+  QueryNegotiationImportanceDTO,
+} from "./importance.dto";
+import type {
+  ActorContext,
+  NegotiationActorRole,
+} from "../negotiation/negotiation.service";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION IMPORTANCE CONTROLLER
 // ─────────────────────────────────────────────
 
-// Tipo auxiliar para tipar req.params com id obrigatório
+const VALID_ROLES: ReadonlyArray<NegotiationActorRole> = [
+  "ATTENDANT",
+  "MANAGER",
+  "GENERAL_MANAGER",
+  "ADMIN",
+];
+
+function isValidRole(role: string): role is NegotiationActorRole {
+  return (VALID_ROLES as ReadonlyArray<string>).includes(role);
+}
+
+// Extrai o ActorContext do req.user injetado pelo authMiddleware.
+// authMiddleware garante a existência de req.user — o "!" é seguro aqui.
+function getActor(req: AuthRequest): ActorContext {
+  const user = req.user!;
+  if (!isValidRole(user.role)) {
+    throw new Error(`Role desconhecido no token: ${user.role}`);
+  }
+  return {
+    id: user.id,
+    role: user.role,
+    team_ids: user.team_ids,
+  };
+}
+
 type ParamsWithId = { id: string };
 
 export const NegotiationImportanceController = {
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  async findAll(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      // Os query params já chegam validados, tipados e limpos pelo Zod no middleware
-      const filters = req.query as any;
-      const importanceHistory = await NegotiationImportanceService.findAll(filters);
+      const actor = getActor(req);
+      // req.query já foi validado e transformado pelo validateQuery (Zod)
+      const filters = req.query as unknown as QueryNegotiationImportanceDTO;
 
-      return res.status(200).json({
-        success: true,
-        data: importanceHistory,
-      });
+      const data = await NegotiationImportanceService.findAll(filters, actor);
+
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }
   },
 
-  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  async findById(
+    req: AuthRequest<ParamsWithId>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const { id } = req.params;
-      const importanceHistory = await NegotiationImportanceService.findById(id);
-
-      return res.status(200).json({
-        success: true,
-        data: importanceHistory,
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  // Equivalente ao seu antigo "updateImportance" (cria um novo registro na linha do tempo)
-  async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      // O req.body já chega 100% validado de acordo com o Schema do Zod
-      const data = req.body;
-
-      // ⚠️ Extrai o ID do usuário autenticado no token (req.user)
-      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
-
-      const importanceHistory = await NegotiationImportanceService.create({
-        ...data,
-        created_by_user_id: userId,
-      });
-
-      return res.status(201).json({
-        success: true,
-        data: importanceHistory,
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const data = req.body;
-
-      const userId = (req as any).user?.id || "00000000-0000-0000-0000-000000000000";
-
-      const importanceHistory = await NegotiationImportanceService.update(id, {
-        ...data,
-        updated_by_user_id: userId,
-      });
-
-      return res.status(200).json({
-        success: true,
-        data: importanceHistory,
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async delete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
-    try {
+      const actor = getActor(req);
       const { id } = req.params;
 
-      await NegotiationImportanceService.delete(id);
+      const data = await NegotiationImportanceService.findById(id, actor);
 
-      return res.status(200).json({
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async create(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const actor = getActor(req);
+      // req.body já chega 100% validado pelo validateBody (Zod)
+      const body = req.body as CreateNegotiationImportanceDTO;
+
+      const data = await NegotiationImportanceService.create(body, actor);
+
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async update(
+    req: AuthRequest<ParamsWithId>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const actor = getActor(req);
+      const { id } = req.params;
+      const body = req.body as UpdateNegotiationImportanceDTO;
+
+      const data = await NegotiationImportanceService.update(id, body, actor);
+
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async delete(
+    req: AuthRequest<ParamsWithId>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const actor = getActor(req);
+      const { id } = req.params;
+
+      await NegotiationImportanceService.delete(id, actor);
+
+      res.status(200).json({
         success: true,
         message: "Histórico de importância excluído com sucesso.",
       });

@@ -1,44 +1,93 @@
-// server/src/modules/stores/store.routes.ts
+// src/modules/stores/stores.routes.ts
 import { Router } from "express";
 import { StoresController } from "./stores.controller.js";
-import { validateBody } from "../../middlewares/validation/validate.middleware.js";
-
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import {
+  checkPermission,
+  checkRole,
+} from "../../middlewares/auth/permission.middleware.js";
+import {
+  validateBody,
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
 import {
   createStoreSchema,
-  updateStoreSchema
-} from "./stores.dtos.js";
+  updateStoreSchema,
+  storeIdParamSchema,
+} from "./stores.dto.js";
 
-const router = Router();
+// ─────────────────────────────────────────────
+// STORES ROUTES
+// ─────────────────────────────────────────────
+// Regras de acesso:
+//   GET    /stores          → qualquer role autenticado
+//   GET    /stores/:id      → qualquer role autenticado
+//   POST   /stores          → somente ADMIN
+//   PUT    /stores/:id      → somente ADMIN
+//   PATCH  /stores/:id      → somente ADMIN
+//   DELETE /stores/:id/hard → somente ADMIN (hard delete físico)
+//   DELETE /stores/:id      → somente ADMIN (soft delete)
+// ─────────────────────────────────────────────
+
+const storesRouter = Router();
 const controller = new StoresController();
 
-// Handlers seguros (evita problema de contexto / bind esquecido)
-const findAll = controller.findAll.bind(controller);
-const findById = controller.findById.bind(controller);
-const create = controller.create.bind(controller);
-const update = controller.update.bind(controller);
-const remove = controller.delete.bind(controller);
+// Autenticação obrigatória em todo o módulo
+storesRouter.use(authMiddleware);
 
-// 🔍 LISTAR TODAS AS STORES
-router.get("/", findAll);
-
-// 🔍 BUSCAR STORE POR ID
-router.get("/:id", findById);
-
-// ➕ CRIAR STORE
-router.post(
+// ─── LEITURA ─────────────────────────────────────────
+storesRouter.get(
   "/",
-  validateBody(createStoreSchema),
-  create
+  checkPermission("ATTENDANT"),
+  controller.findAll
 );
 
-// ✏️ ATUALIZAR STORE
-router.put(
+storesRouter.get(
   "/:id",
-  validateBody(updateStoreSchema),
-  update
+  checkPermission("ATTENDANT"),
+  validateParams(storeIdParamSchema),
+  controller.findById
 );
 
-// ❌ DELETAR STORE
-router.delete("/:id", remove);
+// ─── CRIAÇÃO ─────────────────────────────────────────
+storesRouter.post(
+  "/",
+  checkRole("ADMIN"),
+  validateBody(createStoreSchema),
+  controller.create
+);
 
-export default router;
+// ─── ATUALIZAÇÃO ─────────────────────────────────────
+storesRouter.put(
+  "/:id",
+  checkRole("ADMIN"),
+  validateParams(storeIdParamSchema),
+  validateBody(updateStoreSchema),
+  controller.update
+);
+
+storesRouter.patch(
+  "/:id",
+  checkRole("ADMIN"),
+  validateParams(storeIdParamSchema),
+  validateBody(updateStoreSchema),
+  controller.update
+);
+
+// ─── EXCLUSÃO ────────────────────────────────────────
+// Hard delete — rota específica ANTES da genérica /:id
+storesRouter.delete(
+  "/:id/hard",
+  checkRole("ADMIN"),
+  validateParams(storeIdParamSchema),
+  controller.hardDelete
+);
+
+storesRouter.delete(
+  "/:id",
+  checkRole("ADMIN"),
+  validateParams(storeIdParamSchema),
+  controller.softDelete
+);
+
+export default storesRouter;

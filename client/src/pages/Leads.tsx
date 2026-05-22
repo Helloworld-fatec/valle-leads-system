@@ -13,9 +13,12 @@ const PER_PAGE = 12;
 // HELPERS
 // ─────────────────────────────────────────────
 
+// "Todos" é o valor sentinela de UI; qualquer outro valor é um LeadStatus real.
+type StatusFilter = LeadStatus | "Todos";
+
 function filterLeads(
   leads: Lead[],
-  status: string,
+  status: StatusFilter,
   source: string,
   search: string,
   dateFrom: string,
@@ -24,16 +27,29 @@ function filterLeads(
   return leads.filter((l) => {
     if (status !== "Todos" && l.status !== status) return false;
     if (source !== "Todos" && (l.source ?? "") !== source) return false;
-    if (dateFrom && new Date(l.created_at) < new Date(dateFrom)) return false;
-    if (dateTo && new Date(l.created_at) > new Date(dateTo)) return false;
+
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      if (new Date(l.created_at) < from) return false;
+    }
+
+    if (dateTo) {
+      // Inclusivo: qualquer momento do dia selecionado passa
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      if (new Date(l.created_at) > to) return false;
+    }
+
     if (search) {
       const q = search.toLowerCase();
-      const name = l.customers?.name?.toLowerCase() ?? "";
+      const name  = l.customers?.name?.toLowerCase()  ?? "";
       const email = l.customers?.email?.toLowerCase() ?? "";
-      const cpf = l.customers?.cpf ?? "";
+      const cpf   = l.customers?.cpf                  ?? "";
       if (!name.includes(q) && !email.includes(q) && !cpf.includes(q))
         return false;
     }
+
     return true;
   });
 }
@@ -47,18 +63,18 @@ export default function Leads() {
   const { getLeads } = useLeadService();
 
   // ── Estado ──────────────────────────────────
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [leads, setLeads]           = useState<Lead[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Filtros
-  const [status, setStatus] = useState("Todos");
-  const [source, setSource] = useState("Todos");
+  const [status, setStatus]     = useState<StatusFilter>("Todos");
+  const [source, setSource]     = useState("Todos");
   const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [dateTo, setDateTo]     = useState("");
+  const [page, setPage]         = useState(1);
+  const [search, setSearch]     = useState("");
 
   // ── Busca leads do atendente logado ─────────
   useEffect(() => {
@@ -90,14 +106,14 @@ export default function Leads() {
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const paginated  = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   function handleFilter(key: string, value: string) {
     setPage(1);
-    if (key === "status") setStatus(value);
+    if (key === "status") setStatus(value as StatusFilter);
     if (key === "source") setSource(value);
     if (key === "dateFrom") setDateFrom(value);
-    if (key === "dateTo") setDateTo(value);
+    if (key === "dateTo")   setDateTo(value);
   }
 
   function handleClear() {
@@ -108,6 +124,7 @@ export default function Leads() {
     setDateTo("");
     setPage(1);
   }
+
   // ── Render ───────────────────────────────────
   return (
     <div className="p-4 sm:p-6 lg:p-8">

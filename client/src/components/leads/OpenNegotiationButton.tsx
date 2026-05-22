@@ -9,16 +9,23 @@ interface Props {
   lead: Lead;
 }
 
+// Status que impedem abertura de nova negociação
+const CLOSED_STATUSES: Lead["status"][] = ["finalizado", "perdido"];
+
 export default function OpenNegotiationButton({ lead }: Props) {
   const { user } = useAuth();
   const { createNegotiation } = useLeadService();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
+
+  // Lead encerrado ou sem time não pode abrir negociação
+  const isClosed   = CLOSED_STATUSES.includes(lead.status);
+  const isDisabled = loading || isClosed || !lead.team_id;
 
   async function handleClick() {
-    if (!user?.id) return;
+    if (!user?.id || isDisabled) return;
 
     try {
       setLoading(true);
@@ -26,7 +33,7 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
       await createNegotiation({
         lead_id: lead.id,
-        team_id: lead.team_id,
+        team_id: lead.team_id, // já validado acima (isDisabled guarda o caso undefined)
       });
 
       navigate("/funil");
@@ -41,7 +48,18 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
   return (
     <div className="space-y-2">
-      {/* Erro — aparece acima do botão sem fechar o modal */}
+      {/* Aviso de lead encerrado */}
+      {isClosed && (
+        <div
+          className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg"
+          style={{ background: "#F3F4F6", color: "#6B7280" }}
+        >
+          <AlertCircle size={13} />
+          Lead encerrado — não é possível abrir negociação.
+        </div>
+      )}
+
+      {/* Erro de requisição — aparece acima do botão sem fechar o modal */}
       {error && (
         <div
           className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg"
@@ -54,8 +72,8 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
       <button
         onClick={handleClick}
-        disabled={loading}
-        className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        disabled={isDisabled}
+        className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {loading ? (
           <>

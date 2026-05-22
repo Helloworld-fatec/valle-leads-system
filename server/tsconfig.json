@@ -26,6 +26,6 @@
   },
   "include": ["src", "prisma"],
   "exclude": [
-    "src/modules/auths"
+    "src/modules/auth"
   ]
 }
