@@ -1,0 +1,5 @@
+id,name,address,is_active,created_at,updated_at,created_by_user_id,updated_by_user_id
+e20fb479-56ee-491c-8f03-9c2c2967d3e6,1000 Valle Multimarcas - São José dos Campos,"Av. Cassiopeia, 295 - Jardim Satélite, São José dos Campos - SP, 12230-010",True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,
+ce4b5f09-a043-49f2-8c03-471655bd938c,1000 Valle Multimarcas - Caçapava,"R. Prof. Edmir Viana de Moura, 68 - Vera Cruz, Caçapava - SP, 12286-710",True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,
+1cb1e601-8983-4845-b183-3a514be9b75b,1000 Valle Multimarcas - Pouso Alegre,"Av. Pinto Cobra, 840 - Santa Cecilia, Pouso Alegre - MG, 37554-142",True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,
+6fad49e6-20d2-44cd-967a-6b41582f7d7f,1000 Valle Multimarcas Serramar Shopping,"Av. José Herculano, 1086 - LOJA AB 02C - Pontal de Santa Marina, Caraguatatuba - SP, 11672-390",True,2025-01-01T00:00:00.000Z,2025-01-01T00:00:00.000Z,,

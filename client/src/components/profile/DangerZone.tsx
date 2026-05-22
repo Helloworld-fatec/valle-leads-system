@@ -1,8 +1,18 @@
+// src/components/profile/DangerZone.tsx
 import { LogOut, AlertTriangle } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../hook/useAuth";
 
 export default function DangerZone() {
   const [confirming, setConfirming] = useState(false);
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-5">
@@ -12,17 +22,22 @@ export default function DangerZone() {
       </div>
 
       <div className="space-y-3">
+        {/* Sair da sessão */}
         <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-100">
           <div>
             <p className="text-xs font-semibold text-red-800">Sair da sessão</p>
             <p className="text-xs text-red-500 mt-0.5">Encerrar acesso ao sistema</p>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-all">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-all"
+          >
             <LogOut size={12} />
             Sair
           </button>
         </div>
 
+        {/* Desativar conta */}
         <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
           <div>
             <p className="text-xs font-semibold text-gray-700">Desativar conta</p>

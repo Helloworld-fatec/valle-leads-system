@@ -3,9 +3,11 @@
     "rootDir": ".",
     "outDir": "./dist",
 
-    "module": "CommonJS",
+    "module": "nodenext",
     "target": "esnext",
     "types": ["node"],
+
+    "moduleResolution": "nodenext",
 
     "sourceMap": true,
     "declaration": true,
@@ -22,5 +24,8 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src", "prisma"]
+  "include": ["src", "prisma"],
+  "exclude": [
+    "src/modules/auth"
+  ]
 }

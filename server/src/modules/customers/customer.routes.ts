@@ -1,56 +1,88 @@
+// src/modules/customers/customer.routes.ts
 import { Router } from "express";
-import { CustomersController } from "./customer.controller";
+import { CustomersController } from "./customer.controller.js";
+import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import { checkRole } from "../../middlewares/auth/permission.middleware.js";
 import {
-  CreateCustomerSchema,
-  UpdateCustomerSchema,
-  QueryCustomerSchema,
-} from "./customer.dtos";
-import { validateBody, validateQuery } from "../../middlewares/validation/validate.middleware";
+  validateBody,
+  validateQuery,
+  validateParams,
+} from "../../middlewares/validation/validate.middleware.js";
+import {
+  createCustomerSchema,
+  updateCustomerSchema,
+  queryCustomerSchema,
+  customerIdParamSchema,
+} from "./customer.dto.js";
 
 // ─────────────────────────────────────────────
 // CUSTOMER ROUTES
 // ─────────────────────────────────────────────
+// Regras de acesso:
+//   GET    /customers          → qualquer role autenticado
+//   GET    /customers/:id      → qualquer role autenticado
+//   POST   /customers          → qualquer role autenticado
+//   PUT    /customers/:id      → qualquer role autenticado
+//   PATCH  /customers/:id      → qualquer role autenticado
+//   DELETE /customers/:id      → qualquer role autenticado (soft delete)
+//   DELETE /customers/:id/hard → somente ADMIN (hard delete físico)
+//
+// /hard deve vir ANTES de /:id para o Express resolver primeiro.
+// ─────────────────────────────────────────────
 
-export const customersRouter = Router();
+const customersRouter = Router();
 
-// ⚠️ TODO: aplicar authMiddleware em todas as rotas na próxima sprint
-// customersRouter.use(authMiddleware);
+customersRouter.use(authMiddleware);
 
-// Listagem com filtros opcionais via query params
+// ─── LEITURA ─────────────────────────────────────────
 customersRouter.get(
   "/",
-  validateQuery(QueryCustomerSchema),
+  validateQuery(queryCustomerSchema),
   CustomersController.findAll
 );
 
 customersRouter.get(
   "/:id",
+  validateParams(customerIdParamSchema),
   CustomersController.findById
 );
 
-// validateBody garante que o body está válido antes de chegar no controller
+// ─── CRIAÇÃO ─────────────────────────────────────────
 customersRouter.post(
   "/",
-  validateBody(CreateCustomerSchema),
+  validateBody(createCustomerSchema),
   CustomersController.create
 );
 
-// PUT — atualização completa do recurso
+// ─── ATUALIZAÇÃO ─────────────────────────────────────
 customersRouter.put(
   "/:id",
-  validateBody(UpdateCustomerSchema),
+  validateParams(customerIdParamSchema),
+  validateBody(updateCustomerSchema),
   CustomersController.update
 );
 
-// PATCH — atualização parcial, usa o mesmo schema pois todos os campos já são opcionais
 customersRouter.patch(
   "/:id",
-  validateBody(UpdateCustomerSchema),
+  validateParams(customerIdParamSchema),
+  validateBody(updateCustomerSchema),
   CustomersController.update
 );
 
-// DELETE — soft delete, não remove o registro do banco
+// ─── EXCLUSÃO ────────────────────────────────────────
+// Hard delete — rota específica ANTES da genérica /:id
+customersRouter.delete(
+  "/:id/hard",
+  checkRole("ADMIN"),
+  validateParams(customerIdParamSchema),
+  CustomersController.hardDelete
+);
+
+// Soft delete — qualquer autenticado
 customersRouter.delete(
   "/:id",
+  validateParams(customerIdParamSchema),
   CustomersController.softDelete
 );
+
+export default customersRouter;

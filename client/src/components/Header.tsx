@@ -1,11 +1,18 @@
-import { Search, Bell, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { useAuth } from "../hook/useAuth";
+import { useNavigate } from "react-router-dom";
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Dashboard", subtitle: "Visão geral do sistema" },
-  "/leads": { title: "Leads", subtitle: "Gerenciamento de leads" },
-  "/funil": { title: "Funil de Vendas", subtitle: "Pipeline por etapas" },
-  "/usuarios": { title: "Usuários", subtitle: "Controle de acesso da equipe" },
-  "/perfil": { title: "Meu Perfil", subtitle: "Suas informações e preferências" },
+  "/dashboard":    { title: "Dashboard",  subtitle: "Visão geral da plataforma" },
+  "/leads":        { title: "Leads",      subtitle: "Gerenciamento inteligente" },
+  "/funil":        { title: "Funil",      subtitle: "Pipeline de conversão" },
+  "/usuarios":     { title: "Usuários",   subtitle: "Equipe e permissões" },
+  "/perfil":       { title: "Perfil",     subtitle: "Configurações da conta" },
+  "/manager/leads":{ title: "Leads",      subtitle: "Visão do gestor" },
+  "/teams":        { title: "Times",      subtitle: "Gestão de equipes" },
+  "/stores":       { title: "Lojas",      subtitle: "Gestão de lojas" },
+  "/gm/leads":     { title: "Leads GM",   subtitle: "Visão geral de leads" },
 };
 
 interface HeaderProps {
@@ -13,64 +20,139 @@ interface HeaderProps {
 }
 
 export default function Header({ currentPath }: HeaderProps) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const page = pageTitles[currentPath] ?? { title: "Valle Leads", subtitle: "Sistema" };
+
+  // Iniciais do nome do usuário
+  const initials = user?.name
+    ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+    : "??";
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "numeric",
     month: "long",
-    year: "numeric",
   });
 
-  const hour = now.getHours();
-  const greeting =
-    hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const page = pageTitles[currentPath] ?? { title: "Valle Leads", subtitle: "" };
+  function handleLogout() {
+    setDropdownOpen(false);
+    logout();
+    navigate("/login");
+  }
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-10 shrink-0">
-      {/* Left: breadcrumb/title */}
-      <div className="hidden sm:block">
-        <h2 className="text-sm font-bold text-gray-900 leading-tight">{page.title}</h2>
-        <p className="text-xs text-gray-400 leading-tight">{page.subtitle}</p>
+    <header
+      className="sticky top-0 z-30 h-22 border-b border-white/5 backdrop-blur-2xl overflow-visible"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(8,17,39,0.92) 0%, rgba(11,20,49,0.82) 100%)",
+      }}
+    >
+      {/* Background glows */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-30 left-[15%] w-[320px] h-80 rounded-full bg-blue-500/15 blur-[120px]" />
+        <div className="absolute -top-35 right-[10%] w-65 h-65 rounded-full bg-cyan-400/10 blur-[120px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(37,99,235,0.03),transparent,rgba(6,182,212,0.03))]" />
       </div>
 
-      {/* Center: search */}
-      <div className="flex-1 max-w-xs mx-4 sm:mx-6">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            className="w-full pl-8 pr-4 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
-          />
+      <div className="relative h-full px-6 lg:px-10 flex items-center justify-between gap-6">
+
+        {/* LEFT — título da página */}
+        <div className="flex items-center gap-5 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse" />
+              <span className="text-[10px] uppercase tracking-[0.35em] text-cyan-300/70 font-medium">
+                Valle Platform
+              </span>
+            </div>
+            <h1 className="text-[21px] font-semibold tracking-tight text-white leading-none">
+              {page.title}
+            </h1>
+            <p className="text-[12px] text-white/35 mt-2">{page.subtitle}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Right: notification + user */}
-      <div className="flex items-center gap-2">
-        {/* Notification */}
-        <button className="relative w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-all">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
-        </button>
+        {/* RIGHT — usuário com dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen((v) => !v)}
+            className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-[#0B1736]/80 backdrop-blur-xl px-3 py-2 transition-all duration-300 hover:bg-[#10204D] hover:border-white/10"
+          >
+            {/* Avatar */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-xl bg-blue-500/40 blur-md opacity-0 transition-all duration-300 group-hover:opacity-100" />
+              <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 via-blue-400 to-cyan-400 flex items-center justify-center text-white text-sm font-semibold shadow-[0_0_25px_rgba(37,99,235,0.35)]">
+                {initials}
+              </div>
+            </div>
 
-        {/* User */}
-        <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-gray-50 transition-all">
-          <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
-            SM
-          </div>
-          <div className="hidden md:block text-left">
-            <p className="text-xs font-semibold text-gray-900 leading-tight">
-              {greeting}, Suelen
-            </p>
-            <p className="text-[10px] text-gray-400 leading-tight capitalize">{dateStr}</p>
-          </div>
-          <ChevronDown size={12} className="text-gray-400 hidden md:block" />
-        </button>
+            {/* Nome + data */}
+            <div className="hidden lg:block text-left">
+              <p className="text-sm font-medium text-white leading-none">
+                {user?.name ?? "Usuário"}
+              </p>
+              <p className="text-[11px] text-white/30 mt-1 capitalize">{dateStr}</p>
+            </div>
+
+            <ChevronDown
+              size={15}
+              className={`hidden lg:block text-white/25 transition-all duration-300 group-hover:text-white/60 ${
+                dropdownOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {/* Dropdown */}
+          {dropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-white/10 bg-[#0B1736]/95 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] overflow-hidden z-50">
+
+              {/* Info do usuário */}
+              <div className="px-4 py-3 border-b border-white/8">
+                <p className="text-sm font-medium text-white truncate">
+                  {user?.name ?? "Usuário"}
+                </p>
+                <p className="text-xs text-white/35 mt-0.5 truncate">
+                  {user?.email ?? ""}
+                </p>
+              </div>
+
+              {/* Perfil */}
+              <button
+                onClick={() => { setDropdownOpen(false); navigate("/perfil"); }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200"
+              >
+                <UserCircle size={16} className="shrink-0" />
+                Meu Perfil
+              </button>
+
+              {/* Logout */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/8 transition-all duration-200 border-t border-white/5"
+              >
+                <LogOut size={16} className="shrink-0" />
+                Sair da plataforma
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

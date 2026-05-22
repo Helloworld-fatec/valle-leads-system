@@ -1,103 +1,169 @@
-// server/src/modules/users-teams/usersTeams.service.ts
-import { UsersTeamsRepository } from "./usersTeams.repository.js";
-import { AppError } from "../../middlewares/errors/domainErrors.middleware.js";
-import type { CreateUserTeamDTO, UpdateUserTeamDTO } from "./usersTeams.dto.js";
-
-// Importando repositórios auxiliares (caso queira garantir que User e Team existem)
+// src/modules/users-teams/usersTeams.service.ts
+import { UsersTeamsRepository, type UserTeamWithRelations } from "./usersTeams.repository.js";
 import { UsersRepository } from "../users/users.repository.js";
 import { TeamsRepository } from "../teams/teams.repository.js";
+import type { CreateUserTeamDTO, UpdateUserTeamDTO } from "./usersTeams.dto.js";
+import {
+  RecursoNaoEncontradoError,
+  AcessoNaoAutorizadoError,
+  ConflitoDeDadosError,
+  BusinessRuleError,
+} from "../../middlewares/errors/domainErrors.middleware.js";
+
+// Roles aceitos pelo módulo
+export type UserTeamActorRole =
+  | "ATTENDANT"
+  | "MANAGER"
+  | "GENERAL_MANAGER"
+  | "ADMIN";
+
+export interface ActorContext {
+  id: string;
+  role: UserTeamActorRole;
+}
+
+// ─── Helpers de permissão ─────────────────────────────
+function canManage(role: UserTeamActorRole): boolean {
+  return role === "GENERAL_MANAGER" || role === "ADMIN";
+}
+
+function canSoftDelete(role: UserTeamActorRole): boolean {
+  return role === "GENERAL_MANAGER" || role === "ADMIN";
+}
+
+function canHardDelete(role: UserTeamActorRole): boolean {
+  return role === "ADMIN";
+}
 
 export class UsersTeamsService {
   private repo = new UsersTeamsRepository();
   private usersRepo = new UsersRepository();
   private teamsRepo = new TeamsRepository();
 
-  // 🔍 Listar todos os vínculos
-  async findAll() {
+  // ─── LISTAR ─────────────────────────────────────────
+  // Qualquer role autenticado pode visualizar.
+  async findAll(): Promise<UserTeamWithRelations[]> {
     return this.repo.findAll();
   }
 
-  // 🔍 Buscar vínculo por ID
-  async findById(id: string) {
-    if (!id) {
-      throw new AppError("ID não informado", 400);
-    }
-
+  // ─── BUSCAR POR ID ───────────────────────────────────
+  // Qualquer role autenticado pode visualizar.
+  async findById(id: string): Promise<UserTeamWithRelations> {
     const userTeam = await this.repo.findById(id);
-
     if (!userTeam) {
-      throw new AppError("Vínculo não encontrado", 404);
+      throw new RecursoNaoEncontradoError("Vínculo não encontrado.");
     }
-
     return userTeam;
   }
 
-  // ➕ Criar novo vínculo (Regras de Negócio)
-  async create(data: CreateUserTeamDTO) {
-    const { user_id, team_id } = data;
+  // ─── CRIAR ──────────────────────────────────────────
+  // GENERAL_MANAGER e ADMIN.
+  // Reativa automaticamente se o vínculo já existia mas estava inativo,
+  // em vez de lançar conflito — o "recriar" é apenas ativar o registro.
+  async create(
+    data: CreateUserTeamDTO,
+    actor: ActorContext
+  ): Promise<UserTeamWithRelations> {
+    if (!canManage(actor.role)) {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas gerente geral ou administrador podem criar vínculos."
+      );
+    }
 
-    // 1. Opcional, mas recomendado: Verificar se o User existe
-    const user = await this.usersRepo.findById(user_id);
+    const user = await this.usersRepo.findById(data.user_id);
     if (!user) {
-      throw new AppError("Usuário não encontrado", 404);
+      throw new RecursoNaoEncontradoError("Usuário não encontrado.");
+    }
+    if (!user.is_active) {
+      throw new BusinessRuleError(
+        "Não é possível vincular um usuário inativo a um time."
+      );
     }
 
-    // 2. Opcional, mas recomendado: Verificar se o Team existe
-    const team = await this.teamsRepo.findById(team_id);
+    const team = await this.teamsRepo.findLightById(data.team_id);
     if (!team) {
-      throw new AppError("Time não encontrado", 404);
+      throw new RecursoNaoEncontradoError("Time não encontrado.");
+    }
+    if (!team.is_active) {
+      throw new BusinessRuleError(
+        "Não é possível vincular um usuário a um time inativo."
+      );
     }
 
-    // 3. Regra Core: Garantir que o vínculo não exista (evitar erro do banco de dados)
-    const existingLink = await this.repo.findByUserAndTeam(user_id, team_id);
-    if (existingLink) {
-      throw new AppError("O usuário já pertence a este time", 409); // 409 Conflict
-    }
+    const existing = await this.repo.findByUserAndTeam(data.user_id, data.team_id);
 
-    return this.repo.create(data);
-  }
-
-  // ✏️ Atualizar vínculo (Cuidado: Geralmente em tabelas pivô apenas apagamos e recriamos)
-  async update(id: string, data: UpdateUserTeamDTO) {
-    if (!id) {
-      throw new AppError("ID não informado", 400);
-    }
-
-    // 1. Verifica se o vínculo existe
-    const userTeam = await this.repo.findById(id);
-    if (!userTeam) {
-      throw new AppError("Vínculo não encontrado", 404);
-    }
-
-    // 2. Se tentarmos mudar o user_id ou team_id, devemos garantir que a nova combinação não colida
-    if (data.user_id || data.team_id) {
-      const newUser = data.user_id || userTeam.user_id;
-      const newTeam = data.team_id || userTeam.team_id;
-
-      // Se mudou algo, checa colisão (mas ignora se for o próprio ID que estamos atualizando)
-      if (newUser !== userTeam.user_id || newTeam !== userTeam.team_id) {
-        const collision = await this.repo.findByUserAndTeam(newUser, newTeam);
-        if (collision && collision.id !== id) {
-          throw new AppError("A nova combinação de usuário e time já existe", 409);
-        }
+    if (existing) {
+      if (existing.is_active) {
+        throw new ConflitoDeDadosError("O usuário já pertence a este time.");
       }
+      // Vínculo existe mas está inativo — reativa em vez de recriar
+      return this.repo.update({ id: existing.id, dto: { is_active: true } });
     }
 
-    return this.repo.update(id, data);
+    return this.repo.create({ dto: data, actorId: actor.id });
   }
 
-  // ❌ Deletar vínculo (Hard delete)
-  async delete(id: string) {
-    if (!id) {
-      throw new AppError("ID não informado", 400);
+  // ─── ATUALIZAR ──────────────────────────────────────
+  // GENERAL_MANAGER e ADMIN. Só é possível alterar is_active.
+  async update(
+    id: string,
+    data: UpdateUserTeamDTO,
+    actor: ActorContext
+  ): Promise<UserTeamWithRelations> {
+    if (!canManage(actor.role)) {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas gerente geral ou administrador podem editar vínculos."
+      );
     }
 
     const userTeam = await this.repo.findById(id);
-
     if (!userTeam) {
-      throw new AppError("Vínculo não encontrado", 404);
+      throw new RecursoNaoEncontradoError("Vínculo não encontrado.");
     }
 
-    return this.repo.delete(id);
+    if (userTeam.is_active === data.is_active) {
+      throw new BusinessRuleError(
+        `Vínculo já está ${data.is_active ? "ativo" : "inativo"}.`
+      );
+    }
+
+    return this.repo.update({ id, dto: data });
+  }
+
+  // ─── SOFT DELETE ────────────────────────────────────
+  // GENERAL_MANAGER e ADMIN.
+  async softDelete(id: string, actor: ActorContext): Promise<void> {
+    if (!canSoftDelete(actor.role)) {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas gerente geral ou administrador podem desativar vínculos."
+      );
+    }
+
+    const userTeam = await this.repo.findById(id);
+    if (!userTeam) {
+      throw new RecursoNaoEncontradoError("Vínculo não encontrado.");
+    }
+    if (!userTeam.is_active) {
+      throw new BusinessRuleError("Vínculo já está inativo.");
+    }
+
+    await this.repo.softDelete(id);
+  }
+
+  // ─── HARD DELETE ────────────────────────────────────
+  // Somente ADMIN.
+  async hardDelete(id: string, actor: ActorContext): Promise<void> {
+    if (!canHardDelete(actor.role)) {
+      throw new AcessoNaoAutorizadoError(
+        "Apenas administradores podem excluir vínculos permanentemente."
+      );
+    }
+
+    const userTeam = await this.repo.findById(id);
+    if (!userTeam) {
+      throw new RecursoNaoEncontradoError("Vínculo não encontrado.");
+    }
+
+    await this.repo.hardDelete(id);
   }
 }

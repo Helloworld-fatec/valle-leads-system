@@ -1,78 +1,166 @@
-// server/src/modules/customers/customer.repository.ts
-import { prisma } from '../../config/prisma.js';
-import {
+// src/modules/customers/customer.repository.ts
+import { prisma, Prisma } from "../../config/prisma.js";
+import type {
   CreateCustomerDTO,
   UpdateCustomerDTO,
   QueryCustomerDTO,
-} from "./customer.dtos.js";
+} from "./customer.dto.js";
 
 // ─────────────────────────────────────────────
 // CUSTOMER REPOSITORY
 // ─────────────────────────────────────────────
 
+
+// Select padrão — sem campos pesados
+const customerSelect = {
+  id: true,
+  name: true,
+  email: true,
+  cpf: true,
+  phone: true,
+  address_street: true,
+  address_number: true,
+  address_complement: true,
+  address_neighborhood: true,
+  address_city: true,
+  address_state: true,
+  address_zip: true,
+  is_active: true,
+  created_at: true,
+  updated_at: true,
+  created_by_user_id: true,
+  updated_by_user_id: true,
+} as const satisfies Prisma.CustomersSelect;
+
+export type CustomerRow = Prisma.CustomersGetPayload<{
+  select: typeof customerSelect;
+}>;
+
+// Tipo rico — retornado pelo findById (inclui leads)
+const customerInclude = {
+  leads: true,
+} as const satisfies Prisma.CustomersInclude;
+
+export type CustomerWithRelations = Prisma.CustomersGetPayload<{
+  include: typeof customerInclude;
+}>;
+
 export const CustomersRepository = {
-  async findAll(filters: QueryCustomerDTO) {
-    const { team_id, is_active, name, cpf, page = 1, limit = 20 } = filters;
+  async findAll(filters: QueryCustomerDTO): Promise<CustomerRow[]> {
+    const where: Prisma.CustomersWhereInput = {};
+    if (filters.is_active !== undefined) where.is_active = filters.is_active;
+    if (filters.cpf !== undefined) where.cpf = filters.cpf;
+    if (filters.name !== undefined) {
+      where.name = { contains: filters.name, mode: "insensitive" };
+    }
 
     return prisma.customers.findMany({
-      where: {
-        // Spread condicional — só adiciona o filtro se o valor foi informado
-        ...(team_id && { team_id }),
-        // is_active usa !== undefined pois false é um valor válido e deve ser filtrado
-        ...(is_active !== undefined && { is_active }),
-        // Busca por nome case-insensitive (ex: "joao" encontra "João")
-        ...(name && { name: { contains: name, mode: "insensitive" } }),
-        ...(cpf && { cpf }),
-      },
-      skip: (page - 1) * limit,
-      take: limit,
+      where,
+      select: customerSelect,
+      skip: (filters.page - 1) * filters.limit,
+      take: filters.limit,
       orderBy: { created_at: "desc" },
     });
   },
 
-  async findById(id: string) {
+  async findById(id: string): Promise<CustomerWithRelations | null> {
     return prisma.customers.findUnique({
       where: { id },
-      // Inclui leads relacionados para exibir histórico do customer
-      include: { leads: true },
+      include: customerInclude,
     });
   },
 
-  // Método dedicado para checagem de CPF duplicado no service
-  async findByCpf(cpf: string) {
+  // Lookup leve para validações no service
+  async findLightById(
+    id: string
+  ): Promise<{ id: string; is_active: boolean; cpf: string | null } | null> {
+    return prisma.customers.findUnique({
+      where: { id },
+      select: { id: true, is_active: true, cpf: true },
+    });
+  },
+
+  async findByCpf(cpf: string): Promise<{ id: string } | null> {
     return prisma.customers.findUnique({
       where: { cpf },
+      select: { id: true },
     });
   },
 
-  async create(data: CreateCustomerDTO) {
-    // 1. Remove qualquer propriedade que seja 'undefined' para respeitar o TS estrito
-    const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined)
-    );
-
-    return prisma.customers.create({
-      data: cleanData as any, // O prisma aceita os campos opcionais mesmo sem o cleanData, mas o cast é necessário para evitar erro de tipo
+  async findByPhone(phone: string): Promise<{ id: string } | null> {
+    return prisma.customers.findUnique({
+      where: { phone },
+      select: { id: true },
     });
   },
 
-  async update(id: string, data: UpdateCustomerDTO) {
-    // 1. Remove qualquer propriedade que seja 'undefined' para respeitar o TS estrito
-    const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined)
-    );
+  async create(params: {
+    dto: CreateCustomerDTO;
+    actorId: string;
+  }): Promise<CustomerRow> {
+    const { dto, actorId } = params;
 
+    // Campos String? exigem string | null — usamos ?? null para converter undefined.
+    const data: Prisma.CustomersUncheckedCreateInput = {
+      name: dto.name,
+      phone: dto.phone,
+      email: dto.email ?? null,
+      cpf: dto.cpf ?? null,
+      address_street: dto.address_street ?? null,
+      address_number: dto.address_number ?? null,
+      address_complement: dto.address_complement ?? null,
+      address_neighborhood: dto.address_neighborhood ?? null,
+      address_city: dto.address_city ?? null,
+      address_state: dto.address_state ?? null,
+      address_zip: dto.address_zip ?? null,
+      created_by_user_id: actorId,
+      updated_by_user_id: actorId,
+    };
+
+    return prisma.customers.create({ data, select: customerSelect });
+  },
+
+  async update(params: {
+    id: string;
+    dto: UpdateCustomerDTO;
+    actorId: string;
+  }): Promise<CustomerRow> {
+    const { id, dto, actorId } = params;
+
+    // UncheckedUpdateInput: constrói explicitamente para não passar undefined.
+    const data: Prisma.CustomersUncheckedUpdateInput = {
+      updated_by_user_id: actorId,
+    };
+
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.email !== undefined) data.email = dto.email ?? null;
+    if (dto.cpf !== undefined) data.cpf = dto.cpf ?? null;
+    if (dto.phone !== undefined) data.phone = dto.phone;
+    if (dto.is_active !== undefined) data.is_active = dto.is_active;
+    if (dto.address_street !== undefined) data.address_street = dto.address_street ?? null;
+    if (dto.address_number !== undefined) data.address_number = dto.address_number ?? null;
+    if (dto.address_complement !== undefined) data.address_complement = dto.address_complement ?? null;
+    if (dto.address_neighborhood !== undefined) data.address_neighborhood = dto.address_neighborhood ?? null;
+    if (dto.address_city !== undefined) data.address_city = dto.address_city ?? null;
+    if (dto.address_state !== undefined) data.address_state = dto.address_state ?? null;
+    if (dto.address_zip !== undefined) data.address_zip = dto.address_zip ?? null;
+
+    return prisma.customers.update({ where: { id }, data, select: customerSelect });
+  },
+
+  async softDelete(params: {
+    id: string;
+    actorId: string;
+  }): Promise<CustomerRow> {
+    const { id, actorId } = params;
     return prisma.customers.update({
       where: { id },
-      data: cleanData,
+      data: { is_active: false, updated_by_user_id: actorId },
+      select: customerSelect,
     });
   },
 
-  // Soft delete: mantém o registro no banco, apenas desativa o customer
-  async softDelete(id: string) {
-    return prisma.customers.update({
-      where: { id },
-      data: { is_active: false },
-    });
+  async hardDelete(id: string): Promise<void> {
+    await prisma.customers.delete({ where: { id } });
   },
 };

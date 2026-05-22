@@ -1,72 +1,82 @@
-// server/src/modules/stores/store.service.ts
-import { StoresRepository } from "./stores.repository.js";
-import { TeamsRepository } from "../teams/teams.repository.js";
-import { AppError } from "../../middlewares/errors/domainErrors.middleware.js";
+// src/modules/stores/stores.service.ts
+import { Prisma } from "../../config/prisma.js";
+import { StoresRepository, type StoreRow } from "./stores.repository.js";
+import type { CreateStoreDTO, UpdateStoreDTO } from "./stores.dto.js";
+import {
+  RecursoNaoEncontradoError,
+  BusinessRuleError,
+} from "../../middlewares/errors/domainErrors.middleware.js";
+
+// ─────────────────────────────────────────────
+// STORES SERVICE
+// ─────────────────────────────────────────────
+// Regras de negócio do módulo de lojas.
+// Stores é uma entidade simples (name, address) sem relação direta com Teams
+// no sentido Stores→Teams. A relação existe na direção oposta: Teams.store_id.
+// ─────────────────────────────────────────────
 
 export class StoresService {
   private repo = new StoresRepository();
-  private teamsRepo = new TeamsRepository();
 
-  // 📋 LISTAR TODOS
-  async findAll() {
-    return this.repo.findAll();
+  async findAll(isActive?: boolean): Promise<StoreRow[]> {
+    return this.repo.findAll(isActive);
   }
 
-  // 🔍 BUSCAR POR ID
-  async findById(id: string) {
-    return this.repo.findById(id);
-  }
-
-  // ➕ CRIAR STORE
-  async create(data: any) {
-    const { team_id } = data;
-
-    if (!team_id) {
-      throw new AppError("Team ID é obrigatório", 400);
-    }
-
-    const team = await this.teamsRepo.findById(team_id);
-
-    if (!team) {
-      throw new AppError("Team não encontrada", 404);
-    }
-
-    if (!team.is_active) {
-      throw new AppError("Não é possível criar store em team inativa", 400);
-    }
-
-    return this.repo.create(data);
-  }
-
-  // ✏️ ATUALIZAR STORE
-  async update(id: string, data: any) {
-    if (!id) {
-      throw new AppError("ID não informado", 400);
-    }
-
+  async findById(id: string): Promise<StoreRow> {
     const store = await this.repo.findById(id);
-
     if (!store) {
-      throw new AppError("Store não encontrada", 404);
+      throw new RecursoNaoEncontradoError("Loja não encontrada.");
     }
-
-    return this.repo.update(id, data);
+    return store;
   }
 
-  // ❌ DELETAR STORE (SOFT DELETE + REGRA)
-  async delete(id: string) {
-    if (!id) {
-      throw new AppError("ID não informado", 400);
+  async create(data: CreateStoreDTO, actorId: string): Promise<StoreRow> {
+    return this.repo.create({ dto: data, actorId });
+  }
+
+  async update(
+    id: string,
+    data: UpdateStoreDTO,
+    actorId: string
+  ): Promise<StoreRow> {
+    const store = await this.repo.findLightById(id);
+    if (!store) {
+      throw new RecursoNaoEncontradoError("Loja não encontrada.");
     }
 
-    const store = await this.repo.findById(id);
+    return this.repo.update({ id, dto: data, actorId });
+  }
 
+  async softDelete(id: string, actorId: string): Promise<void> {
+    const store = await this.repo.findLightById(id);
     if (!store) {
-      throw new AppError("Store não encontrada", 404);
-    } else if (!store.is_active) {    
-      throw new AppError("Store já está inativa", 400);
-    } 
+      throw new RecursoNaoEncontradoError("Loja não encontrada.");
+    }
+    if (!store.is_active) {
+      throw new BusinessRuleError("Loja já está inativa.");
+    }
 
-    return this.repo.softDelete(id);
+    await this.repo.softDelete({ id, actorId });
+  }
+
+  async hardDelete(id: string, actorId: string): Promise<void> {
+    const store = await this.repo.findLightById(id);
+    if (!store) {
+      throw new RecursoNaoEncontradoError("Loja não encontrada.");
+    }
+
+    try {
+      await this.repo.hardDelete(id);
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2003"
+      ) {
+        throw new BusinessRuleError(
+          "Não é possível excluir a loja permanentemente pois existem times vinculados."
+        );
+      }
+      throw err;
+    }
   }
 }

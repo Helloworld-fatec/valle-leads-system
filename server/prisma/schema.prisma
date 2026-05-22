@@ -1,21 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider        = "prisma-client-js"
   output          = "../src/generated/prisma"
-  // Atualizado para o nome correto no Prisma 7
   previewFeatures = ["schemaEngineDriverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
-  // A URL não é mais definida aqui no Prisma 7, ela fica no prisma.config.ts
 }
 
 model Stores {
@@ -27,7 +17,8 @@ model Stores {
   updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-  teams              Teams[]  
+  teams Teams[]
+  @@map("stores")
 }
 
 model Teams {
@@ -40,28 +31,40 @@ model Teams {
   updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
-  user_teams         UserTeams[]
-  customers          Customers[]
-  leads              Leads[]
-  negotiations       Negotiations[]
+  user_teams   UserTeams[]
+  leads        Leads[]
+  negotiations Negotiations[]
+  @@index([store_id])
   @@index([created_at])
   @@map("teams")
 }
 
 model Users {
-  id                 String   @id @default(uuid())
-  email              String   @unique
-  password_hash      String
-  name               String
-  role               String   @default("ATTENDANT")
-  is_active          Boolean  @default(true)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  created_by_user_id String?
-  updated_by_user_id String?
-  user_teams         UserTeams[]
-  leads_assigned     Leads[]  @relation("AttendantLeads")
-  logs               SystemLogs[]
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  password_hash        String
+  name                 String
+  role                 String   @default("ATTENDANT")
+  phone_1_ddd          String?
+  phone_1_number       String?
+  phone_2_ddd          String?
+  phone_2_number       String?
+  address_street       String?
+  address_number       String?
+  address_complement   String?
+  address_neighborhood String?
+  address_city         String?
+  address_state        String?
+  address_zip          String?
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+  created_by_user_id   String?
+  updated_by_user_id   String?
+  user_teams            UserTeams[]
+  leads_assigned        Leads[]        @relation("AttendantLeads")
+  negotiations_assigned Negotiations[] @relation("AttendantNegotiations")
+  logs                  SystemLogs[]
   @@index([created_at])
   @@map("users")
 }
@@ -72,104 +75,144 @@ model UserTeams {
   user               Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   team_id            String
   team               Teams    @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  is_active          Boolean  @default(true)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?
-  @@unique([user_id, team_id]) 
+  @@unique([user_id, team_id])
   @@index([user_id])
   @@index([team_id])
   @@map("user_teams")
 }
 
 model Customers {
-  id                 String   @id @default(uuid())
-  name               String
-  email              String?
-  cpf                String?  @unique
-  phone              String?
-  is_active          Boolean  @default(false)
-  team_id            String?
-  teams              Teams?   @relation(fields: [team_id], references: [id], onDelete: Restrict)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  created_by_user_id String?
-  updated_by_user_id String?
-  leads              Leads[]
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String?  @unique
+  cpf                  String?  @unique
+  phone                String   @unique
+  address_street       String?
+  address_number       String?
+  address_complement   String?
+  address_neighborhood String?
+  address_city         String?
+  address_state        String?
+  address_zip          String?
+  is_active            Boolean  @default(false)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+  created_by_user_id   String?
+  updated_by_user_id   String?
+  leads        Leads[]
+  negotiations Negotiations[]
   @@index([created_at])
   @@map("customers")
 }
 
-model Leads {
+model InterestItems {
   id                 String   @id @default(uuid())
-  source             String?   
-  status             String   
-  is_active          Boolean  @default(false)
-  vehicle_interest   String?
-  customer_id        String
-  customers          Customers @relation(fields: [customer_id], references: [id], onDelete: Restrict)
-  team_id            String
-  teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
-  attendant_id       String?
-  attendant          Users?    @relation("AttendantLeads", fields: [attendant_id], references: [id], onDelete: SetNull)
+  reference_code     String?  @unique
+  description        String
+  value              Decimal? @db.Decimal(15, 2)
+  is_active          Boolean  @default(true)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
+  leads Leads[]
+  @@index([reference_code])
+  @@index([created_at])
+  @@map("interest_items")
+}
+
+model Leads {
+  id                 String         @id @default(uuid())
+  source             String?
+  status             String         @default("new")
+  is_active          Boolean        @default(true)
+  customer_id        String
+  customers          Customers      @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  team_id            String
+  teams              Teams          @relation(fields: [team_id], references: [id], onDelete: Restrict)
+  attendant_id       String?
+  attendant          Users?         @relation("AttendantLeads", fields: [attendant_id], references: [id], onDelete: SetNull)
+  interest_item_id   String?
+  interest_item      InterestItems? @relation(fields: [interest_item_id], references: [id], onDelete: SetNull)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+  created_by_user_id String?
+  updated_by_user_id String?
   negotiations       Negotiations[]
+  status_history     NegotiationStatus[]       @relation("LeadStatusHistory")
+  stage_history      NegotiationStageHistory[] @relation("LeadStageHistory")
+  importance_history NegotiationImportance[]   @relation("LeadImportanceHistory")
   @@index([team_id])
   @@index([attendant_id])
   @@index([customer_id])
+  @@index([interest_item_id])
   @@index([status])
   @@index([created_at])
   @@map("leads")
 }
 
 model Negotiations {
-  id                 String   @id @default(uuid())
+  id                 String    @id @default(uuid())
   team_id            String
-  teams              Teams    @relation(fields: [team_id], references: [id], onDelete: Restrict)
+  teams              Teams     @relation(fields: [team_id], references: [id], onDelete: Restrict)
   lead_id            String
-  leads              Leads    @relation(fields: [lead_id], references: [id], onDelete: Restrict)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+  leads              Leads     @relation(fields: [lead_id], references: [id], onDelete: Restrict)
+  customer_id        String
+  customers          Customers @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  attendant_id       String?
+  attendant          Users?    @relation("AttendantNegotiations", fields: [attendant_id], references: [id], onDelete: SetNull)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
   created_by_user_id String?
-  updated_by_user_id String?   
+  updated_by_user_id String?
   status_history     NegotiationStatus[]
   stage_history      NegotiationStageHistory[]
   importance_history NegotiationImportance[]
   @@index([team_id])
   @@index([lead_id])
+  @@index([customer_id])
+  @@index([attendant_id])
   @@index([created_at])
   @@map("negotiations")
 }
 
 model NegotiationStatus {
   id                 String       @id @default(uuid())
-  status_negotiation String
+  status_negotiation String       @default("new")
   notes              String?
   negotiation_id     String
   negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
+  lead_id            String
+  leads              Leads        @relation("LeadStatusHistory", fields: [lead_id], references: [id], onDelete: Cascade)
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
   @@index([negotiation_id])
+  @@index([lead_id])
   @@index([created_at])
   @@map("negotiation_status_history")
 }
 
 model NegotiationStageHistory {
   id                 String       @id @default(uuid())
-  old_status         String?
-  new_status         String
+  old_stage          String?
+  new_stage          String
   notes              String?
   negotiation_id     String
   negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
+  lead_id            String
+  leads              Leads        @relation("LeadStageHistory", fields: [lead_id], references: [id], onDelete: Cascade)
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
   @@index([negotiation_id])
+  @@index([lead_id])
   @@index([created_at])
   @@map("negotiation_stage_history")
 }
@@ -180,18 +223,21 @@ model NegotiationImportance {
   notes              String?
   negotiation_id     String
   negotiations       Negotiations @relation(fields: [negotiation_id], references: [id], onDelete: Cascade)
+  lead_id            String
+  leads              Leads        @relation("LeadImportanceHistory", fields: [lead_id], references: [id], onDelete: Cascade)
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
   created_by_user_id String?
   updated_by_user_id String?
   @@index([negotiation_id])
+  @@index([lead_id])
   @@index([created_at])
   @@map("negotiation_importance_history")
 }
 
 model SystemLogs {
   id                 String   @id @default(uuid())
-  action             String    
+  action             String
   module             String
   description        String?
   ip_address         String?
@@ -200,7 +246,9 @@ model SystemLogs {
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   created_by_user_id String?
+
   @@index([user_id])
+  @@index([module])
   @@index([created_at])
   @@map("system_logs")
 }

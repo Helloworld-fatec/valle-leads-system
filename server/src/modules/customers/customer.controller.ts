@@ -1,89 +1,101 @@
-import { Request, Response, NextFunction } from "express";
-import { CustomersService } from "./customer.service";
-import {
-  QueryCustomerSchema,
-  CreateCustomerSchema,
-  UpdateCustomerSchema,
-} from "./customer.dtos";
-
-// ─────────────────────────────────────────────
-// CUSTOMERS CONTROLLER
-// ─────────────────────────────────────────────
-
-// Tipo auxiliar para tipar req.params com id obrigatório
-type ParamsWithId = { id: string };
+// src/modules/customers/customer.controller.ts
+import type { Response, NextFunction } from "express";
+import { CustomersService } from "./customer.service.js";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
+import type {
+  CreateCustomerDTO,
+  UpdateCustomerDTO,
+  QueryCustomerDTO,
+  CustomerIdParamDTO,
+} from "./customer.dto.js";
 
 export const CustomersController = {
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  // GET /customers
+  async findAll(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      // Query params são parseados e transformados pelo schema antes de chegar no service
-      const filters = QueryCustomerSchema.parse(req.query);
+      const filters = req.query as unknown as QueryCustomerDTO;
       const customers = await CustomersService.findAll(filters);
-
-      return res.status(200).json({
-        success: true,
-        data: customers,
-      });
+      res.status(200).json({ success: true, data: customers });
     } catch (error) {
       next(error);
     }
   },
 
-  async findById(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  // GET /customers/:id
+  async findById(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.params as unknown as CustomerIdParamDTO;
       const customer = await CustomersService.findById(id);
-
-      return res.status(200).json({
-        success: true,
-        data: customer,
-      });
+      res.status(200).json({ success: true, data: customer });
     } catch (error) {
       next(error);
     }
   },
 
-  async create(req: Request, res: Response, next: NextFunction) {
+  // POST /customers
+  async create(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const data = CreateCustomerSchema.parse(req.body);
-      const customer = await CustomersService.create(data);
-
-      // 201 Created — recurso criado com sucesso
-      return res.status(201).json({
-        success: true,
-        data: customer,
-      });
+      const body = req.body as CreateCustomerDTO;
+      const customer = await CustomersService.create(body, req.user!.id);
+      res.status(201).json({ success: true, data: customer });
     } catch (error) {
       next(error);
     }
   },
 
-  async update(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  // PUT/PATCH /customers/:id
+  async update(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const { id } = req.params;
-      const data = UpdateCustomerSchema.parse(req.body);
-      const customer = await CustomersService.update(id, data);
-
-      return res.status(200).json({
-        success: true,
-        data: customer,
-      });
+      const { id } = req.params as unknown as CustomerIdParamDTO;
+      const body = req.body as UpdateCustomerDTO;
+      const customer = await CustomersService.update(id, body, req.user!.id);
+      res.status(200).json({ success: true, data: customer });
     } catch (error) {
       next(error);
     }
   },
 
-  async softDelete(req: Request<ParamsWithId>, res: Response, next: NextFunction) {
+  // DELETE /customers/:id (soft)
+  async softDelete(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.params as unknown as CustomerIdParamDTO;
+      await CustomersService.softDelete(id, req.user!.id);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  },
 
-      // Service cuida da validação — controller apenas repassa e retorna
-      await CustomersService.softDelete(id);
-
-      return res.status(200).json({
-        success: true,
-        message: "Cliente desativado com sucesso.",
-      });
+  // DELETE /customers/:id/hard
+  async hardDelete(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { id } = req.params as unknown as CustomerIdParamDTO;
+      await CustomersService.hardDelete(id);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

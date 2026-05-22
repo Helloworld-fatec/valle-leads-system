@@ -1,92 +1,140 @@
-import type { Request, Response, NextFunction } from "express";
-import { TeamsService } from "./teams.service.js";
+// src/modules/teams/teams.controller.ts
+import type { Response, NextFunction } from "express";
+import {
+  TeamsService,
+  type TeamActorContext,
+  type TeamActorRole,
+} from "./teams.service.js";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
+import type {
+  CreateTeamDTO,
+  UpdateTeamDTO,
+  QueryTeamDTO,
+  TeamIdParamDTO,
+} from "./teams.dto.js";
 
-const service = new TeamsService();
+// Lista fechada de roles válidos para o módulo de times.
+const VALID_TEAM_ROLES: ReadonlyArray<TeamActorRole> = [
+  "ATTENDANT",
+  "MANAGER",
+  "GENERAL_MANAGER",
+  "ADMIN",
+];
+
+function isTeamActorRole(role: string): role is TeamActorRole {
+  return (VALID_TEAM_ROLES as ReadonlyArray<string>).includes(role);
+}
 
 export class TeamsController {
+  private service = new TeamsService();
 
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  // Extrai e valida o ator a partir de req.user.
+  // authMiddleware garante que req.user existe nas rotas protegidas.
+  private getActor(req: AuthRequest): TeamActorContext {
+    const user = req.user!;
+    if (!isTeamActorRole(user.role)) {
+      // Role fora do enum esperado — indica JWT inconsistente.
+      // globalErrorHandler responde 500.
+      throw new Error(`Role desconhecido no token: ${user.role}`);
+    }
+    return { id: user.id, role: user.role };
+  }
+
+  // ─── LISTAR ─────────────────────────────────────────
+  findAll = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const isActiveParam = req.query.is_active;
-
-      let isActive: boolean | undefined;
-
-      if (isActiveParam === "true") {
-        isActive = true;
-      } else if (isActiveParam === "false") {
-        isActive = false;
-      } else {
-        isActive = undefined;
-      }
-
-      const teams = await service.findAll(isActive);
-
-      return res.status(200).json({
-        success: true,
-        data: teams
-      });
-
+      const actor = this.getActor(req);
+      // validateQuery já converteu a query; cast via unknown é seguro aqui.
+      const query = req.query as unknown as QueryTeamDTO;
+      const teams = await this.service.findAll(query.is_active, actor);
+      res.status(200).json({ success: true, data: teams });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  async findById(req: Request, res: Response, next: NextFunction) {
+  // ─── BUSCAR POR ID ───────────────────────────────────
+  findById = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = req.params.id as string;
-
-      const team = await service.findById(id);
-
-      return res.status(200).json({
-        success: true,
-        data: team
-      });
-
+      // Não precisa de actor — findById é aberto a qualquer autenticado.
+      const { id } = req.params as unknown as TeamIdParamDTO;
+      const team = await this.service.findById(id);
+      res.status(200).json({ success: true, data: team });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  async create(req: Request, res: Response, next: NextFunction) {
+  // ─── CRIAR ──────────────────────────────────────────
+  create = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const team = await service.create(req.body);
-
-      return res.status(201).json({
-        success: true,
-        data: team
-      });
-
+      const actor = this.getActor(req);
+      const body = req.body as CreateTeamDTO;
+      const team = await this.service.create(body, actor);
+      res.status(201).json({ success: true, data: team });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  async update(req: Request, res: Response, next: NextFunction) {
+  // ─── ATUALIZAR ──────────────────────────────────────
+  update = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = req.params.id as string;
-
-      const team = await service.update(id, req.body);
-
-      return res.status(200).json({
-        success: true,
-        data: team
-      });
-
+      const actor = this.getActor(req);
+      const { id } = req.params as unknown as TeamIdParamDTO;
+      const body = req.body as UpdateTeamDTO;
+      const team = await this.service.update(id, body, actor);
+      res.status(200).json({ success: true, data: team });
     } catch (err) {
       next(err);
     }
-  }
+  };
 
-  async delete(req: Request, res: Response, next: NextFunction) {
+  // ─── SOFT DELETE ────────────────────────────────────
+  softDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
-      const id = req.params.id as string;
-
-      await service.delete(id);
-
-      return res.status(204).send();
-
+      const actor = this.getActor(req);
+      const { id } = req.params as unknown as TeamIdParamDTO;
+      await this.service.softDelete(id, actor);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }
-  }
+  };
+
+  // ─── HARD DELETE ────────────────────────────────────
+  hardDelete = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const actor = this.getActor(req);
+      const { id } = req.params as unknown as TeamIdParamDTO;
+      await this.service.hardDelete(id, actor);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  };
 }

@@ -1,130 +1,213 @@
-import { useState } from "react";
-import { Zap, Eye, EyeOff, LogIn, AlertCircle } from "lucide-react";
+// src/pages/Login.tsx
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { Eye, EyeOff, LogIn, AlertCircle, ArrowRight } from "lucide-react";
+import { useAuth } from "../hook/useAuth";
+import { loginRequest } from "../services/loginService";
 
-interface LoginProps {
-  onLogin: () => void;
-}
+export default function Login() {
+  const { login } = useAuth();
 
-export default function Login({ onLogin }: LoginProps) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit() {
-    setError("");
+  useEffect(() => {
+    document.body.style.background = "#050816";
+    return () => {
+      document.body.style.background = "";
+    };
+  }, []);
+
+  async function handleSubmit() {
+    setError(null);
+
     if (!form.email || !form.password) {
       setError("Preencha todos os campos.");
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { user, accessToken, refreshToken } = await loginRequest({
+        email: form.email,
+        password: form.password,
+      });
+
+      // Persiste no contexto + localStorage (AuthProvider cuida disso)
+      login(user, accessToken, refreshToken);
+
+      // O redirect é automático — PublicOnlyRoute detecta isAuthenticated=true
+      // e redireciona para /dashboard via Navigate
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao fazer login. Tente novamente.");
+    } finally {
       setLoading(false);
-      // Aceita qualquer credencial para demo
-      onLogin();
-    }, 1200);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSubmit();
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel - branding */}
-      <div
-        className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: "linear-gradient(145deg, #0F172A 0%, #1E3A5F 60%, #2563EB 100%)" }}
-      >
-        {/* Decorative circles */}
-        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-white/5" />
-        <div className="absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-blue-500/10" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-blue-600/5" />
+    <div className="min-h-screen overflow-hidden flex bg-[#050816] relative">
 
-        {/* Logo */}
-        <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
-            <Zap size={20} className="text-white" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-lg leading-tight">Valle</p>
-            <p className="text-blue-300 text-xs leading-tight">Leads System</p>
-          </div>
-        </div>
-
-        {/* Center content */}
-        <div className="relative">
-          <h1 className="text-4xl font-black text-white leading-tight mb-4">
-            Gerencie seus leads<br />
-            <span className="text-blue-300">com inteligência.</span>
-          </h1>
-          <p className="text-white/60 text-base leading-relaxed max-w-sm">
-            Pipeline completo, funil visual, controle de equipes e métricas em tempo real — tudo em um só lugar.
-          </p>
-
-          {/* Stats */}
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {[
-              { value: "1.200+", label: "Leads gerenciados" },
-              { value: "98%", label: "Uptime garantido" },
-              { value: "3x", label: "Mais conversões" },
-            ].map((s) => (
-              <div key={s.label} className="bg-white/8 rounded-xl p-4 border border-white/10">
-                <p className="text-white font-black text-xl">{s.value}</p>
-                <p className="text-white/50 text-xs mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <p className="relative text-white/30 text-xs">
-          © {new Date().getFullYear()} Valle Leads System. Todos os direitos reservados.
-        </p>
+      {/* BACKGROUND */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563EB_0%,transparent_30%),radial-gradient(circle_at_bottom_right,#DC2626_0%,transparent_25%),linear-gradient(135deg,#050816_0%,#081127_45%,#0B1431_100%)]" />
+        <div className="absolute top-[-150px] left-[-120px] w-[450px] h-[450px] rounded-full bg-blue-500/25 blur-[140px] animate-pulse" />
+        <div className="absolute bottom-[-180px] right-[-120px] w-[450px] h-[450px] rounded-full bg-red-500/20 blur-[140px] animate-pulse" />
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+            backgroundSize: "42px 42px",
+          }}
+        />
       </div>
 
-      {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Zap size={16} className="text-white" />
-            </div>
-            <span className="font-bold text-gray-900">Valle Leads</span>
+      {/* LEFT SIDE */}
+      <div className="hidden lg:flex w-1/2 relative z-10 flex-col justify-between px-16 py-14">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="flex items-center gap-4"
+        >
+          <img
+            src="/logo.jpeg"
+            alt="Valle Leads"
+            className="w-16 h-16 object-contain drop-shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+          />
+          <div>
+            <h1 className="text-white font-black text-2xl tracking-tight">Valle</h1>
+            <p className="text-blue-300 text-sm tracking-[0.30em] uppercase">Leads System</p>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.9 }}
+          className="max-w-xl"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.05] backdrop-blur-xl mb-8">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-sm text-white/70">Plataforma online em tempo real</span>
           </div>
 
-          {/* Form card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-black text-gray-900">Entrar</h2>
-              <p className="text-sm text-gray-500 mt-1">Acesse sua conta para continuar</p>
+          <h1 className="text-6xl font-black leading-[1] tracking-tight text-white">
+            Transforme
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-white bg-clip-text text-transparent">
+              oportunidades
+            </span>
+            <br />
+            em resultados.
+          </h1>
+
+          <p className="mt-8 text-lg leading-relaxed text-white/60 max-w-lg">
+            Controle leads, acompanhe negociações e visualize métricas em uma experiência
+            moderna, rápida e visualmente incrível.
+          </p>
+
+          <div className="grid grid-cols-3 gap-5 mt-12">
+            {[
+              { value: "1.2K+", label: "Leads" },
+              { value: "98%", label: "Performance" },
+              { value: "3x", label: "Conversão" },
+            ].map((item) => (
+              <motion.div
+                whileHover={{ y: -8 }}
+                key={item.label}
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] backdrop-blur-xl p-5 transition-all duration-500 hover:bg-white/[0.08]"
+              >
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-500/10 to-cyan-400/10" />
+                <h2 className="relative text-3xl font-black text-white">{item.value}</h2>
+                <p className="relative mt-1 text-sm text-white/50">{item.label}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        <div className="flex items-center justify-between">
+          <p className="text-white/30 text-sm">© {new Date().getFullYear()} Valle Leads System</p>
+          <div className="flex items-center gap-2 text-white/40 text-sm">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Sistema operacional
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT SIDE */}
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+
+        {/* MOBILE LOGO */}
+        <div className="absolute top-8 left-8 flex items-center gap-3 lg:hidden">
+          <img
+            src="/logo.jpeg"
+            alt="Valle Leads"
+            className="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.35)]"
+          />
+          <div>
+            <h1 className="text-white font-black text-xl">Valle</h1>
+            <p className="text-blue-300 text-xs uppercase tracking-[0.25em]">Leads</p>
+          </div>
+        </div>
+
+        {/* FORM CARD */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="w-full max-w-md relative"
+        >
+          <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full scale-110" />
+
+          <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.06] backdrop-blur-2xl p-8 shadow-[0_0_80px_rgba(37,99,235,0.15)]">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-red-500" />
+
+            <div className="mb-8">
+              <h2 className="text-4xl font-black text-white tracking-tight">Entrar</h2>
+              <p className="text-white/50 mt-2">Continue para acessar sua plataforma.</p>
             </div>
 
-            {/* Error */}
+            {/* ERROR */}
             {error && (
-              <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600">
-                <AlertCircle size={14} className="shrink-0" />
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 p-4 mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-200 text-sm"
+              >
+                <AlertCircle size={18} />
                 {error}
-              </div>
+              </motion.div>
             )}
 
-            {/* Email */}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                E-mail
-              </label>
+            {/* EMAIL */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-white/70 mb-2">E-mail</label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                onKeyDown={handleKeyDown}
                 placeholder="seu@email.com"
-                className="w-full px-3.5 py-3 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
+                className="w-full h-14 px-5 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
               />
             </div>
 
-            {/* Password */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-gray-600">Senha</label>
-                <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+            {/* PASSWORD */}
+            <div className="mb-7">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-white/70">Senha</label>
+                <button
+                  type="button"
+                  className="text-xs text-blue-300 hover:text-cyan-300 transition-colors"
+                >
                   Esqueceu a senha?
                 </button>
               </div>
@@ -133,41 +216,44 @@ export default function Login({ onLogin }: LoginProps) {
                   type={showPass ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                  onKeyDown={handleKeyDown}
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-3 pr-10 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
+                  className="w-full h-14 px-5 pr-14 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
                 />
                 <button
+                  type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
                 >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit */}
+            {/* BUTTON */}
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold rounded-xl transition-all shadow-sm shadow-blue-200"
+              className="group relative w-full h-14 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white font-bold text-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/10" />
               {loading ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-6 h-6 mx-auto rounded-full border-2 border-white/30 border-t-white animate-spin" />
               ) : (
-                <>
-                  <LogIn size={15} />
-                  Entrar
-                </>
+                <div className="relative flex items-center justify-center gap-2">
+                  <LogIn size={20} />
+                  Entrar na plataforma
+                  <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+                </div>
               )}
             </button>
 
-            {/* Demo hint */}
-            <p className="text-center text-xs text-gray-400 mt-4">
-              Ambiente de demonstração · qualquer credencial funciona
-            </p>
+            <div className="mt-8 flex items-center justify-center gap-2 text-xs text-white/30">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Plataforma operacional estável
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
