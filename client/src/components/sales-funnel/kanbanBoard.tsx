@@ -1,3 +1,4 @@
+// src/components/sales-funnel/kanbanBoard.tsx
 import { useState } from "react";
 import {
   DndContext,
@@ -9,6 +10,7 @@ import { useNegotiationsService } from "../../services/negotiationsService";
 import NegotiationCard from "./NegotiationCard";
 import KanbanColumn from "../negotiations/KanbanColumn";
 import type { Negotiation, NegotiationStage } from "../../types/negotiations";
+import { AlertCircle } from "lucide-react";
 
 const STAGES: { key: NegotiationStage; label: string; color: string; bg: string }[] = [
   { key: "contato_inicial",      label: "Contato Inicial",      color: "#6366F1", bg: "#EEF2FF" },
@@ -41,10 +43,10 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
     ) as Record<NegotiationStage, Negotiation[]>;
 
     for (const neg of items) {
-      const history = neg.stage_history ?? [];
+      const history   = neg.stage_history ?? [];
       const lastStage: NegotiationStage =
         history.length > 0
-          ? history[history.length - 1].new_stage  // ← new_stage, não new_status
+          ? history[history.length - 1].new_stage
           : "contato_inicial";
 
       if (groups[lastStage]) {
@@ -76,7 +78,7 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
         : "contato_inicial";
 
     if (oldStage === newStage) return;
-    if (CLOSING_STAGES.has(oldStage)) return; // encerrado — imutável
+    if (CLOSING_STAGES.has(oldStage)) return;
 
     // Optimistic update
     onUpdate((prev) =>
@@ -101,24 +103,13 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
     );
 
     try {
-      // Payload alinhado com CreateNegotiationStageHistorySchema —
-      // negotiation_id, old_stage, new_stage. userId não vai no body.
-      await createStageHistory({
-        negotiation_id: negotiationId,
-        old_stage: oldStage,
-        new_stage: newStage,
-      });
+      await createStageHistory({ negotiation_id: negotiationId, old_stage: oldStage, new_stage: newStage });
       setErrorMsg(null);
     } catch {
       onUpdate((prev) =>
         prev.map((n) =>
           n.id === negotiationId
-            ? {
-                ...n,
-                stage_history: (n.stage_history ?? []).filter(
-                  (h) => h.id !== "temp"
-                ),
-              }
+            ? { ...n, stage_history: (n.stage_history ?? []).filter((h) => h.id !== "temp") }
             : n
         )
       );
@@ -129,7 +120,11 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
   return (
     <>
       {errorMsg && (
-        <div className="mb-4 px-4 py-2 bg-red-100 text-red-700 rounded text-sm">
+        <div
+          className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-red-700"
+          style={{ background: "#FEF2F2", border: "1px solid #FCA5A5" }}
+        >
+          <AlertCircle size={15} />
           {errorMsg}
         </div>
       )}
@@ -141,7 +136,7 @@ export default function KanbanBoard({ negotiations, onUpdate }: Props) {
         }
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-3.5 overflow-x-auto pb-4">
           {STAGES.map((stage) => (
             <KanbanColumn
               key={stage.key}

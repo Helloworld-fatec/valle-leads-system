@@ -17,11 +17,14 @@ import type {
 // Diferença central em relação aos outros dashboards: a cláusula WHERE base
 // não filtra por team_id nem attendant_id — a visão é global por definição.
 //
-// Nota sobre groupBy e tipagem (mesmo problema do dashboardManager):
-// O Prisma infere o tipo de retorno do groupBy internamente a partir dos
-// campos de `by`. Declarar Promise<TeamLeadsRow[]> na assinatura causaria
-// TS2345. Solução: aguardar o resultado, mapear explicitamente para
-// TeamLeadsRow[] e retornar — sem nenhum cast `as`.
+// Nota sobre groupBy e tipagem:
+// Mesmo que `team_id` seja NOT NULL no schema, o Prisma infere o tipo de
+// retorno do groupBy como `string | null` para campos que participam do `by`.
+// Isso é um comportamento do gerador de tipos do Prisma — ele não consegue
+// garantir em tempo de compilação que o banco não retornará null.
+// Solução: filtrar as linhas com team_id null com `.filter()` antes do
+// `.map()`. O TypeScript faz o narrowing automaticamente após o filtro,
+// sem necessidade de cast `as`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Status que marca um lead como convertido. */
@@ -83,6 +86,10 @@ export class DashboardGeneralManagerRepository {
   /**
    * 2. Leads convertidos agrupados por equipa, ordenados de forma descendente.
    *    Usado tanto para o ranking de equipas quanto para determinar a top equipa.
+   *
+   *    O `.filter()` descarta as raras linhas onde team_id é null no retorno
+   *    do groupBy (comportamento do gerador de tipos do Prisma). Após o filtro
+   *    o TS faz narrowing para `string` automaticamente.
    */
   public async getConversionsByTeam(
     filters?: GeneralManagerDashboardFilterDTO,
@@ -94,15 +101,19 @@ export class DashboardGeneralManagerRepository {
       orderBy: { _count: { id: 'desc' } },
     });
 
-    return rows.map((r) => ({
-      team_id: r.team_id,
-      _count: { id: r._count.id },
-    }));
+    return rows
+      .filter((r) => r.team_id !== null)
+      .map((r) => ({
+        team_id: r.team_id as string, // narrowed pelo filter acima
+        _count: { id: r._count.id },
+      }));
   }
 
   /**
    * 3. Total de leads (todos os status) agrupado por equipa, ordenado de
    *    forma descendente.
+   *
+   *    Mesmo tratamento de null do método acima.
    */
   public async getLeadsByTeam(
     filters?: GeneralManagerDashboardFilterDTO,
@@ -114,10 +125,12 @@ export class DashboardGeneralManagerRepository {
       orderBy: { _count: { id: 'desc' } },
     });
 
-    return rows.map((r) => ({
-      team_id: r.team_id,
-      _count: { id: r._count.id },
-    }));
+    return rows
+      .filter((r) => r.team_id !== null)
+      .map((r) => ({
+        team_id: r.team_id as string, // narrowed pelo filter acima
+        _count: { id: r._count.id },
+      }));
   }
 
   /**

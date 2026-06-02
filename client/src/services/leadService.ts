@@ -5,13 +5,13 @@ import { useApi } from "./api";
 // TIPOS
 // ─────────────────────────────────────────────
 
-// Valores reais que o backend retorna (lead.dtos.ts → LeadStatusEnum)
+// Valores reais retornados pelo backend
 export type LeadStatus =
-  | "novo"
-  | "em_atendimento"
-  | "aguardando"
-  | "finalizado"
-  | "perdido";
+  | "new"
+  | "in_progress"
+  | "won"
+  | "lost"
+  | "waiting";
 
 export interface LeadCustomer {
   id: string;
@@ -19,35 +19,55 @@ export interface LeadCustomer {
   cpf?: string;
   phone?: string;
   email?: string;
+  address_street?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LeadAttendant {
   id: string;
   name: string;
+  email?: string;
+  role?: string;
 }
 
+export interface LeadTeam {
+  id: string;
+  name: string;
+  store_id?: string | null;   // Prisma retorna null quando não preenchido
+  is_active?: boolean;
+}
+
+export interface InterestItem {
+  id: string;
+  reference_code: string;
+  description?: string | null;
+  value?: string | null;
+  is_active?: boolean;
+}
+
+// O Prisma retorna null (não undefined) em campos de relacionamento opcionais.
+// Todos os joins e FKs opcionais aceitam | null para refletir isso.
 export interface Lead {
   id: string;
-  source?: string;
+  source?: string | null;
   status: LeadStatus;
-  vehicle_interest?: string;
   is_active: boolean;
   customer_id: string;
-  team_id: string;
-  attendant_id?: string;
-  customers?: {        // plural — como vem do banco via Prisma
-    id: string;
-    name: string;
-    cpf?: string;
-    phone?: string;
-    email?: string;
-  };
-  attendant?: {
-    id: string;
-    name: string;
-  };
+  team_id: string | null;          // null quando lead ainda não tem equipe
+  attendant_id?: string | null;    // null = sem atendente atribuído
+  interest_item_id?: string | null;
+  customers?: LeadCustomer | null;
+  teams?: LeadTeam | null;         // null quando o join não encontra registro
+  attendant?: LeadAttendant | null;
+  interest_item?: InterestItem | null;
   created_at: string;
   updated_at: string;
+  created_by_user_id?: string | null;
+  updated_by_user_id?: string | null;
 }
 
 export interface QueryLeadDTO {
@@ -64,8 +84,8 @@ export interface UpdateLeadDTO {
   source?: string;
   status?: LeadStatus;
   is_active?: boolean;
-  vehicle_interest?: string;
-  team_id?: string;        // mover lead entre times (GENERAL_MANAGER / ADMIN)
+  interest_item_id?: string;
+  team_id?: string;
   attendant_id?: string | null;
 }
 
@@ -74,6 +94,14 @@ export interface CreateNegotiationDTO {
   team_id?: string;
   customer_id?: string;
   attendant_id?: string | null;
+}
+
+export interface PaginatedLeadsResponse {
+  success: boolean;
+  data: Lead[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 // ─────────────────────────────────────────────
@@ -99,8 +127,10 @@ export function useLeadService() {
 
   async function getLeads(filters: QueryLeadDTO = {}): Promise<Lead[]> {
     const res = await apiFetch(`/api/leads${buildQuery(filters)}`);
-    const json = await res.json();
-    return json.data ?? json;
+    const json: PaginatedLeadsResponse | Lead[] = await res.json();
+    // Suporte a ambos os formatos: paginado { data: [...] } ou array direto
+    if (Array.isArray(json)) return json;
+    return (json as PaginatedLeadsResponse).data ?? [];
   }
 
   async function getLeadById(id: string): Promise<Lead> {
@@ -118,15 +148,10 @@ export function useLeadService() {
     return json.data ?? json;
   }
 
-  /** Atribui um atendente a um lead — atalho semântico para updateLead */
   async function assignLead(leadId: string, attendantId: string): Promise<Lead> {
     return updateLead(leadId, { attendant_id: attendantId });
   }
 
-  /**
-   * Atribuição de atendente em lote — continua mesmo se um falhar.
-   * Usa Promise.allSettled para não interromper na primeira falha.
-   */
   async function bulkAssignLeads(
     leadIds: string[],
     attendantId: string
@@ -136,11 +161,6 @@ export function useLeadService() {
     );
   }
 
-  /**
-   * Transfere leads entre times em lote.
-   * Rota dedicada: POST /api/leads/bulk/assign-team (GENERAL_MANAGER / ADMIN).
-   * O servidor zera attendant_id de cada lead automaticamente ao trocar time.
-   */
   async function bulkAssignTeam(
     leadIds: string[],
     teamId: string

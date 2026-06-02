@@ -132,7 +132,7 @@ export class LeadsRepository {
     const { dto, actorId } = params;
     return prisma.leads.create({
       data: {
-        status: dto.status,
+        status: dto.status ?? "new",
         customer_id: dto.customer_id,
         team_id: dto.team_id,
         source: dto.source ?? null,

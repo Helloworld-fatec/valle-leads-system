@@ -62,8 +62,8 @@ export interface NegotiationScopeRow {
 
 export interface LeadForNegotiationCreation {
   id: string;
-  team_id: string;
-  customer_id: string;
+  team_id: string | null;      // CORRIGIDO: Agora aceita null
+  customer_id: string | null;  // CORRIGIDO: Agora aceita null
   attendant_id: string | null;
   is_active: boolean;
 }
