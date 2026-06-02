@@ -1,87 +1,194 @@
 // src/modules/dashboards/dashboard-manager/dashboardManager.controller.ts
 
-import { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
+import type { ParsedQs } from 'qs';
+import type { AuthRequest } from '../../../middlewares/auth/auth.middleware.js';
+import type { AuthenticatedRequester } from './dashboardManager.service.js';
+import type { AccessLevel } from '../../../middlewares/auth/permission.middleware.js';
 import { DashboardManagerService } from './dashboardManager.service.js';
+import type { ManagerDashboardFilterDTO } from './dashboardManager.dto.js';
+import { RequisicaoInvalidaError } from '../../../middlewares/errors/domainErrors.middleware.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Query params que chegam neste router após validação pelo schema Zod.
+ * teamId é string | undefined; startDate/endDate chegam como strings brutas
+ * do Express — o transform do schema já os converteu em Date no req.query,
+ * mas a tipagem do Express sempre os expõe como string-based.
+ * O controller delega o cast para o service via DTO.
+ */
+type DashboardManagerQueryParams = ParsedQs & {
+  teamId?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+/** Especialização de AuthRequest para as rotas deste controller. */
+type DashboardManagerRequest = AuthRequest<
+  Record<string, never>,
+  unknown,
+  DashboardManagerQueryParams
+>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD MANAGER CONTROLLER
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardManagerController {
-  private service: DashboardManagerService;
+  private readonly service: DashboardManagerService;
 
   constructor() {
     this.service = new DashboardManagerService();
   }
 
-  /**
-   * Resolve o ID da equipa alvo: 
-   * 1. Pega do parâmetro 'teamId' na query string (para navegação do General Manager).
-   * 2. Caso contrário, usa o team_id do próprio utilizador logado.
-   */
-  /**
-   * Resolve o teamId alvo e garante que é string — lança erro 400 antes
-   * de chegar ao service caso não haja nenhum team_id disponível.
-   * O service.validateAccess() ainda valida a permissão (403) depois.
-   */
-  private resolveTargetTeamId(req: Request): string {
-    const queryTeamId = (req.query.teamId as string) || undefined;
-    // O token armazena team_ids (array), nunca team_id (singular).
-    const user = (req as any).user;
-    const tokenTeamId: string | undefined = Array.isArray(user?.team_ids)
-      ? (user.team_ids[0] as string | undefined)
-      : (user?.team_id as string | undefined);
+  // ─── HELPERS PRIVADOS ────────────────────────────────────────────────────
 
-    const resolved = queryTeamId ?? tokenTeamId;
-
-    if (!resolved) {
-      throw new Error('ID da equipa não encontrado no token nem na query.');
+  /**
+   * Resolve o ID da equipa alvo:
+   *   1. Query param `teamId` (GENERAL_MANAGER/ADMIN navegando entre equipas).
+   *   2. Primeiro team_id do token (MANAGER consultando a própria equipa).
+   *
+   * Lança RequisicaoInvalidaError se nenhum ID estiver disponível — o que
+   * indica um estado inválido de pipeline (token sem team_ids e sem query param).
+   * A validação de permissão (403) ocorre depois no service.assertCanAccess().
+   */
+  private resolveTargetTeamId(req: DashboardManagerRequest): string {
+    const targetId = req.query.teamId ?? req.user.team_ids[0];
+    if (!targetId) {
+      throw new RequisicaoInvalidaError(
+        'ID da equipa não encontrado: informe teamId na query ou verifique o token.',
+      );
     }
-
-    return resolved;
+    return targetId;
   }
 
-  public getTeamKpis = async (req: Request, res: Response, next: NextFunction) => {
+  /**
+   * Mapeia req.user para AuthenticatedRequester.
+   * O role já foi validado pelo authMiddleware + permission.middleware,
+   * portanto o cast para AccessLevel é seguro neste ponto.
+   */
+  private buildRequester(req: DashboardManagerRequest): AuthenticatedRequester {
+    return {
+      id: req.user.id,
+      role: req.user.role as AccessLevel,
+      team_ids: req.user.team_ids,
+    };
+  }
+
+  /**
+   * req.query foi validado e transformado pelo validateQuery(managerDashboardFilterSchema),
+   * portanto o cast para ManagerDashboardFilterDTO é seguro neste ponto.
+   */
+  private extractFilters(req: DashboardManagerRequest): ManagerDashboardFilterDTO {
+    return req.query as unknown as ManagerDashboardFilterDTO;
+  }
+
+  // ─── KPI HANDLERS ────────────────────────────────────────────────────────
+
+  public getTeamKpis = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getTeamKpis((req as any).user, targetId, req.query as any);
+      const data = await this.service.getTeamKpis(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 
-  public getTopAttendant = async (req: Request, res: Response, next: NextFunction) => {
+  public getTopAttendant = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getTopAttendant((req as any).user, targetId, req.query as any);
+      const data = await this.service.getTopAttendant(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 
-  public getLeadsByAttendant = async (req: Request, res: Response, next: NextFunction) => {
+  // ─── CHART HANDLERS ──────────────────────────────────────────────────────
+
+  public getLeadsByAttendant = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getLeadsByAttendant((req as any).user, targetId, req.query as any);
+      const data = await this.service.getLeadsByAttendant(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 
-  public getConversionsByAttendant = async (req: Request, res: Response, next: NextFunction) => {
+  public getConversionsByAttendant = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getConversionsByAttendant((req as any).user, targetId, req.query as any);
+      const data = await this.service.getConversionsByAttendant(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 
-  public getTeamEvolution = async (req: Request, res: Response, next: NextFunction) => {
+  public getTeamEvolution = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getTeamEvolution((req as any).user, targetId, req.query as any);
+      const data = await this.service.getTeamEvolution(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 
-  public getTeamFunnel = async (req: Request, res: Response, next: NextFunction) => {
+  public getTeamFunnel = async (
+    req: DashboardManagerRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const targetId = this.resolveTargetTeamId(req);
-      const data = await this.service.getTeamFunnel((req as any).user, targetId, req.query as any);
+      const data = await this.service.getTeamFunnel(
+        this.buildRequester(req),
+        this.resolveTargetTeamId(req),
+        this.extractFilters(req),
+      );
       res.status(200).json(data);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   };
 }
