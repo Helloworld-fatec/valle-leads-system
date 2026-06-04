@@ -77,14 +77,18 @@ export const NegotiationStatusRepository = {
   ): Promise<StatusListItem[]> {
     const { negotiation_id, status_negotiation, page, limit } = filters;
 
+    // Fallback de segurança para evitar NaN no cálculo do Prisma
+    const p = page ?? 1;
+    const l = limit ?? 20;
+
     return prisma.negotiationStatus.findMany({
       where: {
         ...(negotiation_id && { negotiation_id }),
         ...(status_negotiation && { status_negotiation }),
       },
       include: statusListInclude,
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (p - 1) * l,
+      take: l,
       orderBy: { created_at: "desc" },
     });
   },
@@ -97,7 +101,7 @@ export const NegotiationStatusRepository = {
   },
 
   // Busca o status mais recente de uma negociação — usado pelo service para
-  // validar se já está "closed" antes de aceitar um novo registro.
+  // validar transições (ex.: bloquear duplicado ou reabertura indevida).
   async findCurrentByNegotiationId(negotiationId: string) {
     return prisma.negotiationStatus.findFirst({
       where: { negotiation_id: negotiationId },
@@ -115,40 +119,32 @@ export const NegotiationStatusRepository = {
   },
 
   // ──────────────────────────────────────────────────────
-  // SYNC LEAD STATUS (redundância de domínio)
+  // SYNC LEAD STATUS (redundância de domínio — espelho 1:1)
   // ──────────────────────────────────────────────────────
-  // Recalcula o status atual do lead consultando o histórico de todas as
-  // suas negociações e grava o valor no campo `status` de `leads`.
+  // Com o domínio de status unificado (new | open | won | lost) sendo o mesmo
+  // para a negociação e para o lead, a sincronização é uma cópia direta: o
+  // valor do registro de status mais recente do lead é gravado em leads.status.
+  // Não há mais tradução open/closed → new/in_progress/won/lost.
   //
   // Estratégia:
-  //   - Busca o registro mais recente (by created_at DESC) de
+  //   - Pega o registro mais recente (created_at DESC) em
   //     negotiation_status_history para o lead_id recebido.
-  //   - Se não existir nenhum registro (ex: último status foi deletado),
-  //     retorna ao valor padrão "new".
-  //   - Executa dentro de uma transação opcional: se `tx` for fornecido
-  //     (pelo método `create` que já está numa transação), usa-o;
-  //     caso contrário, abre sua própria operação atômica.
-  //
-  // Por que aqui no repository e não no service?
-  //   O repository é a única camada que fala com o Prisma diretamente.
-  //   Centralizar aqui evita que o service precise conhecer os detalhes
-  //   de qual tabela consultar para derivar o status correto.
+  //   - Se não houver nenhum (ex.: último status foi deletado), volta a "new".
+  //   - Usa a transação `tx` quando fornecida (mantém atomicidade com quem chama);
+  //     caso contrário, opera diretamente sobre o prisma.
   async syncLeadStatus(
     leadId: string,
     tx?: Prisma.TransactionClient
   ): Promise<void> {
     const client = tx ?? prisma;
 
-    // Último registro de status_history que pertence a este lead,
-    // independente de qual negociação originou.
     const lastRecord = await client.negotiationStatus.findFirst({
       where: { lead_id: leadId },
       orderBy: { created_at: "desc" },
       select: { status_negotiation: true },
     });
 
-    // Se não sobrou nenhum registro (histórico vazio após delete),
-    // volta ao status padrão do schema.
+    // Histórico vazio → status padrão do schema.
     const derivedStatus = lastRecord?.status_negotiation ?? "new";
 
     await client.leads.update({
@@ -176,11 +172,9 @@ export const NegotiationStatusRepository = {
         },
       });
 
-      // Sincroniza o status do lead logo após a inserção,
-      // dentro da mesma transação para garantir atomicidade.
+      // Espelha o status no lead logo após a inserção, na mesma transação.
       await NegotiationStatusRepository.syncLeadStatus(payload.lead_id, tx);
 
-      // Recarrega com include completo para retorno consistente.
       const result = await tx.negotiationStatus.findUnique({
         where: { id: record.id },
         include: statusDetailInclude,
@@ -190,8 +184,7 @@ export const NegotiationStatusRepository = {
   },
 
   // Apenas notas podem ser corrigidas — status_negotiation é imutável
-  // após o registro para preservar a integridade do histórico.
-  // Notas não alteram o status do lead, portanto não há necessidade de sync.
+  // após o registro. Notas não alteram o status do lead, então não há sync.
   async update(
     id: string,
     data: UpdateNegotiationStatusDTO & { updated_by_user_id: string }
@@ -211,13 +204,10 @@ export const NegotiationStatusRepository = {
     return result!;
   },
 
-  // Delete físico — NegotiationStatus não tem is_active no schema.
-  // Após excluir o registro, recalcula o status do lead (o penúltimo
-  // registro passa a ser o "atual"), dentro da mesma transação.
+  // Delete físico — após excluir, recalcula o status do lead (o registro
+  // anterior passa a ser o "atual"), na mesma transação.
   async delete(id: string): Promise<void> {
     await prisma.$transaction(async (tx) => {
-      // Carrega o lead_id antes de deletar — após o delete não há como
-      // recuperá-lo sem uma query extra fora da transação.
       const record = await tx.negotiationStatus.findUnique({
         where: { id },
         select: { lead_id: true },
@@ -227,8 +217,8 @@ export const NegotiationStatusRepository = {
 
       await tx.negotiationStatus.delete({ where: { id } });
 
-      // Recalcula: o penúltimo registro (agora o mais recente) passa a ser
-      // o status vigente do lead. Se era o único registro, volta a "new".
+      // Recalcula: o penúltimo registro (agora o mais recente) vira o vigente.
+      // Se era o único, o lead volta a "new".
       await NegotiationStatusRepository.syncLeadStatus(record.lead_id, tx);
     });
   },

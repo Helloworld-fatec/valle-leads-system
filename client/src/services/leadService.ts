@@ -132,6 +132,44 @@ export function useLeadService() {
     return (json as PaginatedLeadsResponse).data ?? [];
   }
 
+  /**
+   * Busca TODAS as páginas de leads que casam com os filtros e concatena.
+   * Use quando precisar do conjunto completo — por exemplo, para enriquecer
+   * negociações pelo lead_id no funil. getLeads() traz só UMA página (o limit
+   * padrão do backend é 20), então o cruzamento por id falha para os leads
+   * fora da primeira página.
+   */
+  async function getAllLeads(
+    filters: Omit<QueryLeadDTO, "page" | "limit"> = {}
+  ): Promise<Lead[]> {
+    const PAGE_SIZE = 100;
+    const all: Lead[] = [];
+    let page = 1;
+
+    // Guarda de segurança contra loop infinito.
+    for (let guard = 0; guard < 1000; guard++) {
+      const res = await apiFetch(
+        `/api/leads${buildQuery({ ...filters, page, limit: PAGE_SIZE })}`
+      );
+      const json: PaginatedLeadsResponse | Lead[] = await res.json();
+
+      // Backend sem paginação: já veio tudo num array só.
+      if (Array.isArray(json)) {
+        all.push(...json);
+        break;
+      }
+
+      const batch = json.data ?? [];
+      all.push(...batch);
+
+      const total = json.total ?? all.length;
+      if (batch.length === 0 || all.length >= total) break;
+      page++;
+    }
+
+    return all;
+  }
+
   async function getLeadById(id: string): Promise<Lead> {
     const res = await apiFetch(`/api/leads/${id}`);
     const json = await res.json();
@@ -183,6 +221,7 @@ export function useLeadService() {
 
   return {
     getLeads,
+    getAllLeads,
     getLeadById,
     updateLead,
     assignLead,

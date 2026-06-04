@@ -76,14 +76,18 @@ export const NegotiationImportanceRepository = {
   ): Promise<ImportanceListItem[]> {
     const { negotiation_id, importance, page, limit } = filters;
 
+    // Fallback de segurança para evitar NaN no cálculo do Prisma
+    const p = page ?? 1;
+    const l = limit ?? 20;
+
     return prisma.negotiationImportance.findMany({
       where: {
         ...(negotiation_id && { negotiation_id }),
         ...(importance && { importance }),
       },
       include: importanceListInclude,
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (p - 1) * l,
+      take: l,
       orderBy: { created_at: "desc" },
     });
   },

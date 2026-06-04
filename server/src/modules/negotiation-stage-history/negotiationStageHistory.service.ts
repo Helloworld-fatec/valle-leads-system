@@ -11,16 +11,14 @@ import type {
   QueryNegotiationStageHistoryDTO,
   NegotiationStage,
 } from "./negotiationStageHistory.dto";
-import { CLOSING_STAGES } from "./negotiationStageHistory.dto";
+import { isClosingStage, CLOSING_STAGE_TO_STATUS } from "./negotiationStageHistory.dto";
+import { isClosedStatus } from "../negotiation-status/status.dto";
 import {
   RecursoNaoEncontradoError,
   BusinessRuleError,
   AcessoNaoAutorizadoError,
 } from "../../middlewares/errors/domainErrors.middleware";
-import type {
-  ActorContext,
-  NegotiationActorRole,
-} from "../negotiation/negotiation.service";
+import type { ActorContext } from "../negotiation/negotiation.service";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION STAGE HISTORY SERVICE
@@ -37,9 +35,6 @@ import type {
 // | Criar estágio   | só suas neg.   | só do time       | tudo            | tudo  |
 // | Editar (notas)  | só suas neg.   | só do time       | tudo            | tudo  |
 // | Deletar         | ✗              | ✗                | ✗               | sim   |
-//
-// "Suas negociações" = negociações em que o actor é o attendant_id.
-// "Do time" = negociações cujo team_id está em actor.team_ids.
 
 // ──────────────────────────────────────────────────────
 // SHAPE MÍNIMO PARA GUARDS DE ESCOPO
@@ -50,7 +45,7 @@ interface NegotiationScopeSnapshot {
   team_id: string;
   attendant_id: string | null;
   lead_id: string;
-  // Último status — usado para checar se a negociação está fechada.
+  // Último status — usado para checar se a negociação já está encerrada.
   status_history: { status_negotiation: string }[];
 }
 
@@ -58,7 +53,6 @@ interface NegotiationScopeSnapshot {
 // HELPERS
 // ──────────────────────────────────────────────────────
 
-// Extrai o status mais recente da negociação já carregada com status_history.
 function lastStatus(
   negotiation: NegotiationScopeSnapshot
 ): string | undefined {
@@ -69,25 +63,16 @@ export const NegotiationStageHistoryService = {
   // ──────────────────────────────────────────────────────
   // LISTAGEM
   // ──────────────────────────────────────────────────────
-  // O RBAC na listagem filtra via scope — não retorna erro, apenas
-  // dados dentro do escopo do actor (consistente com o módulo pai).
 
   async findAll(
     filters: QueryNegotiationStageHistoryDTO,
     actor: ActorContext
   ): Promise<StageHistoryListItem[]> {
-    // Se o actor filtrou por negotiation_id, verifica permissão de leitura
-    // diretamente naquela negociação (falha rápida antes de ir ao banco).
     if (filters.negotiation_id) {
       const negotiation = await loadNegotiationOrThrow(filters.negotiation_id);
       assertCanRead(negotiation, actor);
     }
 
-    // Para ATTENDANT e MANAGER sem filtro de negociação, a listagem geral
-    // retorna apenas o que o repositório expõe — o RBAC granular por
-    // registro individual exigiria joins pesados. A abordagem aqui é:
-    // o front-end sempre filtra por negotiation_id (use case real), e
-    // o filtro por negotiation_id já valida o escopo acima.
     return NegotiationStageHistoryRepository.findAll(filters);
   },
 
@@ -105,7 +90,6 @@ export const NegotiationStageHistoryService = {
       );
     }
 
-    // Reconstrói o snapshot de escopo a partir do include do próprio registro.
     const snap = buildSnapshot(stageHistory);
     assertCanRead(snap, actor);
 
@@ -118,10 +102,10 @@ export const NegotiationStageHistoryService = {
   //
   // Fluxo:
   //   1. Carrega a negociação pai (valida existência + escopo do actor)
-  //   2. [RN] Bloqueia se a negociação já está "closed"
+  //   2. [RN] Bloqueia se a negociação já está encerrada (won/lost)
   //   3. Deriva old_stage automaticamente (último estágio registrado)
-  //   4. Se new_stage for de fechamento → cria estágio + status "closed" em
-  //      transação atômica (createWithAutoClose)
+  //   4. Estágio de fechamento → cria estágio + status terminal (won/lost) +
+  //      sync do lead, tudo em transação atômica (createWithAutoClose)
   //   5. Caso contrário → cria apenas o registro de estágio (create)
 
   async create(
@@ -134,24 +118,25 @@ export const NegotiationStageHistoryService = {
     // 2. Valida escopo do actor
     assertCanWrite(negotiation, actor);
 
-    // 3. [RN] Impede adicionar estágio em negociação encerrada
-    if (lastStatus(negotiation) === "closed") {
+    // 3. [RN] Impede adicionar estágio em negociação encerrada (won/lost)
+    const current = lastStatus(negotiation);
+    if (current && isClosedStatus(current)) {
       throw new BusinessRuleError(
-        "Não é possível adicionar um novo estágio a uma negociação que já está encerrada."
+        "Não é possível adicionar um novo estágio a uma negociação já encerrada (ganha ou perdida)."
       );
     }
 
     // 4. Deriva old_stage do último registro (se não vier no body).
-    //    O campo new_stage no banco é sempre escrito por este service com um
-    //    valor do enum NegotiationStage — o cast é seguro por invariante de
-    //    domínio (nunca persiste string arbitrária nessa coluna).
+    //    O cast é seguro por invariante de domínio: a coluna new_stage só é
+    //    escrita por este service com valores do enum NegotiationStage.
     let resolvedOldStage: NegotiationStage | null = data.old_stage ?? null;
     if (resolvedOldStage === null) {
-      const current =
+      const lastStage =
         await NegotiationStageHistoryRepository.findCurrentByNegotiationId(
           data.negotiation_id
         );
-      resolvedOldStage = (current?.new_stage ?? null) as NegotiationStage | null;
+      resolvedOldStage =
+        (lastStage?.new_stage ?? null) as NegotiationStage | null;
     }
 
     const payload = {
@@ -163,28 +148,30 @@ export const NegotiationStageHistoryService = {
       created_by_user_id: actor.id,
     };
 
-    // 5. Estágio de fechamento → transação atômica com status "closed"
-    if (CLOSING_STAGES.has(data.new_stage)) {
+    // 5. Estágio de fechamento → derivação do status + transação atômica.
+    //    isClosingStage estreita data.new_stage para ClosingStage, então o
+    //    acesso a CLOSING_STAGE_TO_STATUS é totalmente tipado (won | lost).
+    if (isClosingStage(data.new_stage)) {
+      const closingStatus = CLOSING_STAGE_TO_STATUS[data.new_stage];
       const statusNotes =
-        data.new_stage === "fechamento_com_venda"
+        closingStatus === "won"
           ? "Negociação encerrada automaticamente: fechamento com venda."
           : "Negociação encerrada automaticamente: fechamento sem venda.";
 
       return NegotiationStageHistoryRepository.createWithAutoClose({
         ...payload,
+        closingStatus,
         statusNotes,
       });
     }
 
-    // 6. Estágio normal
+    // 6. Estágio normal (não altera o status macro da negociação/lead)
     return NegotiationStageHistoryRepository.create(payload);
   },
 
   // ──────────────────────────────────────────────────────
   // ATUALIZAR REGISTRO (apenas notas)
   // ──────────────────────────────────────────────────────
-  // old_stage e new_stage são imutáveis — alterar a linha do tempo
-  // histórica comprometeria a rastreabilidade do funil.
 
   async update(
     id: string,
@@ -212,8 +199,6 @@ export const NegotiationStageHistoryService = {
   // ──────────────────────────────────────────────────────
   // DELETAR (apenas ADMIN)
   // ──────────────────────────────────────────────────────
-  // Excluir um registro histórico é uma operação destrutiva e irreversível
-  // — restrita ao ADMIN para evitar adulteração de auditoria.
 
   async delete(id: string, actor: ActorContext): Promise<void> {
     if (actor.role !== "ADMIN") {
@@ -239,7 +224,6 @@ export const NegotiationStageHistoryService = {
 // HELPERS INTERNOS
 // ──────────────────────────────────────────────────────
 
-// Carrega a negociação com os campos de escopo necessários ou lança 404.
 async function loadNegotiationOrThrow(
   negotiationId: string
 ): Promise<NegotiationScopeSnapshot> {
@@ -259,8 +243,6 @@ async function loadNegotiationOrThrow(
   };
 }
 
-// Reconstrói o snapshot de escopo a partir de um StageHistoryDetail.
-// O include garante que negotiations está presente com os campos necessários.
 function buildSnapshot(
   stageHistory: StageHistoryDetail
 ): NegotiationScopeSnapshot {

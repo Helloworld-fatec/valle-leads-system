@@ -11,7 +11,7 @@ import { RefreshCw, Plus, Search, Filter, AlertCircle } from "lucide-react";
 export default function SalesFunnel() {
   const { user } = useAuth();
   const { getNegotiations, createImportance } = useNegotiationsService();
-  const { getLeads } = useLeadService();
+  const { getAllLeads } = useLeadService();
 
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -33,7 +33,7 @@ export default function SalesFunnel() {
 
     Promise.all([
       getNegotiations({ attendant_id: user.id, is_open: true }),
-      getLeads({ attendant_id: user.id }),
+      getAllLeads({ attendant_id: user.id }),
     ])
       .then(([negs, leads]) => {
         // O embed `lead` que vem em /negotiations costuma estar incompleto

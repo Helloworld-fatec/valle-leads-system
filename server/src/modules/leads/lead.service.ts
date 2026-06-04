@@ -61,7 +61,7 @@ function canBulkAssignTeam(role: LeadActorRole): boolean {
 // Aceita tanto LeadWithIncludes quanto o select reduzido do findManyByIds.
 interface LeadScopeFields {
   attendant_id: string | null;
-  team_id: string;
+  team_id: string | null;
   is_active: boolean;
 }
 
@@ -250,16 +250,27 @@ export class LeadsService {
       await this.assertTeamExistsAndActive(data.team_id);
     }
 
-    // Se reatribuiu para alguém específico (não null), valida coerência com o time final
+    // Se reatribuiu para alguém específico (não null), valida coerência com o
+    // time final. Sem um time de referência (lead sem time e sem troca de time)
+    // não dá para validar o atendente.
     if (data.attendant_id) {
-      if (actor.role === "MANAGER" || actor.role === "ADMIN" || actor.role === "GENERAL_MANAGER") {
+      if (finalTeamId === null) {
+        throw new RequisicaoInvalidaError(
+          "Não é possível atribuir um atendente a um lead sem time definido."
+        );
+      }
+      // finalTeamId é string a partir daqui.
+
+      if (
+        actor.role === "MANAGER" ||
+        actor.role === "ADMIN" ||
+        actor.role === "GENERAL_MANAGER"
+      ) {
         await this.assertAttendantBelongsToTeam(data.attendant_id, finalTeamId);
       }
-    }
 
-    // Se MANAGER, só pode trocar para um atendente do PRÓPRIO time
-    if (actor.role === "MANAGER" && data.attendant_id) {
-      if (!actor.team_ids.includes(finalTeamId)) {
+      // Se MANAGER, só pode trocar para um atendente do PRÓPRIO time.
+      if (actor.role === "MANAGER" && !actor.team_ids.includes(finalTeamId)) {
         throw new AcessoNaoAutorizadoError(
           "Você só pode reatribuir leads em times que gerencia."
         );
@@ -360,8 +371,16 @@ export class LeadsService {
       );
     }
 
-    // Verifica escopo do MANAGER e que todos compartilham o mesmo time
-    const teamsInBatch = new Set(leads.map((l) => l.team_id));
+    // Verifica escopo do MANAGER e que todos compartilham o mesmo time.
+    // Leads sem time não podem receber atendente (não há time para validar).
+    if (leads.some((l) => l.team_id === null)) {
+      throw new RequisicaoInvalidaError(
+        "Há leads sem time definido; defina o time antes de atribuir um atendente."
+      );
+    }
+    const teamsInBatch = new Set(
+      leads.map((l) => l.team_id).filter((t): t is string => t !== null)
+    );
 
     if (actor.role === "MANAGER") {
       for (const teamId of teamsInBatch) {
@@ -451,7 +470,8 @@ export class LeadsService {
     if (actor.role === "ADMIN" || actor.role === "GENERAL_MANAGER") return;
 
     if (actor.role === "MANAGER") {
-      if (!actor.team_ids.includes(lead.team_id)) {
+      // Lead sem time (team_id null) nunca está no escopo de um manager.
+      if (lead.team_id === null || !actor.team_ids.includes(lead.team_id)) {
         throw new AcessoNaoAutorizadoError(
           "Você só pode visualizar leads dos times que gerencia."
         );
@@ -474,7 +494,8 @@ export class LeadsService {
     if (actor.role === "ADMIN" || actor.role === "GENERAL_MANAGER") return;
 
     if (actor.role === "MANAGER") {
-      if (!actor.team_ids.includes(lead.team_id)) {
+      // Lead sem time (team_id null) nunca está no escopo de um manager.
+      if (lead.team_id === null || !actor.team_ids.includes(lead.team_id)) {
         throw new AcessoNaoAutorizadoError(
           "Você só pode editar leads dos times que gerencia."
         );

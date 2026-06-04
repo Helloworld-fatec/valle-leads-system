@@ -49,11 +49,16 @@ export class LeadsRepository {
   async findAll(filters: FindAllLeadsParams): Promise<PaginatedLeads> {
     const where = this.buildWhere(filters);
 
-    // Fallback explícito: mesmo que o Zod já defina defaults, o repository
-    // garante valores numéricos válidos para que skip nunca seja NaN/undefined
-    // (Prisma 7 não aceita skip undefined quando take está presente).
-    const page  = filters.page  ?? 1;
-    const limit = filters.limit ?? 20;
+    // Coerção robusta para inteiro. A query string sempre chega como string
+    // ("100"); o Zod do DTO valida e transforma, mas esse valor transformado
+    // NÃO está sendo persistido de volta em req.query (no Express 5 o req.query
+    // é somente-leitura), então aqui ainda pode chegar string. `Number(...)`
+    // cobre string, number e undefined; o `|| default` trata o NaN. O Prisma
+    // exige Int em take/skip e skip nunca pode ser NaN/undefined.
+    // (A faixa 1..100 continua sendo garantida pelo QueryLeadSchema, que roda
+    // no validateQuery antes daqui.)
+    const page  = Number(filters.page)  || 1;
+    const limit = Number(filters.limit) || 20;
     const skip  = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
