@@ -1,41 +1,53 @@
 // src/modules/dashboards/dashboard-manager/dashboardManager.routes.ts
 
 import { Router } from 'express';
-import { DashboardManagerController } from './dashboardManager.controller.js';
-import { validateQuery } from '../../../middlewares/validation/validate.middleware.js';
-import { managerDashboardFilterSchema } from './dashboardManager.dto.js';
 import { authMiddleware } from '../../../middlewares/auth/auth.middleware.js';
 import { checkPermission } from '../../../middlewares/auth/permission.middleware.js';
+import { validateQuery } from '../../../middlewares/validation/validate.middleware.js';
+import { managerDashboardFilterSchema } from './dashboardManager.dto.js';
+import { DashboardManagerController } from './dashboardManager.controller.js';
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD MANAGER ROUTES
-// ─────────────────────────────────────────────
-// Pipeline aplicada a TODAS as rotas deste router:
-//   1. authMiddleware            → exige access token válido + injeta req.user
-//   2. checkPermission("MANAGER") → hierárquico: MANAGER, GENERAL_MANAGER e ADMIN
-//   3. validateQuery(schema)     → valida e tipa os filtros temporais
+// ─────────────────────────────────────────────────────────────────────────────
 //
-// Por que checkPermission e não checkRole?
-// Aqui a regra é monotônica: quem tem mais privilégio (GENERAL_MANAGER, ADMIN)
-// pode visualizar o dashboard de gerente também. Hierarquia resolve.
+// Pipeline aplicada a TODAS as rotas via .use():
 //
-// Restrição granular ("manager vê apenas dados dos próprios times", conforme
-// RF02): o SERVICE filtra pelo req.user.team_ids — não cabe na rota.
-// ─────────────────────────────────────────────
+//   1. authMiddleware
+//      → Valida o access token JWT e injeta req.user com { id, email, role, team_ids }.
+//        Qualquer requisição sem token válido é rejeitada com 403 antes de chegar
+//        ao controller.
+//
+//   2. checkPermission('MANAGER')
+//      → Hierárquico: MANAGER, GENERAL_MANAGER e ADMIN passam; ATTENDANT recebe 403.
+//        Aqui a hierarquia resolve bem porque quem tem mais privilégio
+//        (GENERAL_MANAGER, ADMIN) também pode visualizar o dashboard de gerente.
+//
+//   3. validateQuery(managerDashboardFilterSchema)
+//      → Valida e transforma os query params via Zod. Após este middleware,
+//        req.query contém valores já tipados (Dates em vez de strings brutas).
+//        Requisições com params inválidos recebem 422 antes de chegar ao controller.
+//
+// Restrição granular ("manager vê apenas dados dos próprios times"):
+// responsabilidade do DashboardManagerService.assertCanAccess() — que
+// tem contexto de runtime (req.user.team_ids vs targetTeamId) para aplicar
+// a regra. Não cabe na rota, que só conhece papel, não escopo.
+//
+// ─────────────────────────────────────────────────────────────────────────────
 
 const dashboardManagerRoutes = Router();
 const controller = new DashboardManagerController();
 
-// Autenticação + Permissão + Validação aplicadas globalmente
+// Aplica a pipeline de segurança e validação globalmente neste router
 dashboardManagerRoutes.use(authMiddleware);
 dashboardManagerRoutes.use(checkPermission('MANAGER'));
 dashboardManagerRoutes.use(validateQuery(managerDashboardFilterSchema));
 
-// Rotas de KPIs
+// ─── KPIs ─────────────────────────────────────────────────────────────────
 dashboardManagerRoutes.get('/kpi/team', controller.getTeamKpis);
 dashboardManagerRoutes.get('/kpi/top-attendant', controller.getTopAttendant);
 
-// Rotas de Gráficos
+// ─── CHARTS ───────────────────────────────────────────────────────────────
 dashboardManagerRoutes.get('/charts/leads-by-attendant', controller.getLeadsByAttendant);
 dashboardManagerRoutes.get('/charts/conversions-by-attendant', controller.getConversionsByAttendant);
 dashboardManagerRoutes.get('/charts/team-evolution', controller.getTeamEvolution);

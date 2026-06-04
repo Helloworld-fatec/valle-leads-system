@@ -115,10 +115,11 @@ export class NegotiationsService {
   // A negociação herda team/customer/attendant do lead se não vierem no body.
   // Validações em camadas:
   //   1. Lead existe e está ativo
-  //   2. RBAC: o actor pode operar sobre esse lead
-  //   3. RF03: lead não tem outra negociação ATIVA
-  //   4. Coerência de team/customer/attendant se foram passados explicitamente
-  //   5. Cria com transação (negociação + 3 históricos iniciais)
+  //   2. Lead tem team_id e customer_id (campos nullable no schema)
+  //   3. RBAC: o actor pode operar sobre esse lead
+  //   4. RF03: lead não tem outra negociação ATIVA
+  //   5. Coerência de team/customer/attendant se foram passados explicitamente
+  //   6. Cria com transação (negociação + 3 históricos iniciais)
   async create(
     data: CreateNegotiationDTO,
     actor: ActorContext
@@ -136,10 +137,33 @@ export class NegotiationsService {
       );
     }
 
-    // 2. RBAC sobre o lead
-    this.assertCanCreateForLead(lead, actor);
+    // 2. Garante que os campos obrigatórios para criar uma negociação existem
+    //    no lead. team_id e customer_id são nullable no schema (leads pode
+    //    existir sem equipe/cliente ainda atribuídos), portanto validamos
+    //    explicitamente antes de prosseguir.
+    if (!lead.team_id) {
+      throw new RequisicaoInvalidaError(
+        "O lead não possui uma equipe associada. Atribua uma equipe ao lead antes de criar a negociação."
+      );
+    }
+    if (!lead.customer_id) {
+      throw new RequisicaoInvalidaError(
+        "O lead não possui um cliente associado. Atribua um cliente ao lead antes de criar a negociação."
+      );
+    }
 
-    // 3. RF03 — uma negociação ativa por lead
+    // A partir daqui, lead.team_id e lead.customer_id são `string` (não null).
+    // Extraímos em variáveis narrowed para que o TS entenda o tipo correto.
+    const leadTeamId: string = lead.team_id;
+    const leadCustomerId: string = lead.customer_id;
+
+    // 3. RBAC sobre o lead
+    this.assertCanCreateForLead(
+      { team_id: leadTeamId, attendant_id: lead.attendant_id },
+      actor
+    );
+
+    // 4. RF03 — uma negociação ativa por lead
     const existingActive =
       await this.negotiationsRepository.findActiveNegotiationByLeadId(
         data.lead_id
@@ -150,22 +174,22 @@ export class NegotiationsService {
       );
     }
 
-    // 4. Resolução de team/customer/attendant.
+    // 5. Resolução de team/customer/attendant.
     //    Defaults vêm do lead; o body pode sobrescrever, mas validamos coerência.
-    const resolvedTeamId = data.team_id ?? lead.team_id;
-    const resolvedCustomerId = data.customer_id ?? lead.customer_id;
-    const resolvedAttendantId =
+    const resolvedTeamId: string = data.team_id ?? leadTeamId;
+    const resolvedCustomerId: string = data.customer_id ?? leadCustomerId;
+    const resolvedAttendantId: string | null =
       data.attendant_id === undefined ? lead.attendant_id : data.attendant_id;
 
     // O customer_id da negociação tem que ser o do lead (regra de domínio).
-    if (resolvedCustomerId !== lead.customer_id) {
+    if (resolvedCustomerId !== leadCustomerId) {
       throw new RequisicaoInvalidaError(
         "O customer da negociação deve ser o mesmo do lead."
       );
     }
 
     // Se mudou de team em relação ao lead, valida o novo time.
-    if (resolvedTeamId !== lead.team_id) {
+    if (resolvedTeamId !== leadTeamId) {
       if (!canMoveBetweenTeams(actor.role)) {
         throw new AcessoNaoAutorizadoError(
           "Apenas gerente geral ou administrador podem criar negociações em times diferentes do lead."
@@ -425,6 +449,8 @@ export class NegotiationsService {
   }
 
   // Para a criação, o "recurso" base é o lead — checamos sobre os campos do lead.
+  // Recebe um objeto já narrowed (team_id: string, não string | null) para que
+  // a assinatura seja compatível com qualquer caller que já fez o null-check.
   private assertCanCreateForLead(
     lead: { team_id: string; attendant_id: string | null },
     actor: ActorContext

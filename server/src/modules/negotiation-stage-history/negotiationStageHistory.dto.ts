@@ -1,13 +1,14 @@
 // server/src/modules/negotiation-stage-history/negotiationStageHistory.dto.ts
 import { z } from "zod";
+import type { NegotiationStatus } from "../negotiation-status/status.dto";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION STAGE HISTORY DTOS
 // ─────────────────────────────────────────────
 
-// Estágios do funil de vendas conforme definido no documento de elicitação (seção 7).
-// Os dois estágios de fechamento disparam a criação automática de um status "closed"
-// na negociação pai (regra implementada no service).
+// Estágios do funil de vendas conforme o documento de elicitação (seção 7).
+// Os dois estágios de fechamento disparam a criação automática do status
+// terminal correspondente (won/lost) na negociação pai — ver service.
 export const NegotiationStageEnum = z.enum([
   "qualificacao",
   "contato_inicial",
@@ -18,22 +19,35 @@ export const NegotiationStageEnum = z.enum([
   "fechamento_sem_venda",
 ]);
 
-// Estágios que representam encerramento da negociação — ao registrá-los,
-// o service cria automaticamente um NegotiationStatus "closed".
+// Estágios que encerram a negociação.
 export const CLOSING_STAGES = new Set<NegotiationStage>([
   "fechamento_com_venda",
   "fechamento_sem_venda",
 ]);
 
+// FONTE ÚNICA da regra "estágio de fechamento → status terminal".
+// `as const satisfies` garante que os valores são NegotiationStatus válidos
+// e preserva os literais ("won" | "lost") para inferência precisa no service.
+export const CLOSING_STAGE_TO_STATUS = {
+  fechamento_com_venda: "won",
+  fechamento_sem_venda: "lost",
+} as const satisfies Record<string, NegotiationStatus>;
+
+export type ClosingStage = keyof typeof CLOSING_STAGE_TO_STATUS;
+
+// Type guard: estreita um NegotiationStage para ClosingStage, permitindo
+// indexar CLOSING_STAGE_TO_STATUS sem casts.
+export function isClosingStage(stage: NegotiationStage): stage is ClosingStage {
+  return stage in CLOSING_STAGE_TO_STATUS;
+}
+
 export const CreateNegotiationStageHistorySchema = z.object({
   negotiation_id: z.string().uuid("negotiation_id deve ser um UUID válido"),
 
   // Estágio anterior — opcional pois o lead pode não ter histórico prévio.
-  // Nomeado old_stage para alinhar com o campo real do schema Prisma.
   old_stage: NegotiationStageEnum.nullable().optional(),
 
-  // Novo estágio obrigatório — toda mudança deve registrar para onde o funil avançou/retrocedeu.
-  // Nomeado new_stage para alinhar com o campo real do schema Prisma.
+  // Novo estágio obrigatório — toda mudança deve registrar o destino do funil.
   new_stage: NegotiationStageEnum,
 
   // Observação livre sobre a mudança de estágio
@@ -44,18 +58,15 @@ export const CreateNegotiationStageHistorySchema = z.object({
 });
 
 export const UpdateNegotiationStageHistorySchema = z.object({
-  // Apenas notas podem ser corrigidas em um registro histórico existente.
-  // Alterar old_stage/new_stage distorceria a linha do tempo — não permitido.
+  // Apenas notas podem ser corrigidas — old_stage/new_stage são imutáveis.
   notes: z.string().max(500).optional(),
 });
 
 export const QueryNegotiationStageHistorySchema = z.object({
   negotiation_id: z.string().uuid().optional(),
 
-  // Filtro pelo estágio de destino registrado
   new_stage: NegotiationStageEnum.optional(),
 
-  // Paginação — transforma string de query em número e valida intervalo
   page: z
     .string()
     .optional()

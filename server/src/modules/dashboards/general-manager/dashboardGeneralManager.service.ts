@@ -1,127 +1,206 @@
 // src/modules/dashboards/general-manager/dashboardGeneralManager.service.ts
 
-import { DashboardGeneralManagerRepository } from './dashboardGeneralManager.repository.js';
-import { GeneralManagerDashboardFilterDTO } from './dashboardGeneralManager.dto.js';
 import { prisma } from '../../../config/prisma.js';
+import type { AccessLevel } from '../../../middlewares/auth/permission.middleware.js';
 import { AcessoNaoAutorizadoError } from '../../../middlewares/errors/domainErrors.middleware.js';
+import {
+  DashboardGeneralManagerRepository,
+  groupDatesByDay,
+} from './dashboardGeneralManager.repository.js';
+import type {
+  GeneralManagerDashboardFilterDTO,
+  TeamLeadsRow,
+  GlobalKpisResponse,
+  TopTeamResponse,
+  LeadsByTeamResponse,
+  TeamRankingResponse,
+  GlobalEvolutionResponse,
+  GlobalFunnelResponse,
+} from './dashboardGeneralManager.dto.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REQUESTER TYPE
+// Mesmo contrato dos outros módulos de dashboard — representa o subconjunto
+// de req.user necessário para a verificação de papel neste service.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AuthenticatedRequester {
+  id: string;
+  role: AccessLevel;
+  team_ids: string[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD GENERAL MANAGER SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardGeneralManagerService {
-  private repository: DashboardGeneralManagerRepository;
+  private readonly repository: DashboardGeneralManagerRepository;
 
   constructor() {
     this.repository = DashboardGeneralManagerRepository.getInstance();
   }
 
+  // ─── AUTORIZAÇÃO ─────────────────────────────────────────────────────────
+
   /**
-   * VALIDAÇÃO DE SEGURANÇA:
-   * Apenas utilizadores com cargo de ADMIN ou GENERAL_MANAGER podem aceder à visão global.
+   * Garante que apenas ADMIN e GENERAL_MANAGER acedem à visão global.
+   *
+   * Nota: o checkPermission('GENERAL_MANAGER') na rota já bloqueia papéis
+   * inferiores com 403. Esta verificação é uma segunda camada de defesa —
+   * garante que nenhuma refatoração futura que remova o middleware de rota
+   * exponha dados globais a papéis não autorizados.
    */
-  private validateAccess(requester: any): void {
-    const rolesAutorizados = ['ADMIN', 'GENERAL_MANAGER'];
-    
-    if (!requester || !rolesAutorizados.includes(requester.role)) {
-      throw new AcessoNaoAutorizadoError('Acesso restrito a administradores e gerentes gerais.');
+  private assertCanAccess(requester: AuthenticatedRequester): void {
+    if (requester.role !== 'ADMIN' && requester.role !== 'GENERAL_MANAGER') {
+      throw new AcessoNaoAutorizadoError(
+        'Acesso restrito a administradores e gerentes gerais.',
+      );
     }
   }
 
+  // ─── HELPERS PRIVADOS ────────────────────────────────────────────────────
+
   /**
-   * Helper para buscar o nome das equipas a partir dos IDs.
+   * Busca o nome das equipas a partir de uma lista de IDs válidos.
+   * Retorna um mapa { id → name } para lookups O(1) nas formatações.
    */
-  private async getTeamsNames(teamIds: string[]) {
-    const validIds = teamIds.filter((id) => id !== null);
-    if (validIds.length === 0) return {};
+  private async fetchTeamNames(
+    teamIds: string[],
+  ): Promise<Record<string, string>> {
+    if (teamIds.length === 0) return {};
 
     const teams = await prisma.teams.findMany({
-      where: { id: { in: validIds } },
-      select: { id: true, name: true }
+      where: { id: { in: teamIds } },
+      select: { id: true, name: true },
     });
 
-    return teams.reduce((acc, team) => {
+    return teams.reduce<Record<string, string>>((acc, team) => {
       acc[team.id] = team.name;
       return acc;
-    }, {} as Record<string, string>);
+    }, {});
   }
 
-  // 1. KPIs Globais
-  public async getGlobalKpis(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
-    const { totalLeads, convertedLeads } = await this.repository.getGlobalConversionData(filters);
-    
+  /**
+   * Extrai IDs de equipa não-nulos de um array de linhas de groupBy.
+   * team_id em Leads é NOT NULL no schema, mas o tipo do Prisma após o
+   * mapeamento pode ser string | null dependendo da versão — o filter
+   * garante segurança em qualquer cenário.
+   */
+  private extractTeamIds(rows: TeamLeadsRow[]): string[] {
+    return rows.map((r) => r.team_id).filter((id): id is string => id !== null);
+  }
+
+  // ─── KPIs ────────────────────────────────────────────────────────────────
+
+  /** 1. KPIs globais: total de leads, vendas e taxa de conversão. */
+  public async getGlobalKpis(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<GlobalKpisResponse> {
+    this.assertCanAccess(requester);
+
+    const { totalLeads, convertedLeads } =
+      await this.repository.getGlobalConversionData(filters);
+
     const rate = totalLeads === 0 ? 0 : (convertedLeads / totalLeads) * 100;
 
     return {
       totalLeads,
       totalSales: convertedLeads,
-      globalConversionRate: Number(rate.toFixed(2))
+      globalConversionRate: Number(rate.toFixed(2)),
     };
   }
 
-  // 2. Melhor Equipa
-  public async getTopTeam(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
+  /** 2. Equipa com mais conversões no período. */
+  public async getTopTeam(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<TopTeamResponse> {
+    this.assertCanAccess(requester);
+
     const conversions = await this.repository.getConversionsByTeam(filters);
-    
-    if (conversions.length === 0 || !conversions[0]?.team_id) {
+
+    // Sem conversões no período → retorna null
+    const topRow = conversions[0];
+    if (!topRow?.team_id) {
       return { topTeam: null };
     }
 
-    const topTeamId = conversions[0].team_id;
-    const teamsMap = await this.getTeamsNames([topTeamId]);
+    const namesMap = await this.fetchTeamNames([topRow.team_id]);
 
     return {
       topTeam: {
-        id: topTeamId,
-        name: teamsMap[topTeamId] || 'Equipa Desconhecida',
-        conversions: conversions[0]._count.id
-      }
+        id: topRow.team_id,
+        name: namesMap[topRow.team_id] ?? 'Equipa Desconhecida',
+        conversions: topRow._count.id,
+      },
     };
   }
 
-  // 3. Distribuição de Leads por Equipa
-  public async getLeadsByTeam(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
-    const data = await this.repository.getLeadsByTeam(filters);
-    
-    const teamIds = data.map(d => d.team_id).filter(Boolean) as string[];
-    const namesMap = await this.getTeamsNames(teamIds);
+  // ─── CHARTS ──────────────────────────────────────────────────────────────
 
-    const formattedData = data.map(item => ({
-      teamId: item.team_id,
-      teamName: item.team_id ? (namesMap[item.team_id] || 'Desconhecida') : 'Sem Equipe',
-      count: item._count.id
-    }));
+  /** 3. Distribuição do total de leads por equipa. */
+  public async getLeadsByTeam(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<LeadsByTeamResponse> {
+    this.assertCanAccess(requester);
 
-    return { leadsByTeam: formattedData };
+    const rows = await this.repository.getLeadsByTeam(filters);
+    const namesMap = await this.fetchTeamNames(this.extractTeamIds(rows));
+
+    return {
+      leadsByTeam: rows.map((item) => ({
+        teamId: item.team_id,
+        teamName: item.team_id
+          ? (namesMap[item.team_id] ?? 'Desconhecida')
+          : 'Sem Equipa',
+        count: item._count.id,
+      })),
+    };
   }
 
-  // 4. Ranking de Equipes
-  public async getTeamRanking(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
-    const data = await this.repository.getConversionsByTeam(filters);
-    
-    const teamIds = data.map(d => d.team_id).filter(Boolean) as string[];
-    const namesMap = await this.getTeamsNames(teamIds);
+  /** 4. Ranking de equipas por número de conversões (ordem descendente). */
+  public async getTeamRanking(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<TeamRankingResponse> {
+    this.assertCanAccess(requester);
 
-    const formattedData = data.map(item => ({
-      teamId: item.team_id,
-      teamName: item.team_id ? (namesMap[item.team_id] || 'Desconhecida') : 'Sem Equipe',
-      conversions: item._count.id
-    }));
+    const rows = await this.repository.getConversionsByTeam(filters);
+    const namesMap = await this.fetchTeamNames(this.extractTeamIds(rows));
 
-    return { teamRanking: formattedData };
+    return {
+      teamRanking: rows.map((item) => ({
+        teamId: item.team_id,
+        teamName: item.team_id
+          ? (namesMap[item.team_id] ?? 'Desconhecida')
+          : 'Sem Equipa',
+        conversions: item._count.id,
+      })),
+    };
   }
 
-  // 5. Evolução Global
-  public async getGlobalEvolution(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
-    const data = await this.repository.getGlobalEvolution(filters);
-    return { evolution: data };
+  /** 5. Evolução do volume de leads global ao longo do período. */
+  public async getGlobalEvolution(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<GlobalEvolutionResponse> {
+    this.assertCanAccess(requester);
+
+    const dates = await this.repository.getGlobalLeadsCreatedDates(filters);
+    return { evolution: groupDatesByDay(dates) };
   }
 
-  // 6. Funil Global
-  public async getGlobalFunnel(requester: any, filters?: GeneralManagerDashboardFilterDTO) {
-    this.validateAccess(requester);
-    const data = await this.repository.getGlobalFunnel(filters);
-    return { funnel: data };
+  /** 6. Funil global — contagem de leads por status em todas as equipas. */
+  public async getGlobalFunnel(
+    requester: AuthenticatedRequester,
+    filters?: GeneralManagerDashboardFilterDTO,
+  ): Promise<GlobalFunnelResponse> {
+    this.assertCanAccess(requester);
+
+    const funnel = await this.repository.getGlobalFunnel(filters);
+    return { funnel };
   }
 }

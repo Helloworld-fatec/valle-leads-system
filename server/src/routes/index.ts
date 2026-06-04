@@ -52,7 +52,7 @@ mainRouter.use('/negotiation-importance', negotiationImportanceRoutes);
 mainRouter.use('/negotiation-stage-history', negotiationStageHistoryRoutes);
 
 // Negociações Status
-mainRouter.use('/negotiations-status', negotiationStatusRoutes);
+mainRouter.use('/negotiation-status', negotiationStatusRoutes);
     
 // Dashboards
 mainRouter.use('/dashboards/attendant', dashboardAttendantRoutes);

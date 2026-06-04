@@ -23,13 +23,9 @@ interface StoreRow        { id: string; name: string; address: string; is_active
 interface TeamRow         { id: string; store_id: string; name: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
 interface UserRow         { id: string; email: string; password_hash: string; name: string; role: string; phone_1_ddd: string; phone_1_number: string; phone_2_ddd: string; phone_2_number: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
 interface UserTeamRow     { id: string; user_id: string; team_id: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string }
-interface CustomerRow     { id: string; name: string; email: string; cpf: string; phone: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string; is_active: string; team_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
+interface CustomerRow     { id: string; name: string; email: string; cpf: string; phone: string; address_street: string; address_number: string; address_complement: string; address_neighborhood: string; address_city: string; address_state: string; address_zip: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
 interface InterestItemRow { id: string; reference_code: string; description: string; value: string; is_active: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
 interface LeadRow         { id: string; source: string; status: string; is_active: string; customer_id: string; team_id: string; attendant_id: string; interest_item_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
-interface NegotiationRow  { id: string; team_id: string; lead_id: string; customer_id: string; attendant_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
-interface NegStatusRow    { id: string; status_negotiation: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
-interface NegStageRow     { id: string; old_stage: string; new_stage: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
-interface NegImportRow    { id: string; importance: string; notes: string; negotiation_id: string; lead_id: string; created_at: string; updated_at: string; created_by_user_id: string; updated_by_user_id: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -179,7 +175,6 @@ async function seedCustomers() {
       address_state:         nullable(r.address_state),
       address_zip:           nullable(r.address_zip),
       is_active:             toBool(r.is_active),
-      team_id:               nullable(r.team_id),
       created_at:            toDate(r.created_at),
       updated_at:            toDate(r.updated_at),
       created_by_user_id:    nullable(r.created_by_user_id),
@@ -219,91 +214,10 @@ async function seedLeads() {
       source:              nullable(r.source),
       status:              r.status,
       is_active:           toBool(r.is_active),
-      customer_id:         r.customer_id,
-      team_id:             r.team_id,
+      customer_id:         nullable(r.customer_id), // Adicione o nullable() aqui
+      team_id:             nullable(r.team_id),     // Adicione o nullable() aqui
       attendant_id:        nullable(r.attendant_id),
       interest_item_id:    nullable(r.interest_item_id),
-      created_at:          toDate(r.created_at),
-      updated_at:          toDate(r.updated_at),
-      created_by_user_id:  nullable(r.created_by_user_id),
-      updated_by_user_id:  nullable(r.updated_by_user_id),
-    })),
-    skipDuplicates: true,
-  });
-}
-
-async function seedNegotiations() {
-  const rows = readCsv<NegotiationRow>("seed_negotiations.csv");
-  console.log(`  → Inserindo ${rows.length} negotiations...`);
-
-  await prisma.negotiations.createMany({
-    data: rows.map((r) => ({
-      id:                  r.id,
-      team_id:             r.team_id,
-      lead_id:             r.lead_id,
-      customer_id:         r.customer_id,
-      attendant_id:        nullable(r.attendant_id),
-      created_at:          toDate(r.created_at),
-      updated_at:          toDate(r.updated_at),
-      created_by_user_id:  nullable(r.created_by_user_id),
-      updated_by_user_id:  nullable(r.updated_by_user_id),
-    })),
-    skipDuplicates: true,
-  });
-}
-
-async function seedNegotiationStatus() {
-  const rows = readCsv<NegStatusRow>("seed_negotiation_status.csv");
-  console.log(`  → Inserindo ${rows.length} negotiation_status_history...`);
-
-  await prisma.negotiationStatus.createMany({
-    data: rows.map((r) => ({
-      id:                  r.id,
-      status_negotiation:  r.status_negotiation,
-      notes:               nullable(r.notes),
-      negotiation_id:      r.negotiation_id,
-      lead_id:             r.lead_id,
-      created_at:          toDate(r.created_at),
-      updated_at:          toDate(r.updated_at),
-      created_by_user_id:  nullable(r.created_by_user_id),
-      updated_by_user_id:  nullable(r.updated_by_user_id),
-    })),
-    skipDuplicates: true,
-  });
-}
-
-async function seedNegotiationStageHistory() {
-  const rows = readCsv<NegStageRow>("seed_negotiation_stage.csv");
-  console.log(`  → Inserindo ${rows.length} negotiation_stage_history...`);
-
-  await prisma.negotiationStageHistory.createMany({
-    data: rows.map((r) => ({
-      id:                  r.id,
-      old_stage:           nullable(r.old_stage),
-      new_stage:           r.new_stage,
-      notes:               nullable(r.notes),
-      negotiation_id:      r.negotiation_id,
-      lead_id:             r.lead_id,
-      created_at:          toDate(r.created_at),
-      updated_at:          toDate(r.updated_at),
-      created_by_user_id:  nullable(r.created_by_user_id),
-      updated_by_user_id:  nullable(r.updated_by_user_id),
-    })),
-    skipDuplicates: true,
-  });
-}
-
-async function seedNegotiationImportance() {
-  const rows = readCsv<NegImportRow>("seed_negotiation_importance.csv");
-  console.log(`  → Inserindo ${rows.length} negotiation_importance_history...`);
-
-  await prisma.negotiationImportance.createMany({
-    data: rows.map((r) => ({
-      id:                  r.id,
-      importance:          r.importance,
-      notes:               nullable(r.notes),
-      negotiation_id:      r.negotiation_id,
-      lead_id:             r.lead_id,
       created_at:          toDate(r.created_at),
       updated_at:          toDate(r.updated_at),
       created_by_user_id:  nullable(r.created_by_user_id),
@@ -321,9 +235,7 @@ async function main() {
   console.log("🌱 Iniciando seed...\n");
 
   // Ordem obrigatória respeitando as FKs:
-  // stores → teams → users → user_teams
-  //       → customers → interest_items → leads
-  //                                    → negotiations → históricos
+  // stores → teams → users → user_teams → customers → interest_items → leads
 
   await seedStores();
   await seedTeams();
@@ -332,10 +244,6 @@ async function main() {
   await seedCustomers();
   await seedInterestItems();
   await seedLeads();
-  await seedNegotiations();
-  await seedNegotiationStatus();
-  await seedNegotiationStageHistory();
-  await seedNegotiationImportance();
 
   console.log("\n✅ Seed concluído com sucesso!");
 }

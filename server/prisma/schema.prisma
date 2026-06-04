@@ -130,10 +130,10 @@ model Leads {
   source             String?
   status             String         @default("new")
   is_active          Boolean        @default(true)
-  customer_id        String
-  customers          Customers      @relation(fields: [customer_id], references: [id], onDelete: Restrict)
-  team_id            String
-  teams              Teams          @relation(fields: [team_id], references: [id], onDelete: Restrict)
+  customer_id        String?
+  customers          Customers?      @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  team_id            String?
+  teams              Teams?          @relation(fields: [team_id], references: [id], onDelete: Restrict)
   attendant_id       String?
   attendant          Users?         @relation("AttendantLeads", fields: [attendant_id], references: [id], onDelete: SetNull)
   interest_item_id   String?

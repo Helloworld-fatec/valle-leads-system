@@ -2,20 +2,23 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   Users,
-  Kanban,
-  UserCircle,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Handshake,
+  Settings,
   X,
   Menu,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../hook/useAuth";
+import type { UserRole } from "../contexts/AuthContext";
 
 interface NavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  allowedRoles?: UserRole[]; // undefined = visível para todos
 }
 
 interface SidebarProps {
@@ -23,12 +26,34 @@ interface SidebarProps {
   onNavigate: (path: string) => void;
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/dashboard" },
-  { label: "Leads",     icon: <ClipboardList   size={18} />, path: "/leads"     },
-  { label: "Funil",     icon: <Kanban          size={18} />, path: "/funil"     },
-  { label: "Usuários",  icon: <Users           size={18} />, path: "/usuarios"  },
-  { label: "Perfil",    icon: <UserCircle      size={18} />, path: "/perfil"    },
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: "Negociações",
+    icon: <Handshake size={18} />,
+    path: "/funil",
+  },
+  {
+    label: "Leads",
+    icon: <ClipboardList size={18} />,
+    path: "/leads",
+  },
+  {
+    label: "Dashboard",
+    icon: <LayoutDashboard size={18} />,
+    path: "/dashboard",
+  },
+  {
+    label: "Usuários",
+    icon: <Users size={18} />,
+    path: "/usuarios",
+    allowedRoles: ["GENERAL_MANAGER", "ADMIN"],
+  },
+  {
+    label: "Config",
+    icon: <Settings size={18} />,
+    path: "/config",
+    allowedRoles: ["MANAGER", "GENERAL_MANAGER", "ADMIN"],
+  },
 ];
 
 // ─── Conteúdo interno reutilizado em desktop e mobile ────────────────────────
@@ -36,8 +61,8 @@ function SidebarContent({
   currentPath,
   onNavigate,
   collapsed,
-  onCollapse,   // só presente no desktop
-  onClose,      // só presente no mobile
+  onCollapse,
+  onClose,
 }: {
   currentPath: string;
   onNavigate: (path: string) => void;
@@ -45,6 +70,13 @@ function SidebarContent({
   onCollapse?: () => void;
   onClose?: () => void;
 }) {
+  const { user } = useAuth();
+  const role = user?.role;
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.allowedRoles || (role && item.allowedRoles.includes(role))
+  );
+
   return (
     <div className="relative z-10 flex flex-col h-full px-4 py-5">
 
@@ -64,7 +96,6 @@ function SidebarContent({
           </motion.div>
         )}
 
-        {/* Botão de fechar — só no mobile */}
         {onClose && (
           <button
             onClick={onClose}
@@ -78,27 +109,7 @@ function SidebarContent({
       {/* DIVIDER */}
       <div className="h-px bg-white/10 my-6" />
 
-      {/* STATUS */}
-      {!collapsed && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 rounded-3xl border border-white/10 bg-white/4 backdrop-blur-2xl p-4 shadow-[0_0_35px_rgba(37,99,235,0.08)]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
-              <div className="relative w-3 h-3 rounded-full bg-emerald-400" />
-            </div>
-            <div>
-              <p className="text-white text-sm font-medium">Sistema online</p>
-              <p className="text-white/40 text-xs">Operando normalmente</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* MENU — cresce para preencher o espaço disponível */}
+      {/* MENU */}
       <div className="flex-1 overflow-y-auto">
         {!collapsed && (
           <p className="text-[11px] uppercase tracking-[0.30em] text-white/25 px-3 mb-4">
@@ -107,7 +118,7 @@ function SidebarContent({
         )}
 
         <nav className="space-y-2">
-          {navItems.map((item, index) => {
+          {visibleItems.map((item, index) => {
             const isActive = currentPath === item.path;
             return (
               <motion.button
@@ -154,7 +165,7 @@ function SidebarContent({
         </nav>
       </div>
 
-      {/* BOTÃO RECOLHER — dentro do fluxo, sempre visível no desktop */}
+      {/* BOTÃO RECOLHER — desktop */}
       {onCollapse && (
         <button
           onClick={onCollapse}
@@ -178,7 +189,7 @@ function SidebarContent({
   );
 }
 
-// ─── Background decorativo compartilhado ─────────────────────────────────────
+// ─── Background decorativo ────────────────────────────────────────────────────
 function SidebarBackground() {
   return (
     <>

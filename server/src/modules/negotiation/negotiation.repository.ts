@@ -1,5 +1,6 @@
 // server/src/modules/negotiation/negotiation.repository.ts
 import { prisma, Prisma } from "../../config/prisma.js";
+import { NegotiationStatusRepository } from "../negotiation-status/status.repository.js";
 import type {
   CreateNegotiationDTO,
   UpdateNegotiationDTO,
@@ -62,8 +63,8 @@ export interface NegotiationScopeRow {
 
 export interface LeadForNegotiationCreation {
   id: string;
-  team_id: string;
-  customer_id: string;
+  team_id: string | null;      // CORRIGIDO: Agora aceita null
+  customer_id: string | null;  // CORRIGIDO: Agora aceita null
   attendant_id: string | null;
   is_active: boolean;
 }
@@ -191,6 +192,12 @@ export class NegotiationsRepository {
           created_by_user_id: actorId,
         },
       });
+
+      // Espelha imediatamente o status recém-criado no lead pai, dentro da
+      // MESMA transação. Sem isto, a negociação nasce "open" mas leads.status
+      // permanece no default "new" do schema — a redundância fica dessincronizada.
+      // Reaproveita o mesmo syncLeadStatus usado pelos demais caminhos de escrita.
+      await NegotiationStatusRepository.syncLeadStatus(dto.lead_id, tx);
 
       await tx.negotiationStageHistory.create({
         data: {
