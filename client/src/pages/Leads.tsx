@@ -1,3 +1,5 @@
+// src/pages/Leads.tsx
+
 import { useState, useEffect, useMemo } from "react";
 import { LayoutList, LayoutGrid, ArrowUpDown } from "lucide-react";
 import { useAuth } from "../hook/useAuth";
@@ -17,11 +19,10 @@ const PER_PAGE = 20;
 
 // Ordem de prioridade: "new" sempre no topo
 const STATUS_ORDER: Record<string, number> = {
-  new:         0,
-  in_progress: 1,
-  waiting:     2,
-  won:         3,
-  lost:        4,
+  new:  0,
+  open: 1,
+  won:  2,
+  lost: 3,
 };
 
 type StatusFilter = LeadStatus | "Todos";
@@ -95,11 +96,10 @@ function StatusSummary({ leads }: { leads: Lead[] }) {
   }, {});
 
   const items = [
-    { key: "new",         emoji: "🆕" },
-    { key: "in_progress", emoji: "⚡" },
-    { key: "waiting",     emoji: "⏳" },
-    { key: "won",         emoji: "✅" },
-    { key: "lost",        emoji: "❌" },
+    { key: "new",  emoji: "🆕" },
+    { key: "open", emoji: "⚡" },
+    { key: "won",  emoji: "✅" },
+    { key: "lost", emoji: "❌" },
   ];
 
   return (

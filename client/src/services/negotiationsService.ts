@@ -18,8 +18,8 @@ export type NegotiationStage =
 // importance.dto.ts → ImportanceEnum
 export type ImportanceLevel = "frio" | "morno" | "quente";
 
-// status.dto.ts → StatusEnum
-export type NegotiationStatus = "open" | "closed";
+// status.dto.ts → StatusEnum (domínio unificado com o lead)
+export type NegotiationStatus = "new" | "open" | "won" | "lost";
 
 export interface StageHistoryItem {
   id: string;
@@ -55,6 +55,9 @@ export interface Negotiation {
   lead?: {
     id: string;
     source?: string;
+    // Interesse do lead já normalizado para texto (vem de interest_item no
+    // leadService). Permite ao card exibir sem casts.
+    vehicle_interest?: string | null;
     customers?: {
       id: string;
       name: string;
@@ -103,6 +106,13 @@ export interface CreateStatusDTO {
   notes?: string;
 }
 
+export interface CreateNegotiationDTO {
+  lead_id: string;
+  team_id?: string;
+  customer_id?: string;
+  attendant_id?: string | null;
+}
+
 // ─────────────────────────────────────────────
 // HOOK
 // ─────────────────────────────────────────────
@@ -138,6 +148,29 @@ export function useNegotiationsService() {
     const res = await apiFetch(`/api/negotiations/${id}`);
     const json = await res.json();
     return json.data ?? json;
+  }
+
+  /**
+   * Abre uma nova negociação e registra automaticamente o estágio inicial
+   * "contato_inicial". É o ponto de entrada preferencial para criar uma
+   * negociação — garante que toda negociação comece no primeiro estágio do
+   * funil. (O fechamento, por sua vez, é tratado pelo backend ao registrar
+   * um estágio de fechamento, que dispara o status won/lost automaticamente.)
+   */
+  async function openNegotiation(data: CreateNegotiationDTO): Promise<{ id: string }> {
+    const res = await apiFetch("/api/negotiations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    const created: { id: string } = json.data ?? json;
+
+    await createStageHistory({
+      negotiation_id: created.id,
+      new_stage: "contato_inicial",
+    });
+
+    return { id: created.id };
   }
 
   // ── Histórico de Estágios ──────────────────
@@ -219,6 +252,7 @@ export function useNegotiationsService() {
     // negociações
     getNegotiations,
     getNegotiationById,
+    openNegotiation,
     // estágios
     getStageHistory,
     createStageHistory,

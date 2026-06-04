@@ -1,19 +1,20 @@
 // src/components/sales-funnel/NegotiationCard.tsx
-import { useDraggable } from "@dnd-kit/core";
 import { useState } from "react";
-import { Flame, Thermometer, Snowflake, Car, GripVertical } from "lucide-react";
+import { 
+  Flame, 
+  Thermometer, 
+  Snowflake, 
+  Car, 
+  GripVertical, 
+  ArrowRight 
+} from "lucide-react";
 import type { Negotiation, ImportanceLevel } from "../../types/negotiations";
 import NegotiationModal from "./NegotiationModal";
 
 const importanceConfig: Record<ImportanceLevel, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
-  quente: { icon: <Flame size={11} />,       color: "#EF4444", bg: "#FFF1F2", label: "Quente" },
-  morno:  { icon: <Thermometer size={11} />, color: "#F59E0B", bg: "#FFFBEB", label: "Morno"  },
-  frio:   { icon: <Snowflake size={11} />,   color: "#3B82F6", bg: "#EFF6FF", label: "Frio"   },
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  open:   "Aberta",
-  closed: "Encerrada",
+  quente: { icon: <Flame size={12} className="animate-pulse" />, color: "#DC2626", bg: "#FEE2E2", label: "Quente" },
+  morno:  { icon: <Thermometer size={12} />, color: "#D97706", bg: "#FEF3C7", label: "Morno"  },
+  frio:   { icon: <Snowflake size={12} />,   color: "#2563EB", bg: "#DBEAFE", label: "Frio"   },
 };
 
 const avatarGradients = [
@@ -22,8 +23,6 @@ const avatarGradients = [
   "linear-gradient(135deg,#F97316,#EF4444)",
   "linear-gradient(135deg,#10B981,#0EA5E9)",
   "linear-gradient(135deg,#EC4899,#8B5CF6)",
-  "linear-gradient(135deg,#F59E0B,#F97316)",
-  "linear-gradient(135deg,#06B6D4,#3B82F6)",
 ];
 
 function initials(name: string) {
@@ -33,28 +32,22 @@ function initials(name: string) {
 interface Props {
   negotiation: Negotiation;
   color: string;
-  isDragging?: boolean;
+  onAdvance?: () => void;
+  onChangeImportance?: (id: string, level: ImportanceLevel) => void;
 }
 
-export default function NegotiationCard({ negotiation, color, isDragging = false }: Props) {
+export default function NegotiationCard({ 
+  negotiation, 
+  color, 
+  onAdvance, 
+  onChangeImportance 
+}: Props) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showImportanceMenu, setShowImportanceMenu] = useState(false);
 
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: negotiation.id,
-  });
-
-  const style = transform
-    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
-    : undefined;
-
-  const clientName    = negotiation.lead?.customers?.name ?? "—";
-  const vehicle       = (negotiation.lead as any)?.vehicle_interest ?? "Não informado";
-
-  const statusHistory = negotiation.status_history ?? [];
-  const lastStatus    = statusHistory[statusHistory.length - 1];
-  const currentStatus = lastStatus
-    ? (STATUS_LABEL[lastStatus.status_negotiation] ?? lastStatus.status_negotiation)
-    : "Sem status";
+  const clientName = negotiation.lead?.customers?.name ?? "—";
+  const vehicle = negotiation.lead?.vehicle_interest || "Sem descrição do interesse";
 
   const importanceHistory = negotiation.importance_history ?? [];
   const rawImportance: ImportanceLevel =
@@ -63,77 +56,132 @@ export default function NegotiationCard({ negotiation, color, isDragging = false
 
   const idx = negotiation.id.charCodeAt(0) % avatarGradients.length;
 
+  // Handlers para o Drag and Drop Nativo
+  function handleDragStart(e: React.DragEvent) {
+    setIsDragging(true);
+    e.dataTransfer.setData("application/json", negotiation.id);
+    e.dataTransfer.effectAllowed = "move";
+    
+    // Cria um efeito visual limpo reduzindo ligeiramente a opacidade do elemento original
+    setTimeout(() => {
+      const element = document.getElementById(`card-${negotiation.id}`);
+      if (element) element.style.opacity = "0.4";
+    }, 0);
+  }
+
+  function handleDragEnd(e: React.DragEvent) {
+    setIsDragging(false);
+    const element = document.getElementById(`card-${negotiation.id}`);
+    if (element) element.style.opacity = "1";
+  }
+
   return (
     <>
       <div
-        ref={setNodeRef}
-        style={{ ...style }}
-        className={`rounded-xl transition-all duration-150 ${isDragging ? "opacity-60 rotate-1 scale-105" : ""}`}
+        id={`card-${negotiation.id}`}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        className={`relative bg-white rounded-xl transition-all duration-200 group border border-slate-200/80 cursor-grab active:cursor-grabbing select-none hover:border-slate-300 hover:shadow-md ${
+          isDragging ? "shadow-sm border-blue-200 bg-slate-50/50" : "shadow-sm"
+        }`}
       >
-        <div
-          className="p-3.5 rounded-xl cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
-          style={{
-            background: "#ffffff",
-            border: "1px solid #E2E8F0",
-            boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
-          }}
-          onClick={() => setModalOpen(true)}
-        >
-          {/* Drag handle + header */}
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2.5">
-              {/* Drag handle */}
-              <div
-                {...listeners}
-                {...attributes}
-                className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-400 transition-colors shrink-0 mt-0.5"
-                onClick={(e) => e.stopPropagation()}
-              >
+        {/* Indicador lateral sutil da Etapa Atual */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl opacity-80 transition-all group-hover:w-1.5" 
+          style={{ backgroundColor: color }} 
+        />
+
+        <div className="p-3.5 pl-4 flex flex-col gap-3">
+          {/* Top Bar: Grip, Avatar, Título e Ações */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="text-slate-300 group-hover:text-slate-400 transition-colors p-0.5 -ml-1 rounded">
                 <GripVertical size={14} />
               </div>
 
               <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-inner shrink-0"
                 style={{ background: avatarGradients[idx] }}
               >
                 {initials(clientName)}
               </div>
-              <div>
-                <p className="text-sm font-semibold leading-tight text-slate-800">
+              
+              <div className="flex flex-col min-w-0">
+                <h4 
+                  onClick={() => setModalOpen(true)}
+                  className="text-sm font-semibold text-slate-800 line-clamp-1 hover:text-blue-600 transition-colors cursor-pointer"
+                  title={clientName}
+                >
                   {clientName}
-                </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{currentStatus}</p>
+                </h4>
               </div>
             </div>
+          </div>
 
-            {/* Importance badge */}
-            <div
-              className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg shrink-0"
-              style={{ background: imp.bg, color: imp.color }}
-            >
-              {imp.icon}
-              <span>{imp.label}</span>
+          {/* Descrição e Info Intermediária */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded-md min-w-0 flex-1 border border-slate-100">
+              <Car size={13} className="text-slate-400 shrink-0" />
+              <span className="truncate" title={vehicle}>{vehicle}</span>
+            </div>
+
+            {/* Badge de Prioridade com seletor rápido */}
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowImportanceMenu(!showImportanceMenu);
+                }}
+                className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md border transition-all hover:brightness-95"
+                style={{ background: imp.bg, color: imp.color, borderColor: `${imp.color}25` }}
+                title="Alterar importância do Lead"
+              >
+                {imp.icon}
+                <span>{imp.label}</span>
+              </button>
+
+              {/* Dropdown de Importância Rápida */}
+              {showImportanceMenu && (
+                <div 
+                  className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-50 w-24 flex flex-col gap-0.5"
+                  onMouseLeave={() => setShowImportanceMenu(false)}
+                >
+                  {(Object.keys(importanceConfig) as ImportanceLevel[]).map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => {
+                        if (onChangeImportance) onChangeImportance(negotiation.id, level);
+                        setShowImportanceMenu(false);
+                      }}
+                      className="px-2 py-1 text-left text-xs font-medium hover:bg-slate-50 flex items-center gap-1"
+                      style={{ color: importanceConfig[level].color }}
+                    >
+                      {importanceConfig[level].icon}
+                      {importanceConfig[level].label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Vehicle */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
-            <Car size={11} className="shrink-0 opacity-60" />
-            <span className="truncate">{vehicle}</span>
-          </div>
-
-          {/* Footer */}
-          <div
-            className="pt-2.5 border-t border-slate-100 flex items-center gap-1.5"
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: color }}
-            />
-            <span className="text-xs font-semibold" style={{ color }}>
-              {currentStatus}
-            </span>
-          </div>
+          {/* Botão de Avanço Rápido Unificado */}
+          {onAdvance && (
+            <div className="flex justify-end border-t border-slate-100/70 pt-2 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdvance();
+                }}
+                className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-blue-600 transition-colors"
+                title="Avançar etapa"
+              >
+                <span>Avançar</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

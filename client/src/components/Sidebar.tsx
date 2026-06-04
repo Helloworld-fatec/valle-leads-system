@@ -109,26 +109,6 @@ function SidebarContent({
       {/* DIVIDER */}
       <div className="h-px bg-white/10 my-6" />
 
-      {/* STATUS */}
-      {!collapsed && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 rounded-3xl border border-white/10 bg-white/4 backdrop-blur-2xl p-4 shadow-[0_0_35px_rgba(37,99,235,0.08)]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
-              <div className="relative w-3 h-3 rounded-full bg-emerald-400" />
-            </div>
-            <div>
-              <p className="text-white text-sm font-medium">Sistema online</p>
-              <p className="text-white/40 text-xs">Operando normalmente</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
       {/* MENU */}
       <div className="flex-1 overflow-y-auto">
         {!collapsed && (

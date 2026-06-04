@@ -5,13 +5,12 @@ import { useApi } from "./api";
 // TIPOS
 // ─────────────────────────────────────────────
 
-// Valores reais retornados pelo backend
+// Valores reais retornados pelo backend (domínio unificado com a negociação)
 export type LeadStatus =
   | "new"
-  | "in_progress"
+  | "open"
   | "won"
-  | "lost"
-  | "waiting";
+  | "lost";
 
 export interface LeadCustomer {
   id: string;

@@ -72,9 +72,9 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/funil" replace />} />
+          <Route path="/funil" element={<SalesFunnel />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/leads" element={<Leads />} />
-          <Route path="/funil" element={<SalesFunnel />} />
           <Route path="/perfil" element={<Profile />} />
         </Route>
       </Route>
@@ -102,3 +102,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+

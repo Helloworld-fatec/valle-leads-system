@@ -1,3 +1,4 @@
+// src/components/leads/LeadCard.tsx
 import { MapPin, Tag, User, Package, Calendar } from "lucide-react";
 import type { Lead } from "../../services/leadService";
 
@@ -6,11 +7,10 @@ import type { Lead } from "../../services/leadService";
 // ─────────────────────────────────────────────
 
 export const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  new:         { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", label: "Novo" },
-  in_progress: { bg: "#F5F3FF", text: "#6D28D9", dot: "#8B5CF6", label: "Em Andamento" },
-  waiting:     { bg: "#FFFBEB", text: "#92400E", dot: "#F59E0B", label: "Aguardando" },
-  won:         { bg: "#ECFDF5", text: "#065F46", dot: "#10B981", label: "Ganho" },
-  lost:        { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Perdido" },
+  new:  { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", label: "Novo" },
+  open: { bg: "#F5F3FF", text: "#6D28D9", dot: "#8B5CF6", label: "Aberta" },
+  won:  { bg: "#ECFDF5", text: "#065F46", dot: "#10B981", label: "Ganho" },
+  lost: { bg: "#FEF2F2", text: "#991B1B", dot: "#EF4444", label: "Perdido" },
 };
 
 export const SOURCE_ICONS: Record<string, string> = {
