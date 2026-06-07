@@ -19,6 +19,7 @@ import ManagerLeads from "../pages/ManagerLeads";
 import Stores from "../pages/Stores";
 import Teams from "../pages/Teams";
 import GMLeads from "../pages/GMLeads";
+import Config from "../pages/Config";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -70,10 +71,10 @@ export default function AppRoutes() {
       {/* ── Rotas Protegidas (qualquer autenticado) ── */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/funil" replace />} />
+          <Route path="/funil" element={<SalesFunnel />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/leads" element={<Leads />} />
-          <Route path="/funil" element={<SalesFunnel />} />
           <Route path="/perfil" element={<Profile />} />
         </Route>
       </Route>
@@ -84,6 +85,7 @@ export default function AppRoutes() {
           <Route path="/manager/leads" element={<ManagerLeads />} />
           <Route path="/usuarios" element={<Users />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/config" element={<Config />} />
         </Route>
       </Route>
 
@@ -100,3 +102,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+

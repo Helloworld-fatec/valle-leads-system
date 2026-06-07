@@ -11,7 +11,7 @@ export default function PublicOnlyRoute() {
   const { isAuthenticated } = useAuth();
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/funil" replace />;
   }
 
   return <Outlet />;

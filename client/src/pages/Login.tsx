@@ -57,8 +57,8 @@ export default function Login() {
       {/* BACKGROUND */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563EB_0%,transparent_30%),radial-gradient(circle_at_bottom_right,#DC2626_0%,transparent_25%),linear-gradient(135deg,#050816_0%,#081127_45%,#0B1431_100%)]" />
-        <div className="absolute top-[-150px] left-[-120px] w-[450px] h-[450px] rounded-full bg-blue-500/25 blur-[140px] animate-pulse" />
-        <div className="absolute bottom-[-180px] right-[-120px] w-[450px] h-[450px] rounded-full bg-red-500/20 blur-[140px] animate-pulse" />
+        <div className="absolute -top-37.5 -left-30 w-112.5 h-112.5 rounded-full bg-blue-500/25 blur-[140px] animate-pulse" />
+        <div className="absolute -bottom-45 -right-30 w-112.5 h-112.5 rounded-full bg-red-500/20 blur-[140px] animate-pulse" />
         <div
           className="absolute inset-0 opacity-[0.06]"
           style={{
@@ -83,8 +83,8 @@ export default function Login() {
             className="w-16 h-16 object-contain drop-shadow-[0_0_20px_rgba(59,130,246,0.35)]"
           />
           <div>
-            <h1 className="text-white font-black text-2xl tracking-tight">Valle</h1>
-            <p className="text-blue-300 text-sm tracking-[0.30em] uppercase">Leads System</p>
+            <h1 className="text-white font-black text-2xl tracking-tight">Az - Sistema de Gestão de Leads</h1>
+            <p className="text-blue-300 text-sm tracking-[0.30em] uppercase">1000 Valle Multimarcas</p>
           </div>
         </motion.div>
 
@@ -94,15 +94,15 @@ export default function Login() {
           transition={{ duration: 0.9 }}
           className="max-w-xl"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.05] backdrop-blur-xl mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl mb-8">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-sm text-white/70">Plataforma online em tempo real</span>
           </div>
 
-          <h1 className="text-6xl font-black leading-[1] tracking-tight text-white">
-            Transforme
+          <h1 className="text-6xl font-black leading-none tracking-tight text-white">
+            Transformando
             <br />
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-white bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-blue-400 via-cyan-300 to-white bg-clip-text text-transparent">
               oportunidades
             </span>
             <br />
@@ -110,35 +110,13 @@ export default function Login() {
           </h1>
 
           <p className="mt-8 text-lg leading-relaxed text-white/60 max-w-lg">
-            Controle leads, acompanhe negociações e visualize métricas em uma experiência
-            moderna, rápida e visualmente incrível.
+            Sistema de controle de leads, acompanhamento de negociações e visualização de métricas com uma experiência
+            moderna, rápida e visualmente agradável.
           </p>
-
-          <div className="grid grid-cols-3 gap-5 mt-12">
-            {[
-              { value: "1.2K+", label: "Leads" },
-              { value: "98%", label: "Performance" },
-              { value: "3x", label: "Conversão" },
-            ].map((item) => (
-              <motion.div
-                whileHover={{ y: -8 }}
-                key={item.label}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] backdrop-blur-xl p-5 transition-all duration-500 hover:bg-white/[0.08]"
-              >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-500/10 to-cyan-400/10" />
-                <h2 className="relative text-3xl font-black text-white">{item.value}</h2>
-                <p className="relative mt-1 text-sm text-white/50">{item.label}</p>
-              </motion.div>
-            ))}
-          </div>
         </motion.div>
 
         <div className="flex items-center justify-between">
-          <p className="text-white/30 text-sm">© {new Date().getFullYear()} Valle Leads System</p>
-          <div className="flex items-center gap-2 text-white/40 text-sm">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Sistema operacional
-          </div>
+          <p className="text-white/30 text-sm">© {new Date().getFullYear()} Az - Sistema de Gestão de Leads - desenvolvido por Hello World Software House</p>
         </div>
       </div>
 
@@ -167,8 +145,8 @@ export default function Login() {
         >
           <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full scale-110" />
 
-          <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.06] backdrop-blur-2xl p-8 shadow-[0_0_80px_rgba(37,99,235,0.15)]">
-            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-red-500" />
+          <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/6 backdrop-blur-2xl p-8 shadow-[0_0_80px_rgba(37,99,235,0.15)]">
+            <div className="absolute top-0 left-0 w-full h-0.75 bg-linear-to-r from-blue-500 via-cyan-400 to-red-500" />
 
             <div className="mb-8">
               <h2 className="text-4xl font-black text-white tracking-tight">Entrar</h2>
@@ -196,7 +174,7 @@ export default function Login() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 onKeyDown={handleKeyDown}
                 placeholder="seu@email.com"
-                className="w-full h-14 px-5 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
+                className="w-full h-14 px-5 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/8 focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
               />
             </div>
 
@@ -218,7 +196,7 @@ export default function Login() {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   onKeyDown={handleKeyDown}
                   placeholder="••••••••"
-                  className="w-full h-14 px-5 pr-14 rounded-2xl bg-white/[0.05] border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
+                  className="w-full h-14 px-5 pr-14 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 outline-none transition-all focus:border-blue-400 focus:bg-white/8 focus:ring-4 focus:ring-blue-500/10 hover:border-blue-400/40"
                 />
                 <button
                   type="button"
@@ -234,7 +212,7 @@ export default function Login() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="group relative w-full h-14 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white font-bold text-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="group relative w-full h-14 overflow-hidden rounded-2xl bg-linear-to-r from-blue-600 via-blue-500 to-cyan-400 text-white font-bold text-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/10" />
               {loading ? (

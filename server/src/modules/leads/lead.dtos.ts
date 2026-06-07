@@ -1,23 +1,13 @@
 // src/modules/leads/lead.dtos.ts
 import { z } from "zod";
 
-// Lista canônica de status que um lead pode assumir.
-// Mantemos como enum Zod para que tanto a entrada quanto a tipagem
-// derivada (via z.infer) usem exatamente os mesmos valores.
-export const LeadStatusEnum = z.enum([
-  "novo",
-  "em_atendimento",
-  "aguardando",
-  "finalizado",
-  "perdido",
-]);
 
 // Schema de criação de lead.
 // attendant_id é opcional: para ATTENDANT o service força o próprio id;
 // para os demais perfis o atendente pode ser informado ou deixado em branco.
 export const CreateLeadSchema = z.object({
   source: z.string().trim().max(100).optional(),
-  status: LeadStatusEnum,
+  status: z.string().optional(),
   customer_id: z.string().uuid("customer_id deve ser um UUID válido"),
   team_id: z.string().uuid("team_id deve ser um UUID válido"),
   attendant_id: z
@@ -40,7 +30,7 @@ export const CreateLeadSchema = z.object({
 export const UpdateLeadSchema = z
   .object({
     source: z.string().trim().max(100).optional(),
-    status: LeadStatusEnum.optional(),
+    status: z.string().optional(),
     is_active: z.boolean().optional(),
     team_id: z.string().uuid("team_id deve ser um UUID válido").optional(),
     attendant_id: z
@@ -64,7 +54,7 @@ export const UpdateLeadSchema = z
 // is_active aceita "true"/"false" e ignora qualquer outro valor.
 export const QueryLeadSchema = z.object({
   team_id: z.string().uuid().optional(),
-  status: LeadStatusEnum.optional(),
+  status: z.string().optional(),
   attendant_id: z.string().uuid().optional(),
   customer_id: z.string().uuid().optional(),
   interest_item_id: z.string().uuid().optional(),
@@ -127,6 +117,4 @@ export type LeadIdParamDTO = z.infer<typeof LeadIdParamSchema>;
 export type BulkAssignAttendantDTO = z.infer<typeof BulkAssignAttendantSchema>;
 export type BulkAssignTeamDTO = z.infer<typeof BulkAssignTeamSchema>;
 
-// União dos status string-puros — útil quando o service precisa comparar
-// sem instanciar o enum Zod.
-export type LeadStatus = z.infer<typeof LeadStatusEnum>;
+

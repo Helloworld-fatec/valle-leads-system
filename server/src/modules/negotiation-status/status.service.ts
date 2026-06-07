@@ -10,6 +10,7 @@ import type {
   UpdateNegotiationStatusDTO,
   QueryNegotiationStatusDTO,
 } from "./status.dto";
+import { ALLOWED_STATUS_TRANSITIONS, isClosedStatus } from "./status.dto";
 import {
   RecursoNaoEncontradoError,
   BusinessRuleError,
@@ -32,6 +33,11 @@ import type { ActorContext } from "../negotiation/negotiation.service";
 // | Criar status    | só suas neg.   | só do time       | tudo            | tudo  |
 // | Editar (notas)  | só suas neg.   | só do time       | tudo            | tudo  |
 // | Deletar         | ✗              | ✗                | ✗               | sim   |
+//
+// Observação: o caminho normal de fechamento (won/lost) é disparado
+// automaticamente pelo módulo de ESTÁGIOS ao registrar fechamento_com_venda /
+// fechamento_sem_venda (createWithAutoClose). Este endpoint cobre os ajustes
+// manuais de status: abrir (new→open) e reabrir (won/lost→open, privilegiado).
 
 // ──────────────────────────────────────────────────────
 // SHAPE MÍNIMO PARA GUARDS DE ESCOPO
@@ -60,10 +66,6 @@ export const NegotiationStatusService = {
   // ──────────────────────────────────────────────────────
   // LISTAGEM
   // ──────────────────────────────────────────────────────
-  // Se o actor filtrar por negotiation_id, valida o escopo antes de consultar.
-  // Para listagens abertas (sem negotiation_id), o RBAC granular por registro
-  // exigiria joins pesados — o padrão do sistema é que o front-end sempre
-  // filtre por negotiation_id (use case real).
 
   async findAll(
     filters: QueryNegotiationStatusDTO,
@@ -101,10 +103,10 @@ export const NegotiationStatusService = {
   // Regras de negócio aplicadas em ordem:
   //   1. Negociação deve existir
   //   2. Actor deve ter escopo sobre ela
-  //   3. [RN] Não pode criar status duplicado seguido (mesmo valor do atual)
-  //   4. [RN] Não pode reabrir uma negociação já fechada com "open"
-  //      (reabertura deve passar por MANAGER ou acima — ver abaixo)
-  //   5. Cria o registro com lead_id derivado da negociação
+  //   3. [RN] Não pode repetir o status atual (registro duplicado seguido)
+  //   4. [RN] A transição precisa ser válida (ver ALLOWED_STATUS_TRANSITIONS)
+  //   5. [RN] Reabrir (won/lost → open) é privilégio de MANAGER ou acima
+  //   6. Cria o registro com lead_id derivado da negociação (sync 1:1 no repo)
 
   async create(
     data: CreateNegotiationStatusDTO,
@@ -117,24 +119,37 @@ export const NegotiationStatusService = {
     assertCanWrite(negotiation, actor);
 
     const current = lastStatus(negotiation);
+    const target = data.status_negotiation;
 
     // 3. [RN] Impede registro duplicado seguido
-    if (current === data.status_negotiation) {
+    if (current === target) {
       throw new BusinessRuleError(
-        `A negociação já possui o status "${data.status_negotiation}". Nenhuma alteração foi necessária.`
+        `A negociação já possui o status "${target}". Nenhuma alteração foi necessária.`
       );
     }
 
-    // 4. [RN] Reabertura de negociação fechada é uma operação privilegiada
-    if (current === "closed" && data.status_negotiation === "open") {
-      if (actor.role === "ATTENDANT") {
-        throw new AcessoNaoAutorizadoError(
-          "Atendentes não podem reabrir uma negociação encerrada. Solicite a um gerente."
-        );
-      }
+    // 4. [RN] Transição precisa ser permitida pela máquina de estados
+    const from = current ?? "__none__";
+    const allowed = ALLOWED_STATUS_TRANSITIONS[from] ?? [];
+    if (!allowed.includes(target)) {
+      throw new BusinessRuleError(
+        `Transição de status inválida: "${current ?? "indefinido"}" → "${target}".`
+      );
     }
 
-    // 5. Cria o registro — lead_id derivado da negociação
+    // 5. [RN] Reabertura de negociação encerrada é operação privilegiada
+    if (
+      current &&
+      isClosedStatus(current) &&
+      target === "open" &&
+      actor.role === "ATTENDANT"
+    ) {
+      throw new AcessoNaoAutorizadoError(
+        "Atendentes não podem reabrir uma negociação encerrada. Solicite a um gerente."
+      );
+    }
+
+    // 6. Cria o registro — lead_id derivado da negociação
     return NegotiationStatusRepository.create({
       ...data,
       lead_id: negotiation.lead_id,
@@ -145,8 +160,6 @@ export const NegotiationStatusService = {
   // ──────────────────────────────────────────────────────
   // ATUALIZAR REGISTRO (apenas notas)
   // ──────────────────────────────────────────────────────
-  // status_negotiation é imutável — alterar retroativamente distorceria
-  // o histórico e quebraria a lógica de "último status = estado atual".
 
   async update(
     id: string,
@@ -171,8 +184,6 @@ export const NegotiationStatusService = {
   // ──────────────────────────────────────────────────────
   // DELETAR (apenas ADMIN)
   // ──────────────────────────────────────────────────────
-  // Excluir um registro de status é destrutivo e pode adulterar o estado
-  // atual da negociação (se for o mais recente). Restrito ao ADMIN.
 
   async delete(id: string, actor: ActorContext): Promise<void> {
     if (actor.role !== "ADMIN") {
@@ -222,9 +233,9 @@ function buildSnapshot(statusRecord: StatusDetail): NegotiationScopeSnapshot {
     team_id: n.team_id,
     attendant_id: n.attendant_id,
     lead_id: n.lead_id,
-    // StatusDetail inclui stage_history no include da negociação, não status_history.
-    // Para os guards de escopo não precisamos do último status aqui — só team_id
-    // e attendant_id. Passamos array vazio para satisfazer o tipo.
+    // StatusDetail inclui stage_history (não status_history) no include da
+    // negociação. Os guards de escopo só precisam de team_id/attendant_id;
+    // passamos array vazio para satisfazer o tipo.
     status_history: [],
   };
 }

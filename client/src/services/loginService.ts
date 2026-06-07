@@ -10,6 +10,8 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   access_token: string;
+  // ✅ refresh_token declarado corretamente — backend envia no body (não em cookie)
+  refresh_token: string;
   access_token_expires_in: string;
   refresh_token_expires_in: string;
   user: {
@@ -23,8 +25,8 @@ export interface LoginResponse {
 
 /**
  * Faz a requisição de login no backend.
- * O refresh token retorna em cookie httpOnly setado pelo servidor.
- * Aqui capturamos o access_token e os dados do usuário para persistir no contexto.
+ * Tanto o access token quanto o refresh token retornam no body JSON
+ * e são persistidos no localStorage pelo AuthContext (via login()).
  */
 export async function loginRequest(payload: LoginPayload): Promise<{
   user: AuthUser;
@@ -43,28 +45,26 @@ export async function loginRequest(payload: LoginPayload): Promise<{
       const body = await response.json();
       if (body?.message) message = body.message;
     } catch {
-      // ignora
+      // ignora body não-JSON
     }
     throw new Error(message);
   }
 
   const data: LoginResponse = await response.json();
 
-  // refresh_token vem no body — salvo no localStorage para renovação automática.
-  const refreshToken = (data as any).refresh_token ?? "";
-
- const user: AuthUser = {
-  id: data.user.id,
-  name: data.user.name,
-  email: data.user.email,
-  role: data.user.role as AuthUser["role"],
-  team_ids: data.user.team_ids, // array completo — usuário pode pertencer a vários times
-};
+  const user: AuthUser = {
+    id: data.user.id,
+    name: data.user.name,
+    email: data.user.email,
+    role: data.user.role as AuthUser["role"],
+    team_ids: data.user.team_ids,
+  };
 
   return {
     user,
     accessToken: data.access_token,
-    refreshToken,
+    // ✅ sem cast as any — o tipo já declara refresh_token
+    refreshToken: data.refresh_token,
   };
 }
 
@@ -74,6 +74,6 @@ export async function logoutRequest(): Promise<void> {
     method: "POST",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
   }).catch(() => {
-    // falha silenciosa — o estado local já será limpo
+    // falha silenciosa — o estado local já será limpo pelo AuthContext
   });
 }

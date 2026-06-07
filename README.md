@@ -63,13 +63,13 @@ O projeto é desenvolvido em **3 sprints**, seguindo os princípios do Scrum com
 
 ## 🏃 Sprints
 
-### [Sprint 1 — 24/03 a 14/04/2026](docs/sprint_1/README.md)
+### [Sprint 1 — 24/03 a 14/04/2026](docs\sprint_1\README.md)
 Primeira entrega incremental do projeto. Foco em documentação, elicitação de requisitos, scaffolding do backend e implementação dos módulos iniciais: Negotiations, StageHistory, Leads, Customers, Users, Auth, Teams e Stores.
 
-### [Sprint 2 — 15/04 a 21/05/2026](./docs/sprint-2/README.md)
+### [Sprint 2 — 15/04 a 21/05/2026](docs\sprint_2\README.md)
 Segunda entrega incremental. Foco em autenticação, controle de acesso por role (RBAC), fechamento das rotas do backend e primeiras telas do frontend.
 
-### [Sprint 3 — 22/05 a 11/06/2026](./docs/sprint-3/README.md)
+### [Sprint 3 — 22/05 a 11/06/2026](docs\sprint_3\README.md)
 Entrega final do ciclo de desenvolvimento. Foco nas telas completas, funil de negociações, dashboards analíticos e preparação para a apresentação final.
 
 ---
@@ -136,8 +136,8 @@ O servidor estará disponível em `http://localhost:3000`.
 
 | Recurso | Link |
 |---|---|
-| Documentação do Backend | [server/README.MD](./server/README.MD) |
-| Documentação do Frontend | [client/README.md](./client/README.md) |
-| Documentação da Sprint 1 | [docs/sprint-1/README.md](./docs/sprint-1/README.md) |
-| Documentação da Sprint 2 | [docs/sprint-2/README.md](./docs/sprint-2/README.md) |
-| Documentação da Sprint 3 | [docs/sprint-3/README.md](./docs/sprint-3/README.md) |
+| Documentação do Backend | [server/README.MD](server\README.md) |
+| Documentação do Frontend | [client/README.md](client\README.md) |
+| Documentação da Sprint 1 | [docs/sprint-1/README.md](docs\sprint_1\README.md) |
+| Documentação da Sprint 2 | [docs/sprint-2/README.md](docs\sprint_2\README.md) |
+| Documentação da Sprint 3 | [docs/sprint-3/README.md](docs\sprint_3\README.md) |

@@ -19,8 +19,12 @@ export type NegotiationStage =
 // importance.dto.ts → ImportanceEnum
 export type ImportanceLevel = "frio" | "morno" | "quente";
 
-// status.dto.ts → StatusEnum
-export type NegotiationStatusValue = "open" | "closed";
+// status.dto.ts → StatusEnum = ["new", "open", "won", "lost"]
+//   "new"  → estado inicial, antes de qualquer movimentação efetiva
+//   "open" → negociação aberta / em andamento
+//   "won"  → encerrada COM venda  (estágio fechamento_com_venda)
+//   "lost" → encerrada SEM venda  (estágio fechamento_sem_venda)
+export type NegotiationStatusValue = "new" | "open" | "won" | "lost";
 
 // ─────────────────────────────────────────────
 // Entidades relacionadas

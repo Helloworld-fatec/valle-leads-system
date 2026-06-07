@@ -12,11 +12,9 @@ const app = express();
 app.use(json());
 
 // 2. Middleware CORS.
-
- 
-const allowedOrigins = ['http://localhost:5173']; // Adicione a URL do seu frontend
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174']; // Adicione a URL do seu frontend
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

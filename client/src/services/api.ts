@@ -1,5 +1,5 @@
 // src/services/api.ts
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hook/useAuth";
 
@@ -47,22 +47,31 @@ function resolveErrorType(status: number): ApiErrorOptions["type"] {
 
 const REFRESH_TOKEN_KEY = "refreshToken";
 const ACCESS_TOKEN_KEY = "accessToken";
+const USER_KEY = "authUser";
+
+// ─────────────────────────────────────────────
+// Singleton de refresh (escopo de módulo)
+// ─────────────────────────────────────────────
+//
+// ✅ CORREÇÃO: era um useRef dentro do hook, o que significa que cada
+// instância de useApi() tinha seu próprio ref isolado. Com isso, dois
+// componentes que recebem 401 ao mesmo tempo disparariam dois refreshes
+// simultâneos — race condition real.
+//
+// Movido para o módulo garante que há exatamente UMA Promise de refresh
+// em andamento em toda a aplicação, independente de quantos componentes
+// estejam usando useApi() ao mesmo tempo.
+//
+let refreshPromise: Promise<string> | null = null;
 
 // ─────────────────────────────────────────────
 // Hook principal
 // ─────────────────────────────────────────────
 
 export const useApi = () => {
-  const { accessToken, user, login, logout } = useAuth();
+  const { accessToken, login, logout } = useAuth();
   const navigate = useNavigate();
   const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-
-  /**
-   * Ref que guarda a Promise de refresh em andamento.
-   * Garante que requisições paralelas que recebem 401 ao mesmo tempo
-   * aguardem o mesmo refresh, sem disparar múltiplas chamadas ao backend.
-   */
-  const refreshPromiseRef = useRef<Promise<string> | null>(null);
 
   // ─── Montagem da requisição HTTP ─────────────────────────────────
   const makeRequest = useCallback(
@@ -85,17 +94,18 @@ export const useApi = () => {
   );
 
   // ─── Renovação do access token via refresh token ──────────────────
-  /**
-   * Chama POST /api/auth/refresh com o refresh token do localStorage.
-   * - Persiste o novo par de tokens no localStorage e no contexto.
-   * - Retorna o novo access token para a requisição original ser repetida.
-   * - Múltiplas chamadas simultâneas compartilham a mesma Promise (via ref),
-   *   evitando race condition de refresh duplicado.
-   */
+  //
+  // ✅ CORREÇÃO: `user` removido das dependências do useCallback.
+  //    O refresh não precisa do user do contexto React — ele lê o
+  //    refreshToken direto do localStorage e usa os dados frescos que
+  //    o próprio backend devolve na resposta. Ter `user` como dep causava
+  //    recriação da função logo após o refresh (quando o contexto atualizava),
+  //    o que poderia invalidar a deduplicação em fluxos de retry encadeados.
+  //
   const refreshAccessToken = useCallback((): Promise<string> => {
-    // Se já há um refresh em andamento, reutiliza a mesma Promise
-    if (refreshPromiseRef.current) {
-      return refreshPromiseRef.current;
+    // Reutiliza a Promise em andamento, se houver — deduplicação global
+    if (refreshPromise) {
+      return refreshPromise;
     }
 
     const doRefresh = async (): Promise<string> => {
@@ -126,16 +136,19 @@ export const useApi = () => {
       const data = await refreshResponse.json();
 
       const newAccessToken: string = data.access_token;
-      // O backend rotaciona o refresh token — sempre use o novo.
-      // Se por algum motivo não vier (não deveria acontecer), mantém o atual.
+      // Backend rotaciona o refresh — sempre persiste o novo.
+      // Fallback para o atual caso o backend omita (não deveria ocorrer).
       const newRefreshToken: string = data.refresh_token ?? storedRefreshToken;
 
-      // Persiste os novos tokens
+      // ✅ Persiste os novos tokens no localStorage
       localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
       localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
 
-      // Atualiza o contexto React com os dados frescos do usuário vindos do backend
-      const freshUser = data.user ?? user;
+      // ✅ Usa os dados frescos do usuário vindos do backend.
+      //    Se o backend não devolver `user`, lê do localStorage como fallback
+      //    (o usuário não mudou — só o token expirou).
+      const freshUser = data.user ?? JSON.parse(localStorage.getItem(USER_KEY) ?? "null");
+
       if (!freshUser) {
         throw new ApiError({
           message: "Não foi possível recuperar os dados do usuário.",
@@ -143,19 +156,22 @@ export const useApi = () => {
           type: "auth",
         });
       }
+
+      // Atualiza o contexto React com os dados frescos
       login(freshUser, newAccessToken, newRefreshToken);
 
       return newAccessToken;
     };
 
-    refreshPromiseRef.current = doRefresh().finally(() => {
-      // Limpa a ref ao terminar (com sucesso ou erro) para que o próximo
-      // 401 real (depois que o novo token também expirar) dispare um novo refresh
-      refreshPromiseRef.current = null;
+    refreshPromise = doRefresh().finally(() => {
+      // Limpa o singleton ao terminar (sucesso ou erro) para que o próximo
+      // 401 real dispare um novo refresh em vez de reutilizar uma Promise rejeitada
+      refreshPromise = null;
     });
 
-    return refreshPromiseRef.current;
-  }, [BASE_URL, user, login]);
+    return refreshPromise;
+  }, [BASE_URL, login]);
+  // ✅ `user` não é dependência — ver comentário acima
 
   // ─── Força logout e redireciona ──────────────────────────────────
   const forceLogout = useCallback(
@@ -173,12 +189,11 @@ export const useApi = () => {
    * - Injeção automática do Bearer token (do contexto de autenticação)
    * - Renovação automática via refresh token em caso de 401
    * - Retry automático da requisição original após refresh bem-sucedido
-   * - Deduplicação de refreshes paralelos (sem race condition)
+   * - Deduplicação global de refreshes paralelos (sem race condition)
    * - Erros HTTP convertidos em `ApiError` tipado
    */
   const apiFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      // Lê o accessToken do contexto (atualizado pelo AuthProvider)
       let response = await makeRequest(url, options, accessToken);
 
       // ── 401: tenta renovar e repetir ────────────────────────────
@@ -194,11 +209,11 @@ export const useApi = () => {
         let newAccessToken: string;
         try {
           newAccessToken = await refreshAccessToken();
-        } catch (error) {
+        } catch {
           // Refresh falhou (token inválido, expirado, rede, etc.)
           forceLogout("Sessão expirada. Faça login novamente.");
           // forceLogout sempre lança — linha abaixo só satisfaz o TS
-          throw error;
+          throw new ApiError({ message: "Sessão expirada.", status: 401, type: "auth" });
         }
 
         // Repete a requisição original com o token renovado
@@ -232,3 +247,4 @@ export const useApi = () => {
 
   return { apiFetch };
 };
+
