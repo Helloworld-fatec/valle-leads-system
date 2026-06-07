@@ -1,23 +1,24 @@
-# Estágio de desenvolvimento (É este que o Docker Compose vai usar)
-FROM node:22-alpine AS build
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
+
+FROM deps AS build
+WORKDIR /app
+ARG VITE_BACKEND_URL=
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 COPY . .
+RUN npm run build
 
+FROM deps AS dev
+WORKDIR /app
+COPY . .
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
-# ─── Stage 2: production (Nginx) ──────────────────────────────────────────────
 FROM nginx:1.27-alpine AS prod
-
-# Remove a config padrão do Nginx
 RUN rm /etc/nginx/conf.d/default.conf
-
-# Copia nossa config customizada
 COPY nginx.conf /etc/nginx/conf.d/app.conf
-
-# Copia o build do Vite
 COPY --from=build /app/dist /usr/share/nginx/html
-
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,180 +1,75 @@
-# CRM — Leads System
+# Como rodar com Docker — Valle Leads System
 
-Sistema CRM full-stack com backend Node/Express/Prisma e frontend React/Vite/Tailwind.
+Este projeto usa banco PostgreSQL hospedado no Render. Por isso, o `docker-compose.yml` principal **não sobe um container de banco local**. Ele sobe apenas:
 
----
+- `server` — backend Node/Express;
+- `client` — frontend React servido por Nginx.
 
-## Pré-requisitos
+## 1. Criar `.env` na raiz
 
-- [Node.js 22+](https://nodejs.org/)
-- [npm](https://www.npmjs.com/)
-
----
-
-## 🐳 Rodando COM Docker
-
-> O Docker é usado **apenas para o banco de dados** em desenvolvimento.
-> O backend e o frontend rodam direto na sua máquina com `npm run dev`.
-
-### Pré-requisitos adicionais
-
-- [Docker](https://www.docker.com/get-started) + [Docker Compose](https://docs.docker.com/compose/)
-
-### Passo a passo
+Na raiz do projeto:
 
 ```bash
-# 1. Clone o repositório
-git clone <url-do-repo>
-cd <nome-do-repo>
-
-# 2. Configure o .env do backend
-cp .env.example server/.env
-# Edite server/.env e troque as senhas padrão
+cp .env.example .env
 ```
 
-```bash
-# 3. Suba o banco
-docker compose up -d db
-```
-
-```bash
-# 4. Popule o banco com migrations + seed (apenas na primeira vez)
-#    Certifique-se de que server/prisma/seed_data.csv existe antes de rodar
-docker compose run --rm seed
-```
-
-```bash
-# 5. Instale dependências e rode o backend
-cd server
-npm install
-npm run dev          # Terminal 1 — http://localhost:3000
-```
-
-```bash
-# 6. Em outro terminal, suba o frontend
-cd client
-npm install
-npm run dev          # Terminal 2 — http://localhost:5173
-```
-
-> Nas próximas vezes, basta `docker compose up -d db` + `npm run dev` nos dois terminais.
-> O serviço `seed` só precisa rodar **uma vez** por ambiente.
-
-### Comandos úteis
-
-```bash
-# Ver logs do banco
-docker compose logs -f db
-
-# Parar o banco
-docker compose down
-
-# Parar e apagar os dados (reset total — seed precisará rodar novamente)
-docker compose down -v
-
-# Rodar o seed novamente (ex: após reset)
-docker compose run --rm seed
-```
-
----
-
-## 💻 Rodando SEM Docker
-
-Você precisará de um banco PostgreSQL. Opções:
-
-- **Local:** instale o [PostgreSQL](https://www.postgresql.org/download/) na sua máquina
-- **Cloud gratuito:** [Neon](https://neon.tech) ou [Supabase](https://supabase.com) — zero instalação
-
-### Ajuste necessário no `.env`
-
-```bash
-cp .env.example server/.env
-```
-
-Edite o `server/.env` com a connection string do seu banco:
+Edite o `.env` e cole a URL do banco hospedado no Render:
 
 ```env
-# Banco local instalado na máquina:
-DATABASE_URL=postgresql://seu_usuario:sua_senha@localhost:5432/crm_db
-
-# Banco na nuvem (Neon, Supabase, etc.):
-# DATABASE_URL=postgresql://user:senha@host/dbname?sslmode=require
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST/NOME_DO_BANCO?sslmode=require
 ```
 
-### Rodando o backend + seed
+Para rodar localmente pelo Docker no seu computador, normalmente use a **External Database URL** do Render.
+
+## 2. Validar Compose
 
 ```bash
-cd server
-npm install
-npx prisma generate
-npx prisma migrate dev        # cria as tabelas no banco
-
-# Popule o banco (apenas na primeira vez)
-# Certifique-se de que prisma/seed_data.csv existe
-npx ts-node prisma/seed.ts
-
-npm run dev                   # Terminal 1 — http://localhost:3000
+docker compose config
 ```
 
-### Rodando o frontend
+Esse comando não deve mostrar warnings de `POSTGRES_USER`, `POSTGRES_PASSWORD` ou `POSTGRES_DB`, porque o Compose principal não usa banco local.
+
+## 3. Subir aplicação
 
 ```bash
-cd client
-npm install
-npm run dev                   # Terminal 2 — http://localhost:5173
+docker compose up -d --build
 ```
 
----
+Acesse:
 
-## 🚀 Produção
+- Frontend: `http://localhost`
+- Backend: `http://localhost:3000`
+- API: `http://localhost:3000/api`
 
-Os `Dockerfile`s de `server/` e `client/` são voltados para deploy em produção.
+## 4. Logs úteis
 
-O `server/Dockerfile` no stage `prod` executa automaticamente na inicialização:
-1. `prisma migrate deploy` — aplica migrations pendentes
-2. `node dist/prisma/seed.js` — roda o seed (idempotente: usa `findFirst`/`upsert`, não duplica dados)
-3. `node dist/server.js` — inicia o servidor
-
-> **Atenção:** coloque o `seed_data.csv` em `server/prisma/` antes de fazer o build da imagem de produção,
-> pois ele será copiado para dentro do container via `COPY prisma ./prisma`.
-
-Para produção com todos os serviços no Docker, estenda o `docker-compose.yml` adicionando os serviços `server` e `client`.
-
----
-
-## 🗂️ Estrutura do projeto
-
-```
-/
-├── docker-compose.yml       # Banco (dev) + serviço seed
-├── .env.example             # Modelo de variáveis — copie para server/.env
-├── README.md
-├── server/
-│   ├── Dockerfile           # Multi-stage: build + prod (com seed automático)
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   ├── seed.ts          # Script de seed
-│   │   └── seed_data.csv    # CSV com dados fictícios (não commitar dados reais!)
-│   └── src/
-│       └── server.ts
-└── client/
-    ├── Dockerfile           # Multi-stage: build + Nginx
-    ├── nginx.conf
-    ├── vite.config.ts
-    └── src/
-        └── index.css
+```bash
+docker compose ps
+docker compose logs server
+docker compose logs client
 ```
 
----
+## 5. Desenvolvimento com hot reload
 
-## 🔑 Variáveis de ambiente (`server/.env`)
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-| Variável            | Descrição                                    | Exemplo                  |
-|---------------------|----------------------------------------------|--------------------------|
-| `POSTGRES_USER`     | Usuário do banco — usado pelo Docker         | `crm_user`               |
-| `POSTGRES_PASSWORD` | Senha do banco — usado pelo Docker           | `senha_segura`           |
-| `POSTGRES_DB`       | Nome do banco — usado pelo Docker            | `crm_db`                 |
-| `DATABASE_URL`      | Connection string completa usada pelo Prisma | `postgresql://...`       |
-| `JWT_SECRET`        | Segredo para assinar tokens JWT              | string longa e aleatória |
-| `PORT`              | Porta do servidor backend                    | `3000`                   |
+Acesse:
 
+- Frontend dev: `http://localhost:5173`
+- Backend dev: `http://localhost:3000`
+
+## 6. Banco local opcional
+
+Se quiser testar com PostgreSQL local em container, use:
+
+```bash
+docker compose -f docker-compose.local-db.yml up -d --build
+```
+
+Nesse caso, o Compose usa `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB` com defaults ou valores definidos no `.env`.
+
+## 7. Observação de segurança
+
+Nunca commite o `.env`. Se uma `DATABASE_URL` real ou segredo JWT apareceu em log público, gere novas credenciais/secrets antes da entrega.

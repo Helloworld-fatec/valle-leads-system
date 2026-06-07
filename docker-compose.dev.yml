@@ -1,40 +1,25 @@
-version: '3.8'
+# Desenvolvimento com banco hospedado no Render.
+# Backend e frontend rodam com hot reload em containers.
 
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: valle_db
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
-      target: build
-    container_name: valle_server
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file: .env
+      target: dev
+    container_name: valle_server_dev
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
+      NODE_ENV: development
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL precisa estar definida no .env}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET precisa estar definido no .env}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET precisa estar definido no .env}
+      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-7d}
       CHOKIDAR_USEPOLLING: "true"
-    # Usamos o npx para garantir que o Docker encontre o tsx interno
-    command: npx tsx watch src/server.ts
+    command: npm run dev
     volumes:
       - ./server:/app
       - /app/node_modules
@@ -46,17 +31,16 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-      target: build
-    container_name: valle_client
+      target: dev
+    container_name: valle_client_dev
+    env_file:
+      - .env
     environment:
-      - CHOKIDAR_USEPOLLING=true
-    command: npm run dev -- --host
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:3000}
+      CHOKIDAR_USEPOLLING: "true"
+    command: npm run dev -- --host 0.0.0.0
     volumes:
       - ./client:/app
       - /app/node_modules
     ports:
       - "5173:5173"
-
-volumes:
-  postgres_data:
-  seed_flag:
