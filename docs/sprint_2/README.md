@@ -303,3 +303,4 @@ As funcionalidades principais foram consideradas bem encaminhadas, com uma estru
 * Reforçar a identidade visual do sistema com melhor paleta de cores, contraste, organização e clareza.
 * Alinhar os ajustes visuais da Sprint 3 com o feedback recebido na Sprint Review.
 * Priorizar uma experiência simples, clara e bem acabada, mantendo o foco em organização, filtros úteis e boa legibilidade.
+
