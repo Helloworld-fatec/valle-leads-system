@@ -1,4 +1,5 @@
-import { User } from "../../data/mockUsers";
+import { User } from "../../services/userService";
+import { formatPhone, getTeamNames } from "../../constants/userConstants";
 import UserAvatar from "./UserAvatar";
 import RoleBadge from "./RoleBadge";
 import { Mail, Phone, Users, MoreVertical } from "lucide-react";
@@ -8,9 +9,18 @@ interface UserCardProps {
 }
 
 export default function UserCard({ user }: UserCardProps) {
+  const phone     = formatPhone(user.phone_1_ddd, user.phone_1_number);
+  const teamNames = getTeamNames(
+    user.user_teams as Array<{
+      id: string;
+      team_id: string;
+      team?: { id: string; name: string; store_id: string; is_active: boolean };
+    }>
+  );
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all duration-200 overflow-hidden group">
-      {/* Top accent */}
+      {/* Accent top bar */}
       <div
         className="h-1 w-full"
         style={{
@@ -33,7 +43,9 @@ export default function UserCard({ user }: UserCardProps) {
               />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm leading-tight">{user.name}</p>
+              <p className="font-semibold text-gray-900 text-sm leading-tight">
+                {user.name}
+              </p>
               <div className="mt-1">
                 <RoleBadge role={user.role} />
               </div>
@@ -50,22 +62,29 @@ export default function UserCard({ user }: UserCardProps) {
             <Mail size={13} className="text-gray-400 flex-shrink-0" />
             <span className="truncate">{user.email}</span>
           </div>
-          {user.phone && (
+
+          {phone !== "—" && (
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <Phone size={13} className="text-gray-400 flex-shrink-0" />
-              <span>{user.phone}</span>
+              <span>{phone}</span>
             </div>
           )}
+
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <Users size={13} className="text-gray-400 flex-shrink-0" />
-            <span>{user.team}</span>
+            <span className="truncate">{teamNames}</span>
           </div>
         </div>
 
         {/* Footer */}
         <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
           <span className="text-xs text-gray-400">
-            Desde {new Date(user.created_at).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
+            {user.created_at
+              ? `Desde ${new Date(user.created_at).toLocaleDateString("pt-BR", {
+                  month: "short",
+                  year: "numeric",
+                })}`
+              : "—"}
           </span>
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded-full ${
