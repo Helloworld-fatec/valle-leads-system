@@ -4,13 +4,9 @@ import { useAuth } from "../../hook/useAuth";
 import { useLeadService } from "../../services/leadService";
 import type { CreateLeadDTO } from "../../services/leadService";
 import { useClientService } from "../../services/clientService";
-import type { Client } from "../../services/clientService";
+import type { Client, CreateClientDTO } from "../../services/clientService";
 import { useItemService } from "../../services/itemService";
 import type { InterestItem } from "../../services/itemService";
-
-// ─────────────────────────────────────────────
-// CONSTANTES
-// ─────────────────────────────────────────────
 
 const SOURCES = [
   "Instagram",
@@ -28,42 +24,37 @@ interface Props {
   onCreated: () => void;
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE
-// ─────────────────────────────────────────────
-
 export default function CreateLeadModal({ onClose, onCreated }: Props) {
   const { user } = useAuth();
   const { createLead } = useLeadService();
-  const { getClients } = useClientService();
+  const { getClients, createClient } = useClientService();
   const { getItems } = useItemService();
 
-  // ── Campos do formulário ─────────────────────
   const [source, setSource] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [interestItemId, setInterestItemId] = useState("");
 
-  // ── Busca de clientes ────────────────────────
   const [clientSearch, setClientSearch] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientList, setShowClientList] = useState(false);
 
-  // ── Busca de itens ───────────────────────────
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientCpf, setNewClientCpf] = useState("");
+
   const [itemSearch, setItemSearch] = useState("");
   const [items, setItems] = useState<InterestItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InterestItem | null>(null);
   const [showItemList, setShowItemList] = useState(false);
 
-  // ── Estado geral ─────────────────────────────
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // ─────────────────────────────────────────────
-  // BUSCA CLIENTES COM DEBOUNCE
-  // ─────────────────────────────────────────────
 
   useEffect(() => {
     if (selectedClient) return;
@@ -80,6 +71,7 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
 
         const res = await getClients({
           name: clientSearch.trim(),
+          is_active: true,
           limit: 10,
         });
 
@@ -97,54 +89,118 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientSearch, selectedClient]);
 
-  // ─────────────────────────────────────────────
-  // BUSCA ITENS COM DEBOUNCE
-  // ─────────────────────────────────────────────
-
   useEffect(() => {
-  if (selectedItem) return;
+    if (selectedItem) return;
 
-  if (itemSearch.trim().length < 2) {
-    setItems([]);
-    setShowItemList(false);
+    if (itemSearch.trim().length < 2) {
+      setItems([]);
+      setShowItemList(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingItems(true);
+
+        const term = itemSearch.trim();
+        const isOnlyNumbers = /^\d+$/.test(term);
+
+        const res = await getItems({
+          ...(isOnlyNumbers ? { reference_code: term } : { description: term }),
+          limit: 10,
+        });
+
+        setItems(res.data ?? []);
+        setShowItemList(true);
+      } catch {
+        setItems([]);
+        setShowItemList(true);
+      } finally {
+        setLoadingItems(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemSearch, selectedItem]);
+
+  async function handleCreateClient() {
+  if (!newClientName.trim()) {
+    setError("Informe o nome do cliente.");
     return;
   }
 
-  const timer = setTimeout(async () => {
-    try {
-      setLoadingItems(true);
+  if (!newClientPhone.trim()) {
+    setError("Informe o telefone do cliente.");
+    return;
+  }
 
-      const term = itemSearch.trim();
-      const isOnlyNumbers = /^\d+$/.test(term);
+  const cleanPhone = newClientPhone.replace(/\D/g, "");
+  const cleanCpf = newClientCpf.replace(/\D/g, "");
+  const cleanEmail = newClientEmail.trim();
 
-      const res = await getItems({
-        ...(isOnlyNumbers
-          ? { reference_code: term }
-          : { description: term }),
-        limit: 10,
-      });
+  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    setError("Informe um telefone válido com DDD.");
+    return;
+  }
 
-      setItems(res.data ?? []);
-      setShowItemList(true);
-    } catch {
-      setItems([]);
-      setShowItemList(true);
-    } finally {
-      setLoadingItems(false);
+  if (cleanCpf.length > 0) {
+    if (cleanCpf.length !== 11 || /^(\d)\1{10}$/.test(cleanCpf)) {
+      setError("Informe um CPF válido com 11 dígitos ou deixe o campo vazio.");
+      return;
     }
-  }, 400);
+  }
 
-  return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [itemSearch, selectedItem]);
+  const payload: CreateClientDTO = {
+    name: newClientName.trim(),
+    phone: cleanPhone,
+    email: cleanEmail || undefined,
+    cpf: cleanCpf || undefined,
+    is_active: true,
+  };
 
-  // ─────────────────────────────────────────────
-  // SUBMIT
-  // ─────────────────────────────────────────────
+  try {
+    setCreatingClient(true);
+    setError(null);
+
+    const createdClient = await createClient(payload);
+
+    if (createdClient.is_active === false) {
+      setError(
+        "Cliente cadastrado, mas está inativo. Não é possível criar lead para cliente inativo."
+      );
+      return;
+    }
+
+    setSelectedClient(createdClient);
+    setCustomerId(createdClient.id);
+
+    setClientSearch("");
+    setClients([]);
+    setShowClientList(false);
+    setShowNewClientForm(false);
+
+    setNewClientName("");
+    setNewClientPhone("");
+    setNewClientEmail("");
+    setNewClientCpf("");
+  } catch {
+    setError(
+      "Não foi possível cadastrar o cliente. Verifique se telefone, CPF ou e-mail já estão cadastrados."
+    );
+  } finally {
+    setCreatingClient(false);
+  }
+}
 
   async function handleSubmit() {
     if (!customerId) {
       setError("Selecione um cliente.");
+      return;
+    }
+
+    if (selectedClient?.is_active === false) {
+      setError("Não é possível criar um lead para um cliente inativo.");
       return;
     }
 
@@ -175,10 +231,6 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
     }
   }
 
-  // ─────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -208,7 +260,7 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Cliente */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
@@ -226,7 +278,9 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
                         {selectedClient.name}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {selectedClient.phone || selectedClient.email || "Sem contato"}
+                        {selectedClient.phone ||
+                          selectedClient.email ||
+                          "Sem contato"}
                       </p>
                     </div>
 
@@ -300,19 +354,126 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
                 </div>
               )}
 
+              {/* Nenhum cliente encontrado */}
               {showClientList &&
                 clients.length === 0 &&
                 !loadingClients &&
                 clientSearch.trim().length >= 2 &&
                 !selectedClient && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4 text-center">
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-gray-400 mb-3">
                       Nenhum cliente encontrado
                     </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewClientForm(true);
+                        setNewClientName(clientSearch);
+                        setShowClientList(false);
+                      }}
+                      className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                    >
+                      Cadastrar novo cliente
+                    </button>
                   </div>
                 )}
             </div>
           </div>
+
+          {/* Formulário novo cliente */}
+          {showNewClientForm && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Cadastrar novo cliente
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Nome e telefone são obrigatórios.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowNewClientForm(false)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                  Nome completo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  placeholder="Ex: Maria Silva"
+                  className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                  Telefone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  placeholder="Ex: 11999999999"
+                  className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    E-mail
+                  </label>
+                  <input
+                    type="email"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    placeholder="cliente@email.com"
+                    className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    CPF
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientCpf}
+                    onChange={(e) => setNewClientCpf(e.target.value)}
+                    placeholder="00000000000"
+                    className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateClient}
+                disabled={creatingClient}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {creatingClient ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Cadastrando...
+                  </>
+                ) : (
+                  "Salvar cliente"
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Origem */}
           <div>
@@ -470,7 +631,7 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!customerId || loading}
+            disabled={!customerId || loading || showNewClientForm || creatingClient}
             className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
@@ -478,6 +639,10 @@ export default function CreateLeadModal({ onClose, onCreated }: Props) {
                 <Loader2 size={14} className="animate-spin" />
                 Criando...
               </>
+            ) : showNewClientForm ? (
+              "Salve o cliente"
+            ) : !customerId ? (
+              "Selecione cliente"
             ) : (
               "Criar Lead"
             )}
