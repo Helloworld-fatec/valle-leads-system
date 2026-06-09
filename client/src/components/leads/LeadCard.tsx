@@ -186,11 +186,6 @@ export default function LeadCard({
               />
               {status.label}
             </span>
-            {lead.status === "new" && (
-              <span className="inline-flex items-center text-xs font-semibold px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
-                Novo
-              </span>
-            )}
           </div>
         </div>
       </div>

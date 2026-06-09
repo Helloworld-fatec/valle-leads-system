@@ -1,14 +1,19 @@
 // src/pages/Leads.tsx
 
 import { useState, useEffect, useMemo } from "react";
-import { LayoutList, LayoutGrid, ArrowUpDown } from "lucide-react";
+import { LayoutList, LayoutGrid, ArrowUpDown, Plus } from "lucide-react";
 import { useAuth } from "../hook/useAuth";
 import { useLeadService } from "../services/leadService";
 import type { Lead, LeadStatus } from "../services/leadService";
-import LeadCard, { LeadRow, LeadCardSkeleton, LeadRowSkeleton } from "../components/leads/LeadCard";
+import LeadCard, {
+  LeadRow,
+  LeadCardSkeleton,
+  LeadRowSkeleton,
+} from "../components/leads/LeadCard";
 import LeadsFilterBar from "../components/leads/LeadsFilterBar";
 import LeadsPagination from "../components/leads/LeadsPagination";
 import LeadDetailModal from "../components/leads/LeadDetailModal";
+import CreateLeadModal from "../components/leads/CreateLeadModal";
 import { STATUS_CONFIG } from "../components/leads/LeadCard";
 
 // ─────────────────────────────────────────────
@@ -19,14 +24,14 @@ const PER_PAGE = 20;
 
 // Ordem de prioridade: "new" sempre no topo
 const STATUS_ORDER: Record<string, number> = {
-  new:  0,
+  new: 0,
   open: 1,
-  won:  2,
+  won: 2,
   lost: 3,
 };
 
 type StatusFilter = LeadStatus | "Todos";
-type ViewMode     = "list" | "card";
+type ViewMode = "list" | "card";
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -63,11 +68,16 @@ function filterLeads(
 
     if (search) {
       const q = search.toLowerCase();
-      const name  = l.customers?.name?.toLowerCase()  ?? "";
+      const name = l.customers?.name?.toLowerCase() ?? "";
       const email = l.customers?.email?.toLowerCase() ?? "";
-      const cpf   = l.customers?.cpf                  ?? "";
-      const ref   = l.interest_item?.reference_code   ?? "";
-      if (!name.includes(q) && !email.includes(q) && !cpf.includes(q) && !ref.includes(q))
+      const cpf = l.customers?.cpf ?? "";
+      const ref = l.interest_item?.reference_code ?? "";
+      if (
+        !name.includes(q) &&
+        !email.includes(q) &&
+        !cpf.includes(q) &&
+        !ref.includes(q)
+      )
         return false;
     }
 
@@ -96,9 +106,9 @@ function StatusSummary({ leads }: { leads: Lead[] }) {
   }, {});
 
   const items = [
-    { key: "new",  emoji: "🆕" },
+    { key: "new", emoji: "🆕" },
     { key: "open", emoji: "⚡" },
-    { key: "won",  emoji: "✅" },
+    { key: "won", emoji: "✅" },
     { key: "lost", emoji: "❌" },
   ];
 
@@ -127,60 +137,67 @@ function StatusSummary({ leads }: { leads: Lead[] }) {
 // ─────────────────────────────────────────────
 
 export default function Leads() {
-  const { user }   = useAuth();
+  const { user } = useAuth();
   const { getLeads } = useLeadService();
 
   // ── Estado ──────────────────────────────────
-  const [leads, setLeads]       = useState<Lead[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Filtros
-  const [status, setStatus]     = useState<StatusFilter>("Todos");
-  const [source, setSource]     = useState("Todos");
+  const [status, setStatus] = useState<StatusFilter>("Todos");
+  const [source, setSource] = useState("Todos");
   const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo]     = useState("");
-  const [page, setPage]         = useState(1);
-  const [search, setSearch]     = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
   // ── Fetch ────────────────────────────────────
-  useEffect(() => {
+  async function fetchLeads() {
     if (!user?.id) return;
 
-    async function fetchLeads() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getLeads({ attendant_id: user!.id });
-        setLeads(data);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Erro ao carregar leads.");
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getLeads({ attendant_id: user.id });
+      setLeads(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar leads.");
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     fetchLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  async function handleLeadCreated() {
+    await fetchLeads();
+    setPage(1);
+  }
+
   // ── Filtragem + ordenação ────────────────────
   const filtered = useMemo(
-    () => sortLeads(filterLeads(leads, status, source, search, dateFrom, dateTo)),
+    () =>
+      sortLeads(filterLeads(leads, status, source, search, dateFrom, dateTo)),
     [leads, status, source, search, dateFrom, dateTo],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const paginated  = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   function handleFilter(key: string, value: string) {
     setPage(1);
-    if (key === "status")   setStatus(value as StatusFilter);
-    if (key === "source")   setSource(value);
+    if (key === "status") setStatus(value as StatusFilter);
+    if (key === "source") setSource(value);
     if (key === "dateFrom") setDateFrom(value);
-    if (key === "dateTo")   setDateTo(value);
+    if (key === "dateTo") setDateTo(value);
   }
 
   function handleClear() {
@@ -199,7 +216,9 @@ export default function Leads() {
       <div className="mb-6">
         <div className="flex items-start justify-between gap-4 mb-2">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Meus Leads</h1>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Meus Leads
+            </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {loading
                 ? "Carregando..."
@@ -207,28 +226,42 @@ export default function Leads() {
             </p>
           </div>
 
-          {/* Toggle de visualização */}
-          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 shrink-0">
+          {/* Ações + Toggle de visualização */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setViewMode("list")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                         transition-all ${viewMode === "list"
-                           ? "bg-blue-600 text-white shadow-sm"
-                           : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
             >
-              <LayoutList size={14} />
-              <span className="hidden sm:inline">Lista</span>
+              <Plus size={16} />
+              <span className="hidden sm:inline">Novo Lead</span>
             </button>
-            <button
-              onClick={() => setViewMode("card")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                         transition-all ${viewMode === "card"
-                           ? "bg-blue-600 text-white shadow-sm"
-                           : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
-            >
-              <LayoutGrid size={14} />
-              <span className="hidden sm:inline">Cards</span>
-            </button>
+
+            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
+              <button
+                onClick={() => setViewMode("list")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                           transition-all ${
+                             viewMode === "list"
+                               ? "bg-blue-600 text-white shadow-sm"
+                               : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                           }`}
+              >
+                <LayoutList size={14} />
+                <span className="hidden sm:inline">Lista</span>
+              </button>
+              <button
+                onClick={() => setViewMode("card")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                           transition-all ${
+                             viewMode === "card"
+                               ? "bg-blue-600 text-white shadow-sm"
+                               : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                           }`}
+              >
+                <LayoutGrid size={14} />
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -239,7 +272,10 @@ export default function Leads() {
       {/* ── Filtros ── */}
       <LeadsFilterBar
         search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
         stage={status}
         onStage={(v) => handleFilter("status", v)}
         source={source}
@@ -279,12 +315,16 @@ export default function Leads() {
       {/* ── Loading ── */}
       {loading && viewMode === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => <LeadCardSkeleton key={i} />)}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <LeadCardSkeleton key={i} />
+          ))}
         </div>
       )}
       {loading && viewMode === "list" && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          {Array.from({ length: 8 }).map((_, i) => <LeadRowSkeleton key={i} />)}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <LeadRowSkeleton key={i} />
+          ))}
         </div>
       )}
 
@@ -315,12 +355,24 @@ export default function Leads() {
             <div className="flex-1 flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
               <ArrowUpDown size={10} /> Cliente
             </div>
-            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</div>
-            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:block">Origem</div>
-            <div className="w-48 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:block">Produto</div>
-            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">Valor</div>
-            <div className="w-24 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">Equipe</div>
-            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:block text-right">Criado em</div>
+            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Status
+            </div>
+            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:block">
+              Origem
+            </div>
+            <div className="w-48 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:block">
+              Produto
+            </div>
+            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
+              Valor
+            </div>
+            <div className="w-24 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
+              Equipe
+            </div>
+            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:block text-right">
+              Criado em
+            </div>
           </div>
 
           {paginated.map((lead) => (
@@ -340,11 +392,19 @@ export default function Leads() {
         />
       )}
 
-      {/* ── Modal ── */}
+      {/* Modal de detalhe */}
       {selectedLead && (
         <LeadDetailModal
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
+        />
+      )}
+
+      {/* Modal de criação */}
+      {showCreateModal && (
+        <CreateLeadModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleLeadCreated}
         />
       )}
     </div>
