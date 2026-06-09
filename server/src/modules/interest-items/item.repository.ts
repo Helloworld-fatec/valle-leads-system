@@ -14,30 +14,40 @@ import type {
 // ─────────────────────────────────────────────
 
 export const InterestItemsRepository = {
-  async findAll(filters: QueryInterestItemDTO) {
-    const {
-      description,
-      reference_code,
-      is_active,
-      page = 1,
-      limit = 20,
-    } = filters;
+ async findAll(filters: QueryInterestItemDTO) {
+  const {
+    description,
+    reference_code,
+    is_active,
+    page = 1,
+    limit = 20,
+  } = filters;
 
-    return prisma.interestItems.findMany({
-      where: {
-        ...(description && {
-          description: { contains: description, mode: "insensitive" },
-        }),
-        ...(reference_code && {
-          reference_code: { contains: reference_code, mode: "insensitive" },
-        }),
-        ...(is_active !== undefined && { is_active }),
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { created_at: "desc" },
-    });
-  },
+  const parsedPage = Number(page) || 1;
+  const parsedLimit = Number(limit) || 20;
+
+  const rawIsActive = is_active as unknown;
+
+  const parsedIsActive =
+    rawIsActive === undefined
+      ? undefined
+      : rawIsActive === true || rawIsActive === "true";
+
+  return prisma.interestItems.findMany({
+    where: {
+      ...(description && {
+        description: { contains: description, mode: "insensitive" },
+      }),
+      ...(reference_code && {
+        reference_code: { contains: reference_code, mode: "insensitive" },
+      }),
+      ...(is_active !== undefined && { is_active }),
+    },
+    skip: (page - 1) * parsedLimit,
+    take: parsedLimit,
+    orderBy: { created_at: "desc" },
+  });
+},
 
   async findById(id: string) {
     return prisma.interestItems.findUnique({

@@ -46,22 +46,36 @@ export type CustomerWithRelations = Prisma.CustomersGetPayload<{
 }>;
 
 export const CustomersRepository = {
-  async findAll(filters: QueryCustomerDTO): Promise<CustomerRow[]> {
-    const where: Prisma.CustomersWhereInput = {};
-    if (filters.is_active !== undefined) where.is_active = filters.is_active;
-    if (filters.cpf !== undefined) where.cpf = filters.cpf;
-    if (filters.name !== undefined) {
-      where.name = { contains: filters.name, mode: "insensitive" };
-    }
+async findAll(filters: QueryCustomerDTO): Promise<CustomerRow[]> {
+  const where: Prisma.CustomersWhereInput = {};
 
-    return prisma.customers.findMany({
-      where,
-      select: customerSelect,
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
-      orderBy: { created_at: "desc" },
-    });
-  },
+  const parsedPage = Number(filters.page) || 1;
+  const parsedLimit = Number(filters.limit) || 20;
+
+  if (filters.is_active !== undefined) {
+    const rawIsActive = filters.is_active as unknown;
+    where.is_active = rawIsActive === true || rawIsActive === "true";
+  }
+
+  if (filters.cpf !== undefined) {
+    where.cpf = filters.cpf;
+  }
+
+  if (filters.name !== undefined) {
+    where.name = {
+      contains: String(filters.name),
+      mode: "insensitive",
+    };
+  }
+
+  return prisma.customers.findMany({
+    where,
+    select: customerSelect,
+    skip: (parsedPage - 1) * parsedLimit,
+    take: parsedLimit,
+    orderBy: { created_at: "desc" },
+  });
+},
 
   async findById(id: string): Promise<CustomerWithRelations | null> {
     return prisma.customers.findUnique({
