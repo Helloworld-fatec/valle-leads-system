@@ -141,6 +141,9 @@ cp .env.example .env
 
 docker compose config
 docker compose up -d --build
+
+# Popular banco local, se estiver vazio
+docker compose exec server npx prisma db seed
 ```
 
 Acesse:
@@ -158,6 +161,9 @@ Acesse:
 ```bash
 docker compose -f docker-compose.dev.yml config
 docker compose -f docker-compose.dev.yml up -d --build
+
+# Popular banco dev, se estiver vazio
+docker compose -f docker-compose.dev.yml exec server npx prisma db seed
 ```
 
 Acesse:
