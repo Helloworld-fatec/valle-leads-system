@@ -1,5 +1,6 @@
 // src/modules/users/users.routes.ts
 import { Router } from "express";
+import type { Response, NextFunction } from "express";
 import { UsersController } from "./users.controller.js";
 import {
   validateBody,
@@ -14,6 +15,7 @@ import {
   userIdParamSchema,
 } from "./users.dto.js";
 import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
 import {
   checkPermission,
   checkRole,
@@ -38,11 +40,11 @@ import {
 //   DELETE /users/:id/hard     → somente ADMIN (hard delete físico)
 //
 // Importante:
-//   - PUT/PATCH usa dois schemas diferentes injetados condicionalmente.
-//     O controller despacha para updateAdmin ou updateSelf conforme actor.role e id.
-//     A route usa validateBody com o schema mais permissivo (updateUserAdminSchema)
-//     para deixar o campo chegar ao controller — o service bloqueia via RBAC quem
-//     não pode usar campos sensíveis.
+//   - PUT/PATCH usa middleware condicional que escolhe o schema Zod correto:
+//       ADMIN                     → updateUserAdminSchema (campos completos)
+//       qualquer role, próprio id → updateSelfSchema (inclui current/new_password)
+//     Isso evita que current_password e new_password sejam descartados antes
+//     de chegar ao controller, o que causava "Nenhum campo enviado para atualização".
 //   - /hard deve vir ANTES de /:id para o Express resolver primeiro.
 // ─────────────────────────────────────────────
 
@@ -53,7 +55,6 @@ const controller = new UsersController();
 usersRouter.use(authMiddleware);
 
 // ─── LISTAGEM ────────────────────────────────────────
-// checkPermission("MANAGER") aprova MANAGER, GENERAL_MANAGER e ADMIN (hierárquico)
 usersRouter.get(
   "/",
   checkPermission("MANAGER"),
@@ -62,7 +63,6 @@ usersRouter.get(
 );
 
 // ─── LEITURA POR ID ──────────────────────────────────
-// Qualquer autenticado — checkPermission("ATTENDANT") aprova todos os 4 roles
 usersRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
@@ -79,19 +79,31 @@ usersRouter.post(
 );
 
 // ─── ATUALIZAÇÃO ─────────────────────────────────────
-// validateBody usa updateUserAdminSchema (superconjunto dos campos).
-// Para não-ADMIN no próprio id, o body é interpretado como UpdateSelfDTO
-// pelo controller — campos extras como role/is_active/team_ids não estarão
-// presentes porque o updateSelfSchema não os aceita no lado do cliente.
-// Se vierem, são simplesmente ignorados pelo Zod antes de chegar aqui.
+// Middleware condicional: escolhe o schema Zod correto com base no actor.
+//   - ADMIN editando qualquer id     → updateUserAdminSchema (campos completos)
+//   - qualquer role no próprio id    → updateSelfSchema (inclui current/new_password)
 //
-// Nota: se quisermos rejeitar campos extras para não-ADMIN já no middleware,
-// basta criar um middleware condicional. Por ora, a defesa fica no service.
+// Corrige o erro "Nenhum campo enviado para atualização" que ocorria porque
+// o updateUserAdminSchema descartava current_password e new_password.
+function conditionalValidateBody(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const isAdmin = req.user?.role === "ADMIN";
+  const isSelf  = req.user?.id === req.params.id;
+
+  if (!isAdmin && isSelf) {
+    return validateBody(updateSelfSchema)(req, res, next);
+  }
+  return validateBody(updateUserAdminSchema)(req, res, next);
+}
+
 usersRouter.put(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
-  validateBody(updateUserAdminSchema),
+  conditionalValidateBody,
   controller.update
 );
 
@@ -99,12 +111,11 @@ usersRouter.patch(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
-  validateBody(updateUserAdminSchema),
+  conditionalValidateBody,
   controller.update
 );
 
 // ─── EXCLUSÃO ────────────────────────────────────────
-// Hard delete — rota específica ANTES da genérica /:id
 usersRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
@@ -112,7 +123,6 @@ usersRouter.delete(
   controller.hardDelete
 );
 
-// Soft delete
 usersRouter.delete(
   "/:id",
   checkRole("ADMIN"),
