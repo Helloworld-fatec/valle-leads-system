@@ -17,10 +17,10 @@ import UserFilters    from "../components/users/UserFilters";
 import UserCard       from "../components/users/UserCard";
 import UserListRow    from "../components/users/UserListRow";
 import InviteUserModal from "../components/users/InviteUserModal";
+import EditUserModal   from "../components/users/EditUserModal";
 
 type ViewMode = "grid" | "list";
 
-// ─── Skeleton de card (grid) ──────────────────────────────────────────────────
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
@@ -47,7 +47,6 @@ function SkeletonCard() {
   );
 }
 
-// ─── Skeleton de row (lista) ──────────────────────────────────────────────────
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50 animate-pulse">
@@ -77,9 +76,8 @@ function SkeletonRow() {
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function Users() {
-  const { getUsers, deleteUser } = useUserService();
+  const { getUsers, updateUser } = useUserService();
   const { user: authUser }       = useAuth();
 
   const [users, setUsers]   = useState<User[]>([]);
@@ -90,18 +88,18 @@ export default function Users() {
   const [roleFilter, setRoleFilter]     = useState<UserRole | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [viewMode, setViewMode]         = useState<ViewMode>("grid");
-  const [showModal, setShowModal]       = useState(false);
+  
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [editingUser, setEditingUser]         = useState<User | null>(null);
 
-  // Ref para manter referência estável ao service
   const getUsersRef = useRef(getUsers);
   getUsersRef.current = getUsers;
 
-  // Busca todos os usuários (sem paginação exposta — pageSize alto)
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getUsersRef.current({ pageSize: 500 });
+      const result = await getUsersRef.current({});
       setUsers(result.data ?? []);
     } catch {
       setError("Não foi possível carregar os usuários. Verifique sua conexão e tente novamente.");
@@ -114,7 +112,6 @@ export default function Users() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // ─── Filtro client-side ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return users.filter((u) => {
@@ -136,27 +133,30 @@ export default function Users() {
     });
   }, [users, search, roleFilter, statusFilter]);
 
-  // ─── Desativar usuário (soft delete) ────────────────────────────────────
-  const handleDeactivate = useCallback(
-    async (id: string) => {
+  // Handler que agora gerencia tanto Ativação quanto Desativação (Alternar Status)
+  const handleToggleStatus = useCallback(
+    async (id: string, currentStatus: boolean) => {
       try {
-        await deleteUser(id);
+        const nextStatus = !currentStatus;
+        await updateUser(id, { is_active: nextStatus });
         setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, is_active: false } : u))
+          prev.map((u) => (u.id === id ? { ...u, is_active: nextStatus } : u))
         );
       } catch {
-        // Mantém o estado; um toast pode ser adicionado aqui futuramente
+        // Tratar erro ou rollback se necessário
       }
     },
-    [deleteUser]
+    [updateUser]
   );
+
+  const handleEditSuccess = useCallback((updatedUser: User) => {
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+  }, []);
 
   const isAdmin = authUser?.role === "ADMIN";
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-
       {/* Cabeçalho da página */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -172,7 +172,6 @@ export default function Users() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botão recarregar */}
           <button
             onClick={fetchUsers}
             disabled={loading}
@@ -182,14 +181,11 @@ export default function Users() {
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
 
-          {/* Toggle de visualização */}
           <div className="flex border border-gray-200 rounded-xl bg-white overflow-hidden">
             <button
               onClick={() => setViewMode("grid")}
               className={`px-3 py-2.5 transition-all ${
-                viewMode === "grid"
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-500 hover:bg-gray-50"
+                viewMode === "grid" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               <LayoutGrid size={16} />
@@ -197,19 +193,16 @@ export default function Users() {
             <button
               onClick={() => setViewMode("list")}
               className={`px-3 py-2.5 transition-all ${
-                viewMode === "list"
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-500 hover:bg-gray-50"
+                viewMode === "list" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               <List size={16} />
             </button>
           </div>
 
-          {/* Botão novo usuário — apenas ADMIN */}
           {isAdmin && (
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => setShowInviteModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm shadow-blue-200"
             >
               <UserPlus size={16} />
@@ -220,20 +213,12 @@ export default function Users() {
       </motion.div>
 
       {/* KPIs */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.05 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
         <UserStatsCards users={users} loading={loading} />
       </motion.div>
 
       {/* Filtros */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
         <UserFilters
           search={search}
           onSearchChange={setSearch}
@@ -244,22 +229,15 @@ export default function Users() {
         />
       </motion.div>
 
-      {/* Resumo de resultados */}
       {!loading && !error && (
         <p className="text-xs text-gray-400 mb-4">
-          {filtered.length} usuário{filtered.length !== 1 ? "s" : ""} encontrado
-          {filtered.length !== 1 ? "s" : ""}
+          {filtered.length} usuário{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
           {users.length !== filtered.length && ` de ${users.length} no total`}
         </p>
       )}
 
-      {/* Estado de erro */}
       {error && !loading && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center py-20 text-center gap-4"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
             <AlertCircle size={24} className="text-red-400" />
           </div>
@@ -267,29 +245,21 @@ export default function Users() {
             <p className="text-gray-700 font-semibold">Erro ao carregar</p>
             <p className="text-gray-400 text-sm mt-1 max-w-xs">{error}</p>
           </div>
-          <button
-            onClick={fetchUsers}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm"
-          >
+          <button onClick={fetchUsers} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
             <RefreshCw size={15} />
             Tentar novamente
           </button>
         </motion.div>
       )}
 
-      {/* Conteúdo principal */}
       {!error && (
         <>
-          {/* Grid skeleton */}
           {loading && viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...Array(8)].map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
+              {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
-          {/* List skeleton */}
           {loading && viewMode === "list" && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <table className="w-full">
@@ -310,22 +280,13 @@ export default function Users() {
             </div>
           )}
 
-          {/* Vazio após filtros */}
           {!loading && filtered.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-20 text-center"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
                 <UsersIcon size={24} className="text-gray-400" />
               </div>
-              <p className="text-gray-700 font-semibold">
-                Nenhum usuário encontrado
-              </p>
-              <p className="text-gray-400 text-sm mt-1">
-                Tente ajustar os filtros de busca
-              </p>
+              <p className="text-gray-700 font-semibold">Nenhum usuário encontrado</p>
+              <p className="text-gray-400 text-sm mt-1">Tente ajustar os filtros de busca</p>
               {(search || roleFilter !== "ALL" || statusFilter !== "ALL") && (
                 <button
                   onClick={() => {
@@ -341,14 +302,9 @@ export default function Users() {
             </motion.div>
           )}
 
-          {/* Grid de cards */}
+          {/* Grid de Cards */}
           {!loading && filtered.length > 0 && viewMode === "grid" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <AnimatePresence>
                 {filtered.map((user, i) => (
                   <motion.div
@@ -358,39 +314,28 @@ export default function Users() {
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
                   >
-                    <UserCard user={user} />
+                    <UserCard 
+                      user={user} 
+                      onEdit={() => setEditingUser(user)}
+                      onToggleStatus={isAdmin ? (id) => handleToggleStatus(id, user.is_active) : undefined}
+                    />
                   </motion.div>
                 ))}
               </AnimatePresence>
             </motion.div>
           )}
 
-          {/* Tabela / lista */}
+          {/* Tabela / Lista */}
           {!loading && filtered.length > 0 && viewMode === "list" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Usuário
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Perfil
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
-                      Equipe
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">
-                      Telefone
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Status
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Usuário</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Perfil</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Equipe</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Telefone</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -399,7 +344,8 @@ export default function Users() {
                     <UserListRow
                       key={user.id}
                       user={user}
-                      onDeactivate={isAdmin ? handleDeactivate : undefined}
+                      onEdit={() => setEditingUser(user)}
+                      onToggleStatus={isAdmin ? (id) => handleToggleStatus(id, user.is_active) : undefined}
                     />
                   ))}
                 </tbody>
@@ -411,10 +357,18 @@ export default function Users() {
 
       {/* Modal de criação */}
       <AnimatePresence>
-        {showModal && (
-          <InviteUserModal
-            onClose={() => setShowModal(false)}
-            onSuccess={fetchUsers}
+        {showInviteModal && (
+          <InviteUserModal onClose={() => setShowInviteModal(false)} onSuccess={fetchUsers} />
+        )}
+      </AnimatePresence>
+
+      {/* Modal de edição */}
+      <AnimatePresence>
+        {editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onSuccess={handleEditSuccess}
           />
         )}
       </AnimatePresence>

@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { User } from "../../services/userService";
 import { formatPhone, getTeamNames } from "../../constants/userConstants";
 import UserAvatar from "./UserAvatar";
 import RoleBadge from "./RoleBadge";
-import { Phone, Users, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Phone, Users, MoreVertical, Pencil, ShieldAlert, ShieldCheck } from "lucide-react";
 
 interface UserListRowProps {
   user: User;
-  onDeactivate?: (id: string) => void;
+  onEdit?: () => void;
+  onToggleStatus?: (id: string) => void;
 }
 
-export default function UserListRow({ user, onDeactivate }: UserListRowProps) {
+export default function UserListRow({ user, onEdit, onToggleStatus }: UserListRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const phone = formatPhone(user.phone_1_ddd, user.phone_1_number);
   const teamNames = getTeamNames(
@@ -22,11 +24,21 @@ export default function UserListRow({ user, onDeactivate }: UserListRowProps) {
     }>
   );
 
+  // Fecha o menu de 3 pontos se clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
   return (
-    <tr
-      className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group"
-      onClick={() => menuOpen && setMenuOpen(false)}
-    >
+    <tr className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group">
       {/* Usuário */}
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-3">
@@ -48,85 +60,100 @@ export default function UserListRow({ user, onDeactivate }: UserListRowProps) {
       </td>
 
       {/* Perfil */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 vertical-align-middle">
         <RoleBadge role={user.role} />
       </td>
 
       {/* Equipe */}
-      <td className="px-4 py-3.5 hidden md:table-cell">
-        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-          <Users size={13} className="text-gray-400 shrink-0" />
-          <span className="truncate max-w-[160px]">{teamNames}</span>
+      <td className="px-4 py-3.5 hidden md:table-cell max-w-[180px] truncate text-sm text-gray-500">
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-gray-400 flex-shrink-0" />
+          <span className="truncate" title={teamNames}>{teamNames}</span>
         </div>
       </td>
 
       {/* Telefone */}
-      <td className="px-4 py-3.5 hidden lg:table-cell">
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
-          <Phone size={13} className="text-gray-400 shrink-0" />
-          {phone}
-        </div>
+      <td className="px-4 py-3.5 hidden lg:table-cell text-sm text-gray-500">
+        {phone !== "—" ? (
+          <div className="flex items-center gap-2">
+            <Phone size={14} className="text-gray-400 flex-shrink-0" />
+            <span>{phone}</span>
+          </div>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
       </td>
 
       {/* Status */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 text-sm">
         <span
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
             user.is_active
-              ? "bg-green-50 text-green-700"
-              : "bg-gray-100 text-gray-500"
+              ? "text-green-700 bg-green-50"
+              : "text-gray-500 bg-gray-100"
           }`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              user.is_active ? "bg-green-500" : "bg-gray-400"
-            }`}
-          />
           {user.is_active ? "Ativo" : "Inativo"}
         </span>
       </td>
 
-      {/* Ações */}
-      <td className="px-4 py-3.5">
-        <div className="relative flex justify-end">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen((v) => !v);
-            }}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
-          >
-            <MoreVertical size={15} />
-          </button>
+      {/* Menu de Ações de 3 pontos */}
+      <td className="px-4 py-3.5 text-right relative">
+        {(onEdit || onToggleStatus) && (
+          <div className="inline-block text-left" ref={menuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
+              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+            >
+              <MoreVertical size={16} />
+            </button>
 
-          {menuOpen && (
-            <>
-              {/* Overlay para fechar */}
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[152px]">
-                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Pencil size={13} className="text-gray-400" />
-                  Editar
-                </button>
-                {user.is_active && onDeactivate && (
+            {menuOpen && (
+              <div className="absolute right-4 mt-1 w-44 bg-white border border-gray-100 rounded-xl shadow-xl z-30 py-1.5 text-left">
+                {onEdit && (
                   <button
                     onClick={() => {
+                      onEdit();
                       setMenuOpen(false);
-                      onDeactivate(user.id);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
-                    <Trash2 size={13} className="text-red-400" />
-                    Desativar
+                    <Pencil size={14} className="text-gray-400" />
+                    Editar Usuário
+                  </button>
+                )}
+                {onToggleStatus && (
+                  <button
+                    onClick={() => {
+                      onToggleStatus(user.id);
+                      setMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors border-t border-gray-50 ${
+                      user.is_active 
+                        ? "text-red-600 hover:bg-red-50/50" 
+                        : "text-green-600 hover:bg-green-50/50"
+                    }`}
+                  >
+                    {user.is_active ? (
+                      <>
+                        <ShieldAlert size={14} className="text-red-400" />
+                        Desativar Conta
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={14} className="text-green-400" />
+                        Reativar Conta
+                      </>
+                    )}
                   </button>
                 )}
               </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </td>
     </tr>
   );
