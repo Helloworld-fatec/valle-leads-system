@@ -1,42 +1,56 @@
 # 🚗 Valle Leads System — Backend
 
-<div align="center">
+Backend do **Valle Leads System**, sistema de gestão de leads e dashboards analíticos desenvolvido para a **1000 Valle Multimarcas**.
 
-![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge\&logo=nodedotjs\&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge\&logo=typescript\&logoColor=white)
-![Express](https://img.shields.io/badge/Express-5-000000?style=for-the-badge\&logo=express\&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?style=for-the-badge\&logo=prisma\&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge\&logo=postgresql\&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge\&logo=docker\&logoColor=white)
+O backend é responsável pela autenticação, controle de acesso, regras de negócio, persistência de dados, dashboards e fornecimento dos endpoints REST consumidos pelo frontend.
 
-**Sistema de Gestão de Leads com Dashboard Analítico — 1000 Valle Multimarcas**
-ABP 2026-1 · 3DSM · FATEC Jacareí
-
-</div>
+> Projeto acadêmico desenvolvido na **FATEC Jacareí** — ABP 2026-1 | 3º DSM
+> Parceiro: 1000 Valle Multimarcas | Focal Point: Prof. Arley Ferreira de Souza
 
 ---
 
-## 📖 Sobre o Backend
+## 📌 Sobre o Backend
 
-O backend do **Valle Leads System** é responsável pela lógica de negócio, autenticação, controle de acesso, persistência de dados e fornecimento dos endpoints REST utilizados pelo frontend.
+A API do Valle Leads System foi desenvolvida com **Node.js**, **Express**, **TypeScript**, **Prisma** e **PostgreSQL**.
 
-O sistema foi desenvolvido para apoiar a **1000 Valle Multimarcas** no gerenciamento de leads, clientes, usuários, equipes, lojas, negociações e dashboards analíticos.
+Ela permite:
 
-A API permite:
-
-* autenticação de usuários via JWT;
+* autenticação de usuários com JWT;
+* renovação de sessão com refresh token;
 * controle de acesso baseado em papéis;
-* gerenciamento de usuários, clientes, leads, lojas e equipes;
+* gerenciamento de usuários, clientes, lojas, equipes e vínculos usuário/equipe;
+* gerenciamento de leads e itens de interesse;
 * criação e acompanhamento de negociações;
-* registro de histórico de estágio, status e importância das negociações;
+* registro de histórico de etapa, status e importância de negociações;
 * consulta de dashboards para atendente, gerente e gerente geral;
-* integração com banco de dados PostgreSQL via Prisma.
+* execução via Docker com banco local ou banco em nuvem.
 
 ---
 
-## 🏗️ Padrão Arquitetural
+## 🛠 Tecnologias Utilizadas
 
-O backend segue uma organização modular baseada no padrão:
+| Tecnologia        | Uso                                   |
+| ----------------- | ------------------------------------- |
+| Node.js           | Runtime do backend                    |
+| TypeScript        | Tipagem estática                      |
+| Express           | Framework HTTP                        |
+| Prisma            | ORM, migrations, Prisma Client e seed |
+| PostgreSQL        | Banco de dados relacional             |
+| Zod               | Validação de body, params e query     |
+| JWT               | Access token e refresh token          |
+| bcrypt / bcryptjs | Hash de senhas                        |
+| cookie-parser     | Manipulação de cookies                |
+| cors              | Configuração de CORS                  |
+| dotenv            | Variáveis de ambiente                 |
+| csv-parse         | Leitura de arquivos CSV para seed     |
+| Docker            | Conteinerização                       |
+| Docker Compose    | Orquestração de containers            |
+
+---
+
+## 🏗️ Arquitetura
+
+O backend segue organização modular baseada no padrão:
 
 ```txt
 Controller → Service → Repository
@@ -47,7 +61,13 @@ Controller → Service → Repository
 ```txt
 Requisição HTTP
      ↓
-Router
+app.ts
+     ↓
+/api
+     ↓
+Router principal
+     ↓
+Router do módulo
      ↓
 Middlewares
      ↓
@@ -62,219 +82,16 @@ Prisma
 PostgreSQL
 ```
 
-### Responsabilidades
-
-| Camada      | Responsabilidade                                           |
-| ----------- | ---------------------------------------------------------- |
-| Routes      | Define os endpoints e aplica middlewares                   |
-| Middlewares | Autenticação, autorização, validação e tratamento de erros |
-| Controller  | Recebe a requisição e encaminha para o service             |
-| Service     | Aplica regras de negócio                                   |
-| Repository  | Acessa o banco de dados via Prisma                         |
-| Prisma      | ORM responsável pela comunicação com PostgreSQL            |
-
----
-
-## 🛠️ Tecnologias Utilizadas
-
-| Tecnologia        | Uso                                           |
-| ----------------- | --------------------------------------------- |
-| Node.js           | Runtime do backend                            |
-| TypeScript        | Tipagem estática                              |
-| Express           | Framework HTTP                                |
-| Prisma            | ORM e migrations                              |
-| PostgreSQL        | Banco de dados relacional                     |
-| Zod               | Validação de dados                            |
-| JWT               | Autenticação via access token e refresh token |
-| bcrypt / bcryptjs | Hash de senhas                                |
-| cookie-parser     | Manipulação de cookies                        |
-| cors              | Configuração de CORS                          |
-| Docker            | Execução conteinerizada                       |
-| Docker Compose    | Orquestração de containers                    |
-
----
-
-## 👥 Equipe
-
-| Nome            | Papel              |
-| --------------- | ------------------ |
-| Bruno Berval    | Product Owner (PO) |
-| Nicolas Kauê    | Scrum Master (SM)  |
-| Bruna Rodrigues | Dev Team           |
-| Pedro Enrique   | Dev Team           |
-| Ryan Tinel      | Dev Team           |
-| Suelen Castro   | Dev Team           |
-
----
-
-## 🚀 Como Rodar o Projeto
-
-A aplicação pode ser executada via **Docker Compose** a partir da raiz do projeto ou localmente a partir da pasta `/server`.
-
----
-
-## 🐳 Execução com Docker
-
-> Recomendado para execução integrada do projeto.
-
-### Pré-requisitos
-
-* Docker
-* Docker Compose
-* Git
-
-### 1. Clone o repositório
-
-```bash
-git clone https://github.com/Helloworld-fatec/valle-leads-system.git
-cd valle-leads-system
-```
-
-### 2. Crie o arquivo `.env` na raiz do projeto
-
-O arquivo `docker-compose.yml` utiliza `env_file: .env`, portanto o `.env` deve existir na **raiz do projeto**, no mesmo nível do `docker-compose.yml`.
-
-Exemplo:
-
-```env
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=valle_leads
-
-ACCESS_TOKEN_SECRET=coloque_uma_chave_segura_para_access_token
-REFRESH_TOKEN_SECRET=coloque_uma_chave_segura_para_refresh_token
-```
-
-### 3. Suba os containers
-
-```bash
-docker compose up -d --build
-```
-
-Esse comando sobe os containers principais:
-
-* `valle_db` — PostgreSQL
-* `valle_server` — Backend
-* `valle_client` — Frontend
-
-### 4. Executar seed, se necessário
-
-O `docker-compose.yml` possui um serviço separado para seed, executado por profile:
-
-```bash
-docker compose --profile seed up seed
-```
-
-### 5. Acessar o backend
-
-```txt
-http://localhost:3000
-```
-
-A API principal fica em:
-
-```txt
-http://localhost:3000/api
-```
-
----
-
-## 💻 Execução Local do Backend
-
-> Alternativa para desenvolvimento direto na pasta `/server`.
-
-### 1. Acesse a pasta do backend
-
-```bash
-cd server
-```
-
-### 2. Instale as dependências
-
-```bash
-npm install
-```
-
-### 3. Configure o `.env` do backend
-
-Crie um arquivo `.env` dentro da pasta `/server`:
-
-```bash
-cp .env.example .env
-```
-
-Exemplo:
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/valle_leads
-
-ACCESS_TOKEN_SECRET=coloque_uma_chave_segura_para_access_token
-REFRESH_TOKEN_SECRET=coloque_uma_chave_segura_para_refresh_token
-```
-
-### 4. Gere o Prisma Client
-
-```bash
-npm run prisma:generate
-```
-
-### 5. Rode as migrations
-
-```bash
-npm run prisma:migrate
-```
-
-### 6. Inicie o servidor em modo desenvolvimento
-
-```bash
-npm run dev
-```
-
-O servidor estará disponível em:
-
-```txt
-http://localhost:3000
-```
-
----
-
-## 📜 Scripts Disponíveis
-
-| Script                    | Descrição                                                 |
-| ------------------------- | --------------------------------------------------------- |
-| `npm run dev`             | Inicia o servidor em modo desenvolvimento com `tsx watch` |
-| `npm run build`           | Compila o projeto TypeScript                              |
-| `npm run start`           | Executa o build em `dist/server.js`                       |
-| `npm run prisma:generate` | Gera o Prisma Client                                      |
-| `npm run prisma:migrate`  | Executa migrations em desenvolvimento                     |
-
----
-
-## 🔑 Variáveis de Ambiente
-
-### `.env` da raiz do projeto
-
-Usado pelo Docker Compose.
-
-| Variável               | Descrição                      |
-| ---------------------- | ------------------------------ |
-| `POSTGRES_USER`        | Usuário do banco PostgreSQL    |
-| `POSTGRES_PASSWORD`    | Senha do banco PostgreSQL      |
-| `POSTGRES_DB`          | Nome do banco de dados         |
-| `ACCESS_TOKEN_SECRET`  | Chave secreta do access token  |
-| `REFRESH_TOKEN_SECRET` | Chave secreta do refresh token |
-
-### `server/.env`
-
-Usado na execução local do backend.
-
-| Variável               | Descrição                      |
-| ---------------------- | ------------------------------ |
-| `DATABASE_URL`         | URL de conexão com PostgreSQL  |
-| `ACCESS_TOKEN_SECRET`  | Chave secreta do access token  |
-| `REFRESH_TOKEN_SECRET` | Chave secreta do refresh token |
-
-> Nunca commite arquivos `.env` reais no repositório.
+### Responsabilidades por camada
+
+| Camada        | Responsabilidade                                           |
+| ------------- | ---------------------------------------------------------- |
+| `routes`      | Define endpoints e aplica middlewares                      |
+| `middlewares` | Autenticação, autorização, validação e tratamento de erros |
+| `controller`  | Recebe requisições e envia respostas                       |
+| `service`     | Aplica regras de negócio e escopo por perfil               |
+| `repository`  | Acessa o banco via Prisma                                  |
+| `Prisma`      | ORM, migrations e client de banco                          |
 
 ---
 
@@ -283,15 +100,31 @@ Usado na execução local do backend.
 ```txt
 server/
 ├── prisma/
+│   ├── csv/
+│   │   ├── negotiations_seed_long.csv
+│   │   ├── seed_customers.csv
+│   │   ├── seed_data.csv
+│   │   ├── seed_interest_items.csv
+│   │   ├── seed_leads.csv
+│   │   ├── seed_negotiations.csv
+│   │   ├── seed_negotiation_importance.csv
+│   │   ├── seed_negotiation_stage.csv
+│   │   ├── seed_negotiation_status.csv
+│   │   ├── seed_stores.csv
+│   │   └── ...
+│   ├── migrations/
+│   │   └── ...
 │   ├── schema.prisma
 │   ├── seed.ts
-│   ├── seed_data.csv
 │   └── seed_negotiations.ts
 ├── src/
 │   ├── @types/
 │   │   └── express/
+│   │       └── index.d.ts
 │   ├── config/
 │   │   └── prisma.ts
+│   ├── generated/
+│   │   └── prisma/
 │   ├── middlewares/
 │   │   ├── auth/
 │   │   │   ├── auth.middleware.ts
@@ -307,8 +140,8 @@ server/
 │   │   ├── customers/
 │   │   ├── dashboards/
 │   │   │   ├── attendant/
-│   │   │   ├── manager/
-│   │   │   └── general-manager/
+│   │   │   ├── general-manager/
+│   │   │   └── manager/
 │   │   ├── interest-items/
 │   │   ├── leads/
 │   │   ├── negotiation/
@@ -323,348 +156,305 @@ server/
 │   │   └── index.ts
 │   ├── app.ts
 │   └── server.ts
+├── .dockerignore
+├── .env.example
+├── .gitignore
 ├── Dockerfile
 ├── package.json
+├── package-lock.json
 ├── prisma.config.ts
+├── README.md
 └── tsconfig.json
 ```
 
----
-
-## 🧩 Módulos do Sistema
-
-### 🔐 Auth/Login
-
-Responsável pela autenticação dos usuários.
-
-Rotas implementadas:
-
-* `POST /auth/login`
-* `POST /auth/refresh`
-* `POST /auth/logout`
-
-Funcionalidades:
-
-* validação de e-mail e senha;
-* geração de access token;
-* geração de refresh token;
-* renovação de token;
-* logout.
+> Observação: `src/generated/prisma/` é o caminho configurado no Prisma para geração do Prisma Client. Ele é necessário para execução da aplicação e do seed.
 
 ---
 
-### 👤 Users
+## 🔑 Variáveis de Ambiente
 
-Responsável pelo gerenciamento de usuários do sistema.
+O backend depende das seguintes variáveis:
 
-Rotas implementadas:
+| Variável                   | Descrição                                  |
+| -------------------------- | ------------------------------------------ |
+| `DATABASE_URL`             | URL de conexão com PostgreSQL              |
+| `ACCESS_TOKEN_SECRET`      | Chave secreta do access token              |
+| `REFRESH_TOKEN_SECRET`     | Chave secreta do refresh token             |
+| `ACCESS_TOKEN_EXPIRES_IN`  | Tempo de expiração do access token         |
+| `REFRESH_TOKEN_EXPIRES_IN` | Tempo de expiração do refresh token        |
+| `PORT`                     | Porta do servidor. Opcional; padrão `3000` |
 
-* `GET /users`
-* `GET /users/:id`
-* `POST /users`
-* `PUT /users/:id`
-* `PATCH /users/:id`
-* `DELETE /users/:id`
-* `DELETE /users/:id/hard`
+### Exemplo para execução local sem Docker
 
-Funcionalidades:
+Arquivo `server/.env`:
 
-* listagem de usuários;
-* busca por ID;
-* criação de usuário;
-* edição de usuário;
-* atualização do próprio usuário por ID;
-* soft delete;
-* hard delete restrito a `ADMIN`.
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/valle_leads?schema=public
 
----
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
-### 🙍 Customers
+PORT=3000
+```
 
-Responsável pelo gerenciamento de clientes/prospects.
+### Exemplo para Docker com banco local
 
-Rotas implementadas:
+Arquivo `.env` na raiz do projeto:
 
-* `GET /customers`
-* `GET /customers/:id`
-* `POST /customers`
-* `PUT /customers/:id`
-* `PATCH /customers/:id`
-* `DELETE /customers/:id`
-* `DELETE /customers/:id/hard`
+```env
+NODE_ENV=production
 
-Funcionalidades:
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=valle_leads
 
-* listagem e busca de clientes;
-* cadastro de cliente;
-* edição de cliente;
-* soft delete;
-* hard delete restrito a `ADMIN`.
+DATABASE_URL=postgresql://postgres:postgres@db:5432/valle_leads?schema=public
 
----
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
-### 📋 Leads
+VITE_BACKEND_URL=
+```
 
-Responsável pelo gerenciamento de leads.
+### Exemplo para Docker com banco em nuvem
 
-Rotas implementadas:
+Arquivo `.env.cloud` na raiz do projeto:
 
-* `GET /leads`
-* `GET /leads/:id`
-* `POST /leads`
-* `PUT /leads/:id`
-* `PATCH /leads/:id`
-* `DELETE /leads/:id`
-* `DELETE /leads/:id/permanent`
-* `POST /leads/bulk/assign-attendant`
-* `POST /leads/bulk/assign-team`
+```env
+NODE_ENV=production
 
-Funcionalidades:
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST/NOME_DO_BANCO?sslmode=require
 
-* listagem com filtros;
-* visualização por ID;
-* criação de lead;
-* edição de lead;
-* soft delete;
-* hard delete restrito a `ADMIN`;
-* atribuição em lote para atendente;
-* atribuição em lote para equipe.
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
+
+VITE_BACKEND_URL=
+```
+
+> Nunca commite arquivos `.env` reais. O `.env.example` deve conter apenas placeholders.
 
 ---
 
-### 🚘 Interest Items
+## 🚀 Como Rodar Localmente sem Docker
 
-Responsável pelos itens de interesse vinculados aos leads, como veículos ou produtos de interesse.
+### 1. Acessar a pasta do backend
 
-Rotas implementadas:
+```bash
+cd server
+```
 
-* `GET /interest-items`
-* `GET /interest-items/:id`
-* `POST /interest-items`
-* `PUT /interest-items/:id`
-* `PATCH /interest-items/:id`
-* `DELETE /interest-items/:id`
-* `DELETE /interest-items/:id/hard`
+### 2. Instalar dependências
 
-Funcionalidades:
+```bash
+npm install
+```
 
-* listagem de itens de interesse;
-* busca por ID;
-* cadastro;
-* edição;
-* soft delete;
-* hard delete restrito a `ADMIN`.
+### 3. Criar `.env`
 
----
+```bash
+cp .env.example .env
+```
 
-### 🤝 Negotiation
+Configure a variável `DATABASE_URL` para apontar para um banco PostgreSQL válido.
 
-Responsável pelo gerenciamento das negociações vinculadas aos leads.
+### 4. Gerar Prisma Client
 
-Rotas implementadas:
+```bash
+npm run prisma:generate
+```
 
-* `GET /negotiations`
-* `GET /negotiations/:id`
-* `POST /negotiations`
-* `PUT /negotiations/:id`
-* `PATCH /negotiations/:id`
-* `DELETE /negotiations/:id`
-* `POST /negotiations/bulk/assign-attendant`
-* `POST /negotiations/bulk/assign-team`
+### 5. Rodar migrations em desenvolvimento
 
-Funcionalidades:
+```bash
+npm run prisma:migrate
+```
 
-* listagem de negociações;
-* visualização por ID;
-* criação de negociação;
-* edição de negociação;
-* exclusão permanente restrita a `ADMIN`;
-* atribuição em lote para atendente;
-* atribuição em lote para equipe.
+### 6. Rodar seed, se necessário
 
----
+```bash
+npx prisma db seed
+```
 
-### 📌 Negotiation Status
+### 7. Iniciar servidor
 
-Responsável pelo histórico de status das negociações.
+```bash
+npm run dev
+```
 
-Rotas implementadas:
+A API ficará disponível em:
 
-* `GET /negotiation-status`
-* `GET /negotiation-status/:id`
-* `POST /negotiation-status`
-* `PUT /negotiation-status/:id`
-* `PATCH /negotiation-status/:id`
-* `DELETE /negotiation-status/:id`
+```txt
+http://localhost:3000
+```
 
-Funcionalidades:
-
-* listagem de registros de status;
-* visualização por ID;
-* criação de novo registro de status;
-* atualização de observações;
-* exclusão restrita a `ADMIN`.
-
----
-
-### 🌡️ Negotiation Importance
-
-Responsável pelo histórico de importância das negociações.
-
-Rotas implementadas:
-
-* `GET /negotiation-importance`
-* `GET /negotiation-importance/:id`
-* `POST /negotiation-importance`
-* `PUT /negotiation-importance/:id`
-* `PATCH /negotiation-importance/:id`
-* `DELETE /negotiation-importance/:id`
-
-Funcionalidades:
-
-* listagem de registros de importância;
-* visualização por ID;
-* criação de novo registro;
-* atualização de observações;
-* exclusão restrita a `ADMIN`.
-
----
-
-### 🧭 Negotiation Stage History
-
-Responsável pelo histórico de etapas do funil de negociação.
-
-Rotas implementadas:
-
-* `GET /negotiation-stage-history`
-* `GET /negotiation-stage-history/:id`
-* `POST /negotiation-stage-history`
-* `PUT /negotiation-stage-history/:id`
-* `PATCH /negotiation-stage-history/:id`
-* `DELETE /negotiation-stage-history/:id`
-
-Funcionalidades:
-
-* listagem do histórico de etapas;
-* visualização por ID;
-* criação de novo registro de etapa;
-* atualização de observações;
-* exclusão restrita a `ADMIN`.
-
----
-
-### 🏪 Stores
-
-Responsável pelo gerenciamento das lojas.
-
-Rotas implementadas:
-
-* `GET /stores`
-* `GET /stores/:id`
-* `POST /stores`
-* `PUT /stores/:id`
-* `PATCH /stores/:id`
-* `DELETE /stores/:id`
-* `DELETE /stores/:id/hard`
-
-Funcionalidades:
-
-* listagem de lojas;
-* visualização por ID;
-* criação de loja;
-* edição de loja;
-* soft delete;
-* hard delete restrito a `ADMIN`.
-
----
-
-### 👥 Teams
-
-Responsável pelo gerenciamento de equipes.
-
-Rotas implementadas:
-
-* `GET /teams`
-* `GET /teams/:id`
-* `POST /teams`
-* `PUT /teams/:id`
-* `PATCH /teams/:id`
-* `DELETE /teams/:id`
-* `DELETE /teams/:id/hard`
-
-Funcionalidades:
-
-* listagem de equipes;
-* visualização por ID;
-* criação de equipe;
-* edição de equipe;
-* soft delete;
-* hard delete restrito a `ADMIN`.
-
----
-
-### 🔗 Users Teams
-
-Responsável pelo vínculo entre usuários e equipes.
-
-Rotas implementadas:
-
-* `GET /users-teams`
-* `GET /users-teams/:id`
-* `POST /users-teams`
-* `PUT /users-teams/:id`
-* `PATCH /users-teams/:id`
-* `DELETE /users-teams/:id`
-* `DELETE /users-teams/:id/hard`
-
-Funcionalidades:
-
-* listagem de vínculos;
-* busca por ID;
-* criação de vínculo usuário-equipe;
-* edição de vínculo;
-* soft delete;
-* hard delete restrito a `ADMIN`.
-
----
-
-### 📊 Dashboards
-
-O backend possui três módulos separados de dashboard:
-
-* Dashboard do Atendente;
-* Dashboard do Gerente;
-* Dashboard do Gerente Geral.
-
----
-
-## 🌐 Rotas da API
-
-Base URL:
+Base das rotas:
 
 ```txt
 http://localhost:3000/api
 ```
 
-Rotas protegidas exigem:
+---
+
+## 📜 Scripts Disponíveis
+
+| Script                    | Descrição                                                               |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `npm run dev`             | Inicia o servidor em modo desenvolvimento com `tsx watch src/server.ts` |
+| `npm run build`           | Compila o projeto TypeScript                                            |
+| `npm run start`           | Executa o build                                                         |
+| `npm run prisma:generate` | Gera o Prisma Client                                                    |
+| `npm run prisma:migrate`  | Executa migrations em modo desenvolvimento                              |
+
+### Scripts Prisma
+
+| Script                      | Descrição                                        |
+| --------------------------- | ------------------------------------------------ |
+| `npx prisma generate`       | Gera Prisma Client                               |
+| `npx prisma migrate deploy` | Aplica migrations em ambiente de deploy/produção |
+| `npx prisma migrate dev`    | Cria/aplica migrations em desenvolvimento        |
+| `npx prisma db seed`        | Executa seed configurado em `package.json`       |
+
+O seed principal executa:
 
 ```txt
-Authorization: Bearer <access_token>
+tsx prisma/seed.ts
 ```
 
 ---
 
-## 🔐 Auth
+## 🐳 Docker
 
-| Método | Rota            | Descrição                      | Autenticação |
-| ------ | --------------- | ------------------------------ | ------------ |
-| POST   | `/auth/login`   | Realiza login e retorna tokens | Pública      |
-| POST   | `/auth/refresh` | Renova o access token          | Pública      |
-| POST   | `/auth/logout`  | Encerra sessão/logout          | Pública      |
+A infraestrutura Docker do projeto possui três modos principais:
 
-### `POST /auth/login`
+| Arquivo                    | Banco usado                      | Finalidade                     |
+| -------------------------- | -------------------------------- | ------------------------------ |
+| `docker-compose.yml`       | PostgreSQL local em container    | Produção/local e demonstração  |
+| `docker-compose.dev.yml`   | PostgreSQL local em container    | Desenvolvimento com hot reload |
+| `docker-compose.cloud.yml` | PostgreSQL em nuvem, como Render | Teste com banco remoto         |
 
-Exemplo de body:
+### Backend no Docker
+
+O `server/Dockerfile` possui stages para:
+
+| Stage   | Uso                                     |
+| ------- | --------------------------------------- |
+| `deps`  | Instala dependências                    |
+| `build` | Gera Prisma Client e compila TypeScript |
+| `dev`   | Executa backend em modo desenvolvimento |
+| `prod`  | Executa backend compilado               |
+
+No modo produção/local, o backend deve executar no start:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+node dist/src/server.js
+```
+
+Isso garante que:
+
+* o Prisma Client seja gerado;
+* as migrations sejam aplicadas;
+* o servidor seja iniciado.
+
+### Seed no Docker
+
+O seed **não é executado automaticamente** no start do container para evitar duplicação de dados.
+
+Após subir os containers, rode manualmente quando o banco estiver vazio:
+
+```bash
+docker compose exec server npx prisma db seed
+```
+
+No modo dev:
+
+```bash
+docker compose -f docker-compose.dev.yml exec server npx prisma db seed
+```
+
+No modo cloud, use com cuidado, pois o comando altera o banco remoto:
+
+```bash
+docker compose -f docker-compose.cloud.yml exec server npx prisma db seed
+```
+
+### Execução Docker produção/local
+
+Na raiz do projeto:
+
+```bash
+cp .env.example .env
+docker compose config
+docker compose up -d --build
+docker compose exec server npx prisma db seed
+```
+
+A API estará em:
+
+```txt
+http://localhost:3000/api
+```
+
+### Execução Docker dev
+
+```bash
+docker compose -f docker-compose.dev.yml config
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml exec server npx prisma db seed
+```
+
+### Execução Docker cloud
+
+```bash
+cp .env.example .env.cloud
+docker compose -f docker-compose.cloud.yml config
+docker compose -f docker-compose.cloud.yml up -d --build
+```
+
+---
+
+## 🔐 Autenticação
+
+A autenticação usa JWT com dois tokens:
+
+| Token         | Uso                                    |
+| ------------- | -------------------------------------- |
+| Access Token  | Autorização das requisições protegidas |
+| Refresh Token | Renovação da sessão                    |
+
+### Variáveis obrigatórias
+
+```env
+ACCESS_TOKEN_SECRET=...
+REFRESH_TOKEN_SECRET=...
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
+```
+
+As chaves `ACCESS_TOKEN_SECRET` e `REFRESH_TOKEN_SECRET` devem ser diferentes.
+
+### Rotas de autenticação
+
+Base:
+
+```txt
+/api/auth
+```
+
+| Método | Rota                | Descrição                          | Autenticação |
+| ------ | ------------------- | ---------------------------------- | ------------ |
+| POST   | `/api/auth/login`   | Autentica usuário e retorna tokens | Pública      |
+| POST   | `/api/auth/refresh` | Renova o par de tokens             | Pública      |
+| POST   | `/api/auth/logout`  | Encerra a sessão/logout            | Pública      |
+
+### Exemplo de login
 
 ```json
 {
@@ -673,159 +463,367 @@ Exemplo de body:
 }
 ```
 
----
+### Autorização em rotas protegidas
 
-## 👤 Users
+Rotas protegidas exigem header:
 
-| Método | Rota              | Descrição                     | Permissão                                  |
-| ------ | ----------------- | ----------------------------- | ------------------------------------------ |
-| GET    | `/users`          | Lista usuários                | `MANAGER` ou superior                      |
-| GET    | `/users/:id`      | Busca usuário por ID          | Usuário autenticado                        |
-| POST   | `/users`          | Cria usuário                  | `ADMIN`                                    |
-| PUT    | `/users/:id`      | Atualiza usuário              | Usuário autenticado, com regras no service |
-| PATCH  | `/users/:id`      | Atualiza usuário parcialmente | Usuário autenticado, com regras no service |
-| DELETE | `/users/:id`      | Soft delete de usuário        | `ADMIN`                                    |
-| DELETE | `/users/:id/hard` | Hard delete de usuário        | `ADMIN`                                    |
+```txt
+Authorization: Bearer <access_token>
+```
 
 ---
 
-## 🙍 Customers
+## 👤 Controle de Acesso e Permissões
 
-| Método | Rota                  | Descrição                     | Permissão           |
-| ------ | --------------------- | ----------------------------- | ------------------- |
-| GET    | `/customers`          | Lista clientes                | Usuário autenticado |
-| GET    | `/customers/:id`      | Busca cliente por ID          | Usuário autenticado |
-| POST   | `/customers`          | Cria cliente                  | Usuário autenticado |
-| PUT    | `/customers/:id`      | Atualiza cliente              | Usuário autenticado |
-| PATCH  | `/customers/:id`      | Atualiza cliente parcialmente | Usuário autenticado |
-| DELETE | `/customers/:id`      | Soft delete de cliente        | Usuário autenticado |
-| DELETE | `/customers/:id/hard` | Hard delete de cliente        | `ADMIN`             |
+O backend usa controle de acesso baseado em papéis.
 
----
+### Roles
 
-## 📋 Leads
+| Role              | Descrição     | Nível |
+| ----------------- | ------------- | ----- |
+| `ATTENDANT`       | Atendente     | 1     |
+| `MANAGER`         | Gerente       | 2     |
+| `GENERAL_MANAGER` | Gerente Geral | 3     |
+| `ADMIN`           | Administrador | 4     |
 
-| Método | Rota                           | Descrição                         | Permissão                                  |
-| ------ | ------------------------------ | --------------------------------- | ------------------------------------------ |
-| GET    | `/leads`                       | Lista leads com filtros           | Usuário autenticado                        |
-| GET    | `/leads/:id`                   | Busca lead por ID                 | Usuário autenticado                        |
-| POST   | `/leads`                       | Cria lead                         | Usuário autenticado                        |
-| PUT    | `/leads/:id`                   | Atualiza lead                     | Usuário autenticado, com regras no service |
-| PATCH  | `/leads/:id`                   | Atualiza lead parcialmente        | Usuário autenticado, com regras no service |
-| DELETE | `/leads/:id`                   | Soft delete de lead               | Usuário autenticado, com regras no service |
-| DELETE | `/leads/:id/permanent`         | Hard delete de lead               | `ADMIN`                                    |
-| POST   | `/leads/bulk/assign-attendant` | Atribuição em lote para atendente | `MANAGER` ou `ADMIN`                       |
-| POST   | `/leads/bulk/assign-team`      | Atribuição em lote para equipe    | `GENERAL_MANAGER` ou `ADMIN`               |
+### Middlewares principais
 
----
+| Middleware           | Responsabilidade                  |
+| -------------------- | --------------------------------- |
+| `authMiddleware`     | Valida JWT e injeta `req.user`    |
+| `checkPermission`    | Verifica permissão por hierarquia |
+| `checkRole`          | Verifica roles explícitas         |
+| `validateBody`       | Valida body com Zod               |
+| `validateQuery`      | Valida query params com Zod       |
+| `validateParams`     | Valida route params com Zod       |
+| `globalErrorHandler` | Trata erros da aplicação          |
 
-## 🚘 Interest Items
+### Diferença entre `checkPermission` e `checkRole`
 
-| Método | Rota                       | Descrição                  | Permissão                     |
-| ------ | -------------------------- | -------------------------- | ----------------------------- |
-| GET    | `/interest-items`          | Lista itens de interesse   | Usuário autenticado           |
-| GET    | `/interest-items/:id`      | Busca item por ID          | Usuário autenticado           |
-| POST   | `/interest-items`          | Cria item de interesse     | `GENERAL_MANAGER` ou superior |
-| PUT    | `/interest-items/:id`      | Atualiza item              | `GENERAL_MANAGER` ou superior |
-| PATCH  | `/interest-items/:id`      | Atualiza item parcialmente | `GENERAL_MANAGER` ou superior |
-| DELETE | `/interest-items/:id`      | Soft delete de item        | `GENERAL_MANAGER` ou superior |
-| DELETE | `/interest-items/:id/hard` | Hard delete de item        | `ADMIN`                       |
+`checkPermission("MANAGER")` aprova:
 
----
+```txt
+MANAGER, GENERAL_MANAGER, ADMIN
+```
 
-## 🤝 Negotiations
+`checkRole("MANAGER", "ADMIN")` aprova apenas:
 
-| Método | Rota                                  | Descrição                         | Permissão                                  |
-| ------ | ------------------------------------- | --------------------------------- | ------------------------------------------ |
-| GET    | `/negotiations`                       | Lista negociações                 | Usuário autenticado                        |
-| GET    | `/negotiations/:id`                   | Busca negociação por ID           | Usuário autenticado                        |
-| POST   | `/negotiations`                       | Cria negociação                   | Usuário autenticado                        |
-| PUT    | `/negotiations/:id`                   | Atualiza negociação               | Usuário autenticado, com regras no service |
-| PATCH  | `/negotiations/:id`                   | Atualiza negociação parcialmente  | Usuário autenticado, com regras no service |
-| DELETE | `/negotiations/:id`                   | Exclui negociação permanentemente | `ADMIN`                                    |
-| POST   | `/negotiations/bulk/assign-attendant` | Atribuição em lote para atendente | `MANAGER` ou `ADMIN`                       |
-| POST   | `/negotiations/bulk/assign-team`      | Atribuição em lote para equipe    | `GENERAL_MANAGER` ou `ADMIN`               |
+```txt
+MANAGER, ADMIN
+```
+
+Além dos middlewares, regras granulares de escopo são aplicadas nos services, como:
+
+* atendente visualizar apenas seus próprios dados;
+* gerente visualizar dados da equipe;
+* gerente geral visualizar escopo global;
+* restrições de edição por recurso e perfil.
 
 ---
 
-## 📌 Negotiation Status
+## 🌐 Base da API
 
-| Método | Rota                      | Descrição                         | Permissão           |
-| ------ | ------------------------- | --------------------------------- | ------------------- |
-| GET    | `/negotiation-status`     | Lista histórico de status         | Usuário autenticado |
-| GET    | `/negotiation-status/:id` | Busca registro de status          | Usuário autenticado |
-| POST   | `/negotiation-status`     | Cria registro de status           | Usuário autenticado |
-| PUT    | `/negotiation-status/:id` | Atualiza observações do registro  | Usuário autenticado |
-| PATCH  | `/negotiation-status/:id` | Atualiza observações parcialmente | Usuário autenticado |
-| DELETE | `/negotiation-status/:id` | Exclui registro                   | `ADMIN`             |
+O arquivo `app.ts` registra o router principal em:
 
----
+```txt
+/api
+```
 
-## 🌡️ Negotiation Importance
+Portanto, todas as rotas dos módulos abaixo usam o prefixo:
 
-| Método | Rota                          | Descrição                         | Permissão           |
-| ------ | ----------------------------- | --------------------------------- | ------------------- |
-| GET    | `/negotiation-importance`     | Lista histórico de importância    | Usuário autenticado |
-| GET    | `/negotiation-importance/:id` | Busca registro de importância     | Usuário autenticado |
-| POST   | `/negotiation-importance`     | Cria registro de importância      | Usuário autenticado |
-| PUT    | `/negotiation-importance/:id` | Atualiza observações do registro  | Usuário autenticado |
-| PATCH  | `/negotiation-importance/:id` | Atualiza observações parcialmente | Usuário autenticado |
-| DELETE | `/negotiation-importance/:id` | Exclui registro                   | `ADMIN`             |
+```txt
+http://localhost:3000/api
+```
+
+Rota de teste:
+
+| Método | Rota | Descrição                              |
+| ------ | ---- | -------------------------------------- |
+| GET    | `/`  | Retorna mensagem de boas-vindas da API |
 
 ---
 
-## 🧭 Negotiation Stage History
+## 🧩 Módulos Implementados
 
-| Método | Rota                             | Descrição                         | Permissão           |
-| ------ | -------------------------------- | --------------------------------- | ------------------- |
-| GET    | `/negotiation-stage-history`     | Lista histórico de etapas         | Usuário autenticado |
-| GET    | `/negotiation-stage-history/:id` | Busca registro de etapa           | Usuário autenticado |
-| POST   | `/negotiation-stage-history`     | Cria registro de etapa            | Usuário autenticado |
-| PUT    | `/negotiation-stage-history/:id` | Atualiza observações do registro  | Usuário autenticado |
-| PATCH  | `/negotiation-stage-history/:id` | Atualiza observações parcialmente | Usuário autenticado |
-| DELETE | `/negotiation-stage-history/:id` | Exclui registro                   | `ADMIN`             |
+### Auth/Login
 
----
+Diretório:
 
-## 🏪 Stores
+```txt
+src/modules/auth/login/
+```
 
-| Método | Rota               | Descrição                  | Permissão           |
-| ------ | ------------------ | -------------------------- | ------------------- |
-| GET    | `/stores`          | Lista lojas                | Usuário autenticado |
-| GET    | `/stores/:id`      | Busca loja por ID          | Usuário autenticado |
-| POST   | `/stores`          | Cria loja                  | `ADMIN`             |
-| PUT    | `/stores/:id`      | Atualiza loja              | `ADMIN`             |
-| PATCH  | `/stores/:id`      | Atualiza loja parcialmente | `ADMIN`             |
-| DELETE | `/stores/:id`      | Soft delete de loja        | `ADMIN`             |
-| DELETE | `/stores/:id/hard` | Hard delete de loja        | `ADMIN`             |
+Responsável por login, refresh token e logout.
+
+Rotas:
+
+* `POST /api/auth/login`
+* `POST /api/auth/refresh`
+* `POST /api/auth/logout`
 
 ---
 
-## 👥 Teams
+### Users
 
-| Método | Rota              | Descrição                    | Permissão                    |
-| ------ | ----------------- | ---------------------------- | ---------------------------- |
-| GET    | `/teams`          | Lista equipes                | `GENERAL_MANAGER` ou `ADMIN` |
-| GET    | `/teams/:id`      | Busca equipe por ID          | Usuário autenticado          |
-| POST   | `/teams`          | Cria equipe                  | `GENERAL_MANAGER` ou `ADMIN` |
-| PUT    | `/teams/:id`      | Atualiza equipe              | `GENERAL_MANAGER` ou `ADMIN` |
-| PATCH  | `/teams/:id`      | Atualiza equipe parcialmente | `GENERAL_MANAGER` ou `ADMIN` |
-| DELETE | `/teams/:id`      | Soft delete de equipe        | `GENERAL_MANAGER` ou `ADMIN` |
-| DELETE | `/teams/:id/hard` | Hard delete de equipe        | `ADMIN`                      |
+Diretório:
+
+```txt
+src/modules/users/
+```
+
+Responsável pelo gerenciamento de usuários.
+
+Rotas:
+
+| Método | Rota                  | Permissão                          |
+| ------ | --------------------- | ---------------------------------- |
+| GET    | `/api/users`          | `MANAGER` ou superior              |
+| GET    | `/api/users/:id`      | Qualquer usuário autenticado       |
+| POST   | `/api/users`          | `ADMIN`                            |
+| PUT    | `/api/users/:id`      | Autenticado, com regras no service |
+| PATCH  | `/api/users/:id`      | Autenticado, com regras no service |
+| DELETE | `/api/users/:id`      | `ADMIN`                            |
+| DELETE | `/api/users/:id/hard` | `ADMIN`                            |
 
 ---
 
-## 🔗 Users Teams
+### Customers
 
-| Método | Rota                    | Descrição                     | Permissão                    |
-| ------ | ----------------------- | ----------------------------- | ---------------------------- |
-| GET    | `/users-teams`          | Lista vínculos usuário-equipe | Usuário autenticado          |
-| GET    | `/users-teams/:id`      | Busca vínculo por ID          | Usuário autenticado          |
-| POST   | `/users-teams`          | Cria vínculo usuário-equipe   | `GENERAL_MANAGER` ou `ADMIN` |
-| PUT    | `/users-teams/:id`      | Atualiza vínculo              | `GENERAL_MANAGER` ou `ADMIN` |
-| PATCH  | `/users-teams/:id`      | Atualiza vínculo parcialmente | `GENERAL_MANAGER` ou `ADMIN` |
-| DELETE | `/users-teams/:id`      | Soft delete de vínculo        | `GENERAL_MANAGER` ou `ADMIN` |
-| DELETE | `/users-teams/:id/hard` | Hard delete de vínculo        | `ADMIN`                      |
+Diretório:
+
+```txt
+src/modules/customers/
+```
+
+Responsável pelo gerenciamento de clientes/prospects.
+
+Rotas:
+
+| Método | Rota                      | Permissão   |
+| ------ | ------------------------- | ----------- |
+| GET    | `/api/customers`          | Autenticado |
+| GET    | `/api/customers/:id`      | Autenticado |
+| POST   | `/api/customers`          | Autenticado |
+| PUT    | `/api/customers/:id`      | Autenticado |
+| PATCH  | `/api/customers/:id`      | Autenticado |
+| DELETE | `/api/customers/:id`      | Autenticado |
+| DELETE | `/api/customers/:id/hard` | `ADMIN`     |
+
+---
+
+### Stores
+
+Diretório:
+
+```txt
+src/modules/stores/
+```
+
+Responsável pelo gerenciamento de lojas.
+
+Rotas:
+
+| Método | Rota                   | Permissão   |
+| ------ | ---------------------- | ----------- |
+| GET    | `/api/stores`          | Autenticado |
+| GET    | `/api/stores/:id`      | Autenticado |
+| POST   | `/api/stores`          | `ADMIN`     |
+| PUT    | `/api/stores/:id`      | `ADMIN`     |
+| PATCH  | `/api/stores/:id`      | `ADMIN`     |
+| DELETE | `/api/stores/:id`      | `ADMIN`     |
+| DELETE | `/api/stores/:id/hard` | `ADMIN`     |
+
+---
+
+### Teams
+
+Diretório:
+
+```txt
+src/modules/teams/
+```
+
+Responsável pelo gerenciamento de equipes.
+
+Rotas:
+
+| Método | Rota                  | Permissão                    |
+| ------ | --------------------- | ---------------------------- |
+| GET    | `/api/teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| GET    | `/api/teams/:id`      | Autenticado                  |
+| POST   | `/api/teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| PUT    | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| PATCH  | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/teams/:id/hard` | `ADMIN`                      |
+
+---
+
+### Users Teams
+
+Diretório:
+
+```txt
+src/modules/users-teams/
+```
+
+Responsável pelo vínculo entre usuários e equipes.
+
+Rotas:
+
+| Método | Rota                        | Permissão                    |
+| ------ | --------------------------- | ---------------------------- |
+| GET    | `/api/users-teams`          | Autenticado                  |
+| GET    | `/api/users-teams/:id`      | Autenticado                  |
+| POST   | `/api/users-teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| PUT    | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| PATCH  | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/users-teams/:id/hard` | `ADMIN`                      |
+
+---
+
+### Interest Items
+
+Diretório:
+
+```txt
+src/modules/interest-items/
+```
+
+Responsável pelos itens de interesse vinculados a leads, como veículos ou produtos de interesse.
+
+Rotas:
+
+| Método | Rota                           | Permissão                     |
+| ------ | ------------------------------ | ----------------------------- |
+| GET    | `/api/interest-items`          | Autenticado                   |
+| GET    | `/api/interest-items/:id`      | Autenticado                   |
+| POST   | `/api/interest-items`          | `GENERAL_MANAGER` ou superior |
+| PUT    | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| PATCH  | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| DELETE | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| DELETE | `/api/interest-items/:id/hard` | `ADMIN`                       |
+
+---
+
+### Leads
+
+Diretório:
+
+```txt
+src/modules/leads/
+```
+
+Responsável pelo gerenciamento de leads.
+
+Rotas:
+
+| Método | Rota                               | Permissão                          |
+| ------ | ---------------------------------- | ---------------------------------- |
+| GET    | `/api/leads`                       | Autenticado                        |
+| GET    | `/api/leads/:id`                   | Autenticado                        |
+| POST   | `/api/leads`                       | Autenticado                        |
+| PUT    | `/api/leads/:id`                   | Autenticado, com regras no service |
+| PATCH  | `/api/leads/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/leads/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/leads/:id/permanent`         | `ADMIN`                            |
+| POST   | `/api/leads/bulk/assign-attendant` | `MANAGER` ou `ADMIN`               |
+| POST   | `/api/leads/bulk/assign-team`      | `GENERAL_MANAGER` ou `ADMIN`       |
+
+---
+
+### Negotiations
+
+Diretório:
+
+```txt
+src/modules/negotiation/
+```
+
+Responsável pelo gerenciamento de negociações.
+
+Rotas:
+
+| Método | Rota                                      | Permissão                          |
+| ------ | ----------------------------------------- | ---------------------------------- |
+| GET    | `/api/negotiations`                       | Autenticado                        |
+| GET    | `/api/negotiations/:id`                   | Autenticado                        |
+| POST   | `/api/negotiations`                       | Autenticado                        |
+| PUT    | `/api/negotiations/:id`                   | Autenticado, com regras no service |
+| PATCH  | `/api/negotiations/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/negotiations/:id`                   | `ADMIN`                            |
+| POST   | `/api/negotiations/bulk/assign-attendant` | `MANAGER` ou `ADMIN`               |
+| POST   | `/api/negotiations/bulk/assign-team`      | `GENERAL_MANAGER` ou `ADMIN`       |
+
+---
+
+### Negotiation Status
+
+Diretório:
+
+```txt
+src/modules/negotiation-status/
+```
+
+Responsável pelo histórico de status de uma negociação.
+
+Rotas:
+
+| Método | Rota                          | Permissão   |
+| ------ | ----------------------------- | ----------- |
+| GET    | `/api/negotiation-status`     | Autenticado |
+| GET    | `/api/negotiation-status/:id` | Autenticado |
+| POST   | `/api/negotiation-status`     | Autenticado |
+| PUT    | `/api/negotiation-status/:id` | Autenticado |
+| PATCH  | `/api/negotiation-status/:id` | Autenticado |
+| DELETE | `/api/negotiation-status/:id` | `ADMIN`     |
+
+---
+
+### Negotiation Importance
+
+Diretório:
+
+```txt
+src/modules/negotiation-importance/
+```
+
+Responsável pelo histórico de importância de uma negociação.
+
+Rotas:
+
+| Método | Rota                              | Permissão   |
+| ------ | --------------------------------- | ----------- |
+| GET    | `/api/negotiation-importance`     | Autenticado |
+| GET    | `/api/negotiation-importance/:id` | Autenticado |
+| POST   | `/api/negotiation-importance`     | Autenticado |
+| PUT    | `/api/negotiation-importance/:id` | Autenticado |
+| PATCH  | `/api/negotiation-importance/:id` | Autenticado |
+| DELETE | `/api/negotiation-importance/:id` | `ADMIN`     |
+
+---
+
+### Negotiation Stage History
+
+Diretório:
+
+```txt
+src/modules/negotiation-stage-history/
+```
+
+Responsável pelo histórico de etapas do funil de negociação.
+
+Rotas:
+
+| Método | Rota                                 | Permissão   |
+| ------ | ------------------------------------ | ----------- |
+| GET    | `/api/negotiation-stage-history`     | Autenticado |
+| GET    | `/api/negotiation-stage-history/:id` | Autenticado |
+| POST   | `/api/negotiation-stage-history`     | Autenticado |
+| PUT    | `/api/negotiation-stage-history/:id` | Autenticado |
+| PATCH  | `/api/negotiation-stage-history/:id` | Autenticado |
+| DELETE | `/api/negotiation-stage-history/:id` | `ADMIN`     |
 
 ---
 
@@ -836,7 +834,7 @@ Exemplo de body:
 Base:
 
 ```txt
-/dashboards/attendant
+/api/dashboards/attendant
 ```
 
 Permissão mínima:
@@ -845,16 +843,18 @@ Permissão mínima:
 ATTENDANT
 ```
 
-| Método | Rota                                                 | Descrição                  |
-| ------ | ---------------------------------------------------- | -------------------------- |
-| GET    | `/dashboards/attendant/kpi/active-leads`             | Total de leads ativos      |
-| GET    | `/dashboards/attendant/kpi/converted-leads`          | Total de leads convertidos |
-| GET    | `/dashboards/attendant/kpi/conversion-rate`          | Taxa de conversão          |
-| GET    | `/dashboards/attendant/kpi/avg-service-time`         | Tempo médio de atendimento |
-| GET    | `/dashboards/attendant/charts/leads-evolution`       | Evolução de leads          |
-| GET    | `/dashboards/attendant/charts/sales-funnel`          | Funil de vendas            |
-| GET    | `/dashboards/attendant/charts/leads-by-source`       | Leads por origem           |
-| GET    | `/dashboards/attendant/charts/conversions-by-period` | Conversões por período     |
+Rotas:
+
+| Método | Rota                                                     |
+| ------ | -------------------------------------------------------- |
+| GET    | `/api/dashboards/attendant/kpi/active-leads`             |
+| GET    | `/api/dashboards/attendant/kpi/converted-leads`          |
+| GET    | `/api/dashboards/attendant/kpi/conversion-rate`          |
+| GET    | `/api/dashboards/attendant/kpi/avg-service-time`         |
+| GET    | `/api/dashboards/attendant/charts/leads-evolution`       |
+| GET    | `/api/dashboards/attendant/charts/sales-funnel`          |
+| GET    | `/api/dashboards/attendant/charts/leads-by-source`       |
+| GET    | `/api/dashboards/attendant/charts/conversions-by-period` |
 
 ---
 
@@ -863,7 +863,7 @@ ATTENDANT
 Base:
 
 ```txt
-/dashboards/manager
+/api/dashboards/manager
 ```
 
 Permissão mínima:
@@ -872,14 +872,16 @@ Permissão mínima:
 MANAGER
 ```
 
-| Método | Rota                                                  | Descrição                |
-| ------ | ----------------------------------------------------- | ------------------------ |
-| GET    | `/dashboards/manager/kpi/team`                        | KPIs da equipe           |
-| GET    | `/dashboards/manager/kpi/top-attendant`               | Melhor atendente         |
-| GET    | `/dashboards/manager/charts/leads-by-attendant`       | Leads por atendente      |
-| GET    | `/dashboards/manager/charts/conversions-by-attendant` | Conversões por atendente |
-| GET    | `/dashboards/manager/charts/team-evolution`           | Evolução da equipe       |
-| GET    | `/dashboards/manager/charts/team-funnel`              | Funil da equipe          |
+Rotas:
+
+| Método | Rota                                                      |
+| ------ | --------------------------------------------------------- |
+| GET    | `/api/dashboards/manager/kpi/team`                        |
+| GET    | `/api/dashboards/manager/kpi/top-attendant`               |
+| GET    | `/api/dashboards/manager/charts/leads-by-attendant`       |
+| GET    | `/api/dashboards/manager/charts/conversions-by-attendant` |
+| GET    | `/api/dashboards/manager/charts/team-evolution`           |
+| GET    | `/api/dashboards/manager/charts/team-funnel`              |
 
 ---
 
@@ -888,7 +890,7 @@ MANAGER
 Base:
 
 ```txt
-/dashboards/general-manager
+/api/dashboards/general-manager
 ```
 
 Permissão mínima:
@@ -897,81 +899,39 @@ Permissão mínima:
 GENERAL_MANAGER
 ```
 
-| Método | Rota                                                  | Descrição          |
-| ------ | ----------------------------------------------------- | ------------------ |
-| GET    | `/dashboards/general-manager/kpi/global`              | KPIs globais       |
-| GET    | `/dashboards/general-manager/kpi/top-team`            | Melhor equipe      |
-| GET    | `/dashboards/general-manager/charts/leads-by-team`    | Leads por equipe   |
-| GET    | `/dashboards/general-manager/charts/team-ranking`     | Ranking de equipes |
-| GET    | `/dashboards/general-manager/charts/global-evolution` | Evolução global    |
-| GET    | `/dashboards/general-manager/charts/global-funnel`    | Funil global       |
+Rotas:
 
----
-
-## 🔐 Controle de Acesso
-
-O sistema utiliza autenticação por JWT e autorização baseada em papéis.
-
-### Papéis utilizados
-
-| Role              | Descrição     |
-| ----------------- | ------------- |
-| `ATTENDANT`       | Atendente     |
-| `MANAGER`         | Gerente       |
-| `GENERAL_MANAGER` | Gerente Geral |
-| `ADMIN`           | Administrador |
-
-### Middlewares principais
-
-| Middleware           | Responsabilidade                               |
-| -------------------- | ---------------------------------------------- |
-| `authMiddleware`     | Valida o access token e injeta `req.user`      |
-| `checkRole`          | Permite apenas roles explicitamente informadas |
-| `checkPermission`    | Valida permissão mínima por hierarquia         |
-| `validateBody`       | Valida corpo da requisição com Zod             |
-| `validateQuery`      | Valida query params com Zod                    |
-| `validateParams`     | Valida parâmetros de rota com Zod              |
-| `globalErrorHandler` | Trata erros globais da aplicação               |
+| Método | Rota                                                      |
+| ------ | --------------------------------------------------------- |
+| GET    | `/api/dashboards/general-manager/kpi/global`              |
+| GET    | `/api/dashboards/general-manager/kpi/top-team`            |
+| GET    | `/api/dashboards/general-manager/charts/leads-by-team`    |
+| GET    | `/api/dashboards/general-manager/charts/team-ranking`     |
+| GET    | `/api/dashboards/general-manager/charts/global-evolution` |
+| GET    | `/api/dashboards/general-manager/charts/global-funnel`    |
 
 ---
 
 ## 🗄️ Banco de Dados
 
-O projeto utiliza PostgreSQL com Prisma ORM.
+O projeto usa PostgreSQL com Prisma.
 
-### Principais tabelas
+Modelos definidos no `schema.prisma`:
 
-| Tabela                      | Descrição                                        |
-| --------------------------- | ------------------------------------------------ |
-| `users`                     | Usuários do sistema                              |
-| `stores`                    | Lojas/unidades                                   |
-| `teams`                     | Equipes                                          |
-| `user_teams`                | Vínculo entre usuários e equipes                 |
-| `customers`                 | Clientes/prospects                               |
-| `interest_items`            | Itens de interesse                               |
-| `leads`                     | Leads                                            |
-| `negotiations`              | Negociações                                      |
-| `negotiation_status`        | Histórico de status                              |
-| `negotiation_stage_history` | Histórico de etapas                              |
-| `negotiation_importance`    | Histórico de importância                         |
-| `system_logs`               | Estrutura prevista no schema para logs/auditoria |
-
----
-
-## ⚠️ Funcionalidades Planejadas ou Pendentes
-
-As funcionalidades abaixo aparecem como requisitos ou estruturas previstas, mas **não devem ser consideradas endpoints implementados nesta versão do backend**.
-
-| Funcionalidade                  | Status                                            |
-| ------------------------------- | ------------------------------------------------- |
-| Recuperação de senha por e-mail | Não implementada como rota                        |
-| Redefinição de senha por token  | Não implementada como rota                        |
-| `GET /users/me`                 | Não implementada                                  |
-| `PATCH /users/me`               | Não implementada                                  |
-| `POST /leads/:id/transfer`      | Não implementada                                  |
-| `GET /leads/:id/history`        | Não implementada                                  |
-| `GET /logs`                     | Não implementada como rota                        |
-| Módulo de logs/auditoria        | Estrutura prevista no banco, fluxo ainda pendente |
+| Model                     | Tabela                      |
+| ------------------------- | --------------------------- |
+| `Stores`                  | `stores`                    |
+| `Teams`                   | `teams`                     |
+| `Users`                   | `users`                     |
+| `UserTeams`               | `user_teams`                |
+| `Customers`               | `customers`                 |
+| `InterestItems`           | `interest_items`            |
+| `Leads`                   | `leads`                     |
+| `Negotiations`            | `negotiations`              |
+| `NegotiationStatus`       | `negotiation_status`        |
+| `NegotiationStageHistory` | `negotiation_stage_history` |
+| `NegotiationImportance`   | `negotiation_importance`    |
+| `SystemLogs`              | `system_logs`               |
 
 ---
 
@@ -983,39 +943,66 @@ O backend utiliza Zod para validação de:
 * query params;
 * route params.
 
-Erros são encaminhados para o middleware global:
+Middlewares de validação:
+
+```txt
+validateBody
+validateQuery
+validateParams
+```
+
+Erros são tratados pelo middleware global:
 
 ```txt
 globalErrorHandler
 ```
 
-A estrutura geral permite padronizar respostas de erro e evitar validações diretamente nos controllers.
+---
+
+## 🌐 CORS
+
+O backend permite requisições dos seguintes ambientes de desenvolvimento:
+
+```txt
+http://localhost:5173
+http://localhost:5174
+```
+
+No Docker produção/local, o frontend é servido pelo Nginx e acessa a API pelo proxy `/api`, evitando problema de CORS.
 
 ---
 
-## 🌿 Versionamento e Git
+## ⚠️ Funcionalidades Planejadas ou Pendentes
 
-O projeto segue um fluxo baseado em branches.
+As funcionalidades abaixo aparecem como requisitos, modelos, comentários ou arquivos previstos, mas **não devem ser consideradas endpoints implementados nesta versão do backend**.
 
-| Branch       | Uso                                  |
-| ------------ | ------------------------------------ |
-| `main`       | Código estável e pronto para entrega |
-| `develop`    | Integração das entregas da sprint    |
-| `feat/*`     | Desenvolvimento de funcionalidades   |
-| `docs/*`     | Ajustes de documentação              |
-| `fix/*`      | Correções                            |
-| `refactor/*` | Refatorações                         |
+| Funcionalidade                     | Status                                                           |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| Recuperação de senha por e-mail    | Não há endpoint implementado                                     |
+| Redefinição de senha por token     | Não há endpoint implementado                                     |
+| `GET /api/users/me`                | Não implementado                                                 |
+| `PATCH /api/users/me`              | Não implementado                                                 |
+| `GET /api/logs`                    | Não implementado                                                 |
+| Módulo de logs/auditoria           | Existe model `SystemLogs`, mas não há módulo/rotas implementadas |
+| `POST /api/leads/:id/transfer`     | Não implementado                                                 |
+| `GET /api/leads/:id/history`       | Não implementado                                                 |
+| Seed automático ao subir container | Não implementado por decisão técnica; seed é manual              |
 
-### Prefixos de commit
+---
 
-| Prefixo    | Uso                     |
-| ---------- | ----------------------- |
-| `feat`     | Nova funcionalidade     |
-| `fix`      | Correção                |
-| `docs`     | Documentação            |
-| `refactor` | Refatoração             |
-| `style`    | Estilização             |
-| `chore`    | Configuração/manutenção |
+## ✅ Checklist da Documentação Backend
+
+Esta documentação cobre:
+
+* estrutura real do `server`;
+* tecnologias utilizadas;
+* módulos reais do backend;
+* rotas reais registradas em `/api`;
+* autenticação e permissões;
+* variáveis de ambiente;
+* Docker, Prisma, migrations e seed;
+* pendências conhecidas;
+* endpoints que não devem ser considerados implementados.
 
 ---
 
@@ -1024,29 +1011,11 @@ O projeto segue um fluxo baseado em branches.
 | Recurso                  | Caminho                      |
 | ------------------------ | ---------------------------- |
 | README principal         | `../README.md`               |
+| Guia de execução Docker  | `../HOWTORUN.md`             |
 | Documentação do frontend | `../client/README.md`        |
-| Documentação da Sprint 1 | `../docs/sprint_1/README.md` |
-| Documentação da Sprint 2 | `../docs/sprint_2/README.md` |
-| Documentação da Sprint 3 | `../docs/sprint_3/README.md` |
-| Product Backlog          | `../docs/PRODUCT_BACKLOG.md` |
-
----
-
-## 📝 Manutenção da Documentação
-
-Esta documentação deve ser atualizada sempre que houver alteração em:
-
-* rotas;
-* módulos;
-* regras de autenticação;
-* permissões;
-* variáveis de ambiente;
-* Docker;
-* migrations;
-* scripts;
-* estrutura de pastas.
-
-Atualizações de backend que alterem contrato de API devem ser acompanhadas de atualização deste README no mesmo Pull Request.
+| Sprint 1                 | `../docs/sprint-1/README.md` |
+| Sprint 2                 | `../docs/sprint-2/README.md` |
+| Sprint 3                 | `../docs/sprint-3/README.md` |
 
 ---
 
