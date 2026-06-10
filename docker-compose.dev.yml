@@ -1,46 +1,65 @@
-# Desenvolvimento com banco hospedado no Render.
-# Backend e frontend rodam com hot reload em containers.
-
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: valle_db_dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-valle_leads}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
       target: dev
     container_name: valle_server_dev
+    restart: unless-stopped
     env_file:
       - .env
     environment:
       NODE_ENV: development
-      PORT: ${PORT:-3000}
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL precisa estar definida no .env}
-      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET precisa estar definido no .env}
-      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET precisa estar definido no .env}
-      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
-      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-7d}
-      CHOKIDAR_USEPOLLING: "true"
-    command: npm run dev
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-valle_leads}?schema=public
+    ports:
+      - "3000:3000"
     volumes:
       - ./server:/app
       - /app/node_modules
-      - /app/src/generated
-    ports:
-      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
 
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
       target: dev
+      args:
+        VITE_BACKEND_URL: ""
     container_name: valle_client_dev
-    env_file:
-      - .env
+    restart: unless-stopped
     environment:
-      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:3000}
-      CHOKIDAR_USEPOLLING: "true"
-    command: npm run dev -- --host 0.0.0.0
+      VITE_BACKEND_URL: ""
+    ports:
+      - "5173:5173"
     volumes:
       - ./client:/app
       - /app/node_modules
-    ports:
-      - "5173:5173"
+    depends_on:
+      - server
+
+volumes:
+  postgres_dev_data:
