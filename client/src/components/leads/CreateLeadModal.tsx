@@ -1,651 +1,1130 @@
-import { useState, useEffect } from "react";
-import { X, Loader2, User, Package } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  X,
+  User,
+  Package,
+  Phone,
+  Mail,
+  IdCard,
+  Loader2,
+  ArrowLeft,
+  Search,
+  Car,
+  Image as ImageIcon,
+} from "lucide-react";
 import { useAuth } from "../../hook/useAuth";
-import { useLeadService } from "../../services/leadService";
-import type { CreateLeadDTO } from "../../services/leadService";
 import { useClientService } from "../../services/clientService";
 import type { Client, CreateClientDTO } from "../../services/clientService";
 import { useItemService } from "../../services/itemService";
 import type { InterestItem } from "../../services/itemService";
+import { useLeadService } from "../../services/leadService";
 
-const SOURCES = [
-  "Instagram",
+type Props = {
+  /**
+   * Fallback de equipe enviado pela página Leads.tsx.
+   *
+   * Alguns usuários não trazem team_id direto no objeto user.
+   * Por isso usamos a equipe dos leads carregados como alternativa.
+   */
+  defaultTeamId?: string;
+
+  onClose: () => void;
+  onCreated: () => void;
+};
+
+/**
+ * Origens padronizadas para evitar variações digitadas manualmente.
+ */
+const LEAD_ORIGINS = [
   "WhatsApp",
+  "Instagram",
   "Facebook",
-  "Loja Física",
   "Indicação",
+  "Loja Física",
   "Mercado Livre",
   "Site",
+  "Google",
   "Telefone",
 ];
 
-interface Props {
-  onClose: () => void;
-  onCreated: () => void;
+/**
+ * Remove tudo que não for número.
+ */
+function onlyNumbers(value: string) {
+  return value.replace(/\D/g, "");
 }
 
-export default function CreateLeadModal({ onClose, onCreated }: Props) {
+/**
+ * Validação simples de CPF.
+ */
+function isInvalidCpf(cpf: string) {
+  if (!cpf) return false;
+  if (cpf.length !== 11) return true;
+  if (/^(\d)\1{10}$/.test(cpf)) return true;
+
+  return false;
+}
+
+/**
+ * Formata valores monetários vindos do backend.
+ */
+function formatCurrency(value?: string | null) {
+  if (!value) return null;
+
+  const numberValue = Number(value);
+
+  if (Number.isNaN(numberValue)) return value;
+
+  return numberValue.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+/**
+ * Normaliza respostas de listagem.
+ *
+ * Isso protege o componente caso a API retorne:
+ * - [...]
+ * - { data: [...] }
+ * - { success: true, data: [...] }
+ * - { data: { data: [...] } }
+ */
+function normalizeList<T>(response: unknown): T[] {
+  const data = response as any;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.data?.data)) return data.data.data;
+
+  return [];
+}
+
+/**
+ * Modal de criação de lead.
+ *
+ * Fluxo:
+ * 1. Buscar/selecionar cliente.
+ * 2. Se não existir, cadastrar cliente.
+ * 3. Selecionar origem.
+ * 4. Opcionalmente selecionar veículo/produto.
+ * 5. Criar lead.
+ */
+export default function CreateLeadModal({
+  defaultTeamId,
+  onClose,
+  onCreated,
+}: Props) {
   const { user } = useAuth();
-  const { createLead } = useLeadService();
   const { getClients, createClient } = useClientService();
   const { getItems } = useItemService();
+  const { createLead } = useLeadService();
 
-  const [source, setSource] = useState("");
-  const [customerId, setCustomerId] = useState("");
-  const [interestItemId, setInterestItemId] = useState("");
+  // ─────────────────────────────────────────────
+  // Estados gerais
+  // ─────────────────────────────────────────────
+
+  const [error, setError] = useState<string | null>(null);
+  const [creatingLead, setCreatingLead] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+
+  // ─────────────────────────────────────────────
+  // Estados do cliente
+  // ─────────────────────────────────────────────
 
   const [clientSearch, setClientSearch] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientList, setShowClientList] = useState(false);
+  const [clientSearchFinished, setClientSearchFinished] = useState(false);
 
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [customerId, setCustomerId] = useState("");
+
+  /**
+   * Controla a etapa exclusiva de cadastro de cliente.
+   */
   const [showNewClientForm, setShowNewClientForm] = useState(false);
-  const [creatingClient, setCreatingClient] = useState(false);
+
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientCpf, setNewClientCpf] = useState("");
 
+  // ─────────────────────────────────────────────
+  // Estados do lead
+  // ─────────────────────────────────────────────
+
+  const [source, setSource] = useState("");
   const [itemSearch, setItemSearch] = useState("");
   const [items, setItems] = useState<InterestItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<InterestItem | null>(null);
   const [showItemList, setShowItemList] = useState(false);
+  const [itemSearchFinished, setItemSearchFinished] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<InterestItem | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Erro específico do campo de veículo/produto.
+   *
+   * Fica separado do erro geral para não criar alerta grande
+   * e não causar pulo visual no modal.
+   */
+  const [itemError, setItemError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (selectedClient) return;
+  const hasSelectedClient = Boolean(selectedClient && customerId);
+  const canFillLeadData = hasSelectedClient && !showNewClientForm;
+  const hasEnoughClientSearch = clientSearch.trim().length >= 2;
 
-    if (clientSearch.trim().length < 2) {
+  /**
+   * Texto do botão principal do rodapé.
+   */
+  const footerButtonText = useMemo(() => {
+    if (showNewClientForm) {
+      return creatingClient ? "Salvando cliente..." : "Salvar cliente";
+    }
+
+    if (!hasSelectedClient) {
+      return "Cadastrar novo cliente";
+    }
+
+    if (!source) {
+      return "Selecione a origem";
+    }
+
+    return creatingLead ? "Criando..." : "Criar Lead";
+  }, [
+    showNewClientForm,
+    creatingClient,
+    hasSelectedClient,
+    source,
+    creatingLead,
+  ]);
+
+  /**
+   * Define quando o botão principal fica desabilitado.
+   */
+  const isFooterButtonDisabled = useMemo(() => {
+    if (showNewClientForm) return creatingClient;
+
+    if (!hasSelectedClient) {
+      return !hasEnoughClientSearch;
+    }
+
+    return creatingLead || !source;
+  }, [
+    showNewClientForm,
+    creatingClient,
+    hasSelectedClient,
+    hasEnoughClientSearch,
+    creatingLead,
+    source,
+  ]);
+
+  // ─────────────────────────────────────────────
+  // Busca manual de clientes
+  // ─────────────────────────────────────────────
+
+  /**
+   * Busca clientes sob demanda.
+   *
+   * Mantemos a busca de cliente manual porque o cadastro de cliente
+   * é mais sensível e precisa ser controlado.
+   */
+  async function handleSearchClients() {
+    const query = clientSearch.trim();
+
+    if (query.length < 2) {
+      setError("Digite pelo menos 2 caracteres para buscar cliente.");
+      return;
+    }
+
+    try {
+      setLoadingClients(true);
+      setError(null);
+      setClientSearchFinished(false);
+      setSelectedClient(null);
+      setCustomerId("");
+
+      const onlyDigits = onlyNumbers(query);
+      const isOnlyDigits = onlyDigits.length === query.length;
+
+      const response = await getClients({
+        name: isOnlyDigits ? undefined : query,
+        cpf: isOnlyDigits ? onlyDigits : undefined,
+        is_active: true,
+        page: 1,
+        limit: 8,
+      });
+
+      const result = normalizeList<Client>(response);
+
+      setClients(result);
+      setShowClientList(true);
+    } catch {
       setClients([]);
-      setShowClientList(false);
-      return;
+      setShowClientList(true);
+      setError("Não foi possível buscar clientes.");
+    } finally {
+      setLoadingClients(false);
+      setClientSearchFinished(true);
     }
+  }
 
-    const timer = setTimeout(async () => {
-      try {
-        setLoadingClients(true);
+  /**
+   * Seleciona um cliente existente.
+   */
+  function handleSelectClient(client: Client) {
+    setSelectedClient(client);
+    setCustomerId(client.id);
+    setClientSearch(client.name);
 
-        const res = await getClients({
-          name: clientSearch.trim(),
-          is_active: true,
-          limit: 10,
-        });
+    setClients([]);
+    setShowClientList(false);
+    setClientSearchFinished(false);
+    setShowNewClientForm(false);
+    setError(null);
+  }
 
-        setClients(res.data ?? []);
-        setShowClientList(true);
-      } catch {
-        setClients([]);
-        setShowClientList(true);
-      } finally {
-        setLoadingClients(false);
-      }
-    }, 400);
+  /**
+   * Remove o cliente selecionado e limpa campos dependentes.
+   */
+  function handleClearSelectedClient() {
+    setSelectedClient(null);
+    setCustomerId("");
+    setClientSearch("");
+    setClients([]);
+    setShowClientList(false);
+    setClientSearchFinished(false);
+    setShowNewClientForm(false);
 
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientSearch, selectedClient]);
+    setSource("");
+    setSelectedItem(null);
+    setItemSearch("");
+    setItems([]);
+    setShowItemList(false);
+    setItemSearchFinished(false);
+    setItemError(null);
+    setError(null);
+  }
 
-  useEffect(() => {
-    if (selectedItem) return;
+  /**
+   * Abre a etapa de cadastro de novo cliente.
+   */
+  function handleOpenNewClientForm() {
+    const searchedName = clientSearch.trim();
 
-    if (itemSearch.trim().length < 2) {
-      setItems([]);
-      setShowItemList(false);
-      return;
-    }
+    setSelectedClient(null);
+    setCustomerId("");
+    setClients([]);
+    setShowClientList(false);
+    setClientSearchFinished(false);
+    setShowNewClientForm(true);
+    setError(null);
 
-    const timer = setTimeout(async () => {
-      try {
-        setLoadingItems(true);
+    setNewClientName(searchedName);
+    setNewClientPhone("");
+    setNewClientEmail("");
+    setNewClientCpf("");
+  }
 
-        const term = itemSearch.trim();
-        const isOnlyNumbers = /^\d+$/.test(term);
+  /**
+   * Volta para a busca de cliente.
+   */
+  function handleCancelNewClientForm() {
+    setShowNewClientForm(false);
+    setError(null);
+  }
 
-        const res = await getItems({
-          ...(isOnlyNumbers ? { reference_code: term } : { description: term }),
-          limit: 10,
-        });
-
-        setItems(res.data ?? []);
-        setShowItemList(true);
-      } catch {
-        setItems([]);
-        setShowItemList(true);
-      } finally {
-        setLoadingItems(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemSearch, selectedItem]);
-
+  /**
+   * Cadastra cliente novo e já seleciona ele no lead.
+   */
   async function handleCreateClient() {
-  if (!newClientName.trim()) {
-    setError("Informe o nome do cliente.");
-    return;
-  }
+    if (!newClientName.trim()) {
+      setError("Informe o nome do cliente.");
+      return;
+    }
 
-  if (!newClientPhone.trim()) {
-    setError("Informe o telefone do cliente.");
-    return;
-  }
+    if (!newClientPhone.trim()) {
+      setError("Informe o telefone do cliente.");
+      return;
+    }
 
-  const cleanPhone = newClientPhone.replace(/\D/g, "");
-  const cleanCpf = newClientCpf.replace(/\D/g, "");
-  const cleanEmail = newClientEmail.trim();
+    const cleanPhone = onlyNumbers(newClientPhone);
+    const cleanCpf = onlyNumbers(newClientCpf);
+    const cleanEmail = newClientEmail.trim();
 
-  if (cleanPhone.length < 10 || cleanPhone.length > 11) {
-    setError("Informe um telefone válido com DDD.");
-    return;
-  }
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      setError("Informe um telefone válido com DDD.");
+      return;
+    }
 
-  if (cleanCpf.length > 0) {
-    if (cleanCpf.length !== 11 || /^(\d)\1{10}$/.test(cleanCpf)) {
+    if (isInvalidCpf(cleanCpf)) {
       setError("Informe um CPF válido com 11 dígitos ou deixe o campo vazio.");
       return;
     }
+
+    const payload: CreateClientDTO = {
+      name: newClientName.trim(),
+      phone: cleanPhone,
+      email: cleanEmail || undefined,
+      cpf: cleanCpf || undefined,
+    };
+
+    try {
+      setCreatingClient(true);
+      setError(null);
+
+      const createdClient = await createClient(payload);
+
+      if (createdClient.is_active === false) {
+        setError(
+          "Cliente cadastrado, mas está inativo. Não é possível criar lead para cliente inativo."
+        );
+        return;
+      }
+
+      setSelectedClient(createdClient);
+      setCustomerId(createdClient.id);
+      setClientSearch(createdClient.name);
+
+      setShowNewClientForm(false);
+      setShowClientList(false);
+      setClientSearchFinished(false);
+      setClients([]);
+
+      setNewClientName("");
+      setNewClientPhone("");
+      setNewClientEmail("");
+      setNewClientCpf("");
+    } catch {
+      setError(
+        "Não foi possível cadastrar o cliente. Verifique se telefone, CPF ou e-mail já estão cadastrados."
+      );
+    } finally {
+      setCreatingClient(false);
+    }
   }
 
-  const payload: CreateClientDTO = {
-    name: newClientName.trim(),
-    phone: cleanPhone,
-    email: cleanEmail || undefined,
-    cpf: cleanCpf || undefined,
-    is_active: true,
-  };
+  // ─────────────────────────────────────────────
+  // Busca automática de produto/item de interesse
+  // ─────────────────────────────────────────────
 
-  try {
-    setCreatingClient(true);
+  /**
+   * Busca veículos/produtos automaticamente.
+   *
+   * Ajuste de UX:
+   * - Não exibimos "Buscando itens..." enquanto já existe lista na tela.
+   * - Não limpamos a lista atual enquanto uma nova busca está em andamento.
+   * - Só atualizamos os resultados quando a nova busca termina.
+   */
+  useEffect(() => {
+    const query = itemSearch.trim();
+
+    if (!canFillLeadData || query.length < 2 || selectedItem) {
+      setItems([]);
+      setShowItemList(false);
+      setItemSearchFinished(false);
+      setItemError(null);
+      setLoadingItems(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timeout = setTimeout(async () => {
+      try {
+        if (items.length === 0) {
+          setLoadingItems(true);
+        }
+
+        setItemError(null);
+        setItemSearchFinished(false);
+
+        const isReferenceSearch = /^\d+$/.test(query);
+
+        let result: InterestItem[] = [];
+
+        if (isReferenceSearch) {
+          const byReference = await getItems({
+            reference_code: query,
+            is_active: true,
+            page: 1,
+            limit: 8,
+          });
+
+          result = normalizeList<InterestItem>(byReference);
+
+          if (result.length === 0) {
+            const byDescription = await getItems({
+              description: query,
+              is_active: true,
+              page: 1,
+              limit: 8,
+            });
+
+            result = normalizeList<InterestItem>(byDescription);
+          }
+        } else {
+          const byDescription = await getItems({
+            description: query,
+            is_active: true,
+            page: 1,
+            limit: 8,
+          });
+
+          result = normalizeList<InterestItem>(byDescription);
+        }
+
+        if (cancelled) return;
+
+        setItems(result);
+        setShowItemList(true);
+        setItemSearchFinished(true);
+      } catch {
+        if (cancelled) return;
+
+        setItems([]);
+        setShowItemList(true);
+        setItemSearchFinished(true);
+        setItemError(
+          "Não foi possível buscar produtos agora. Verifique a API de veículos/produtos."
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingItems(false);
+        }
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [itemSearch, selectedItem, canFillLeadData, getItems, items.length]);
+
+  /**
+   * Seleciona item/produto de interesse.
+   */
+  function handleSelectItem(item: InterestItem) {
+    setSelectedItem(item);
+
+    setItemSearch(
+      item.reference_code
+        ? `${item.reference_code} - ${item.description}`
+        : item.description
+    );
+
+    setItems([]);
+    setShowItemList(false);
+    setItemSearchFinished(false);
+    setItemError(null);
     setError(null);
+  }
 
-    const createdClient = await createClient(payload);
+  /**
+   * Limpa item selecionado.
+   */
+  function handleClearSelectedItem() {
+    setSelectedItem(null);
+    setItemSearch("");
+    setItems([]);
+    setShowItemList(false);
+    setItemSearchFinished(false);
+    setItemError(null);
+  }
 
-    if (createdClient.is_active === false) {
+  // ─────────────────────────────────────────────
+  // Ação do botão principal
+  // ─────────────────────────────────────────────
+
+  function handleFooterAction() {
+    if (showNewClientForm) {
+      handleCreateClient();
+      return;
+    }
+
+    if (!hasSelectedClient) {
+      handleOpenNewClientForm();
+      return;
+    }
+
+    handleCreateLead();
+  }
+
+  // ─────────────────────────────────────────────
+  // Criação do lead
+  // ─────────────────────────────────────────────
+
+  async function handleCreateLead() {
+    if (!selectedClient || !customerId) {
+      setError("Selecione um cliente antes de criar o lead.");
+      return;
+    }
+
+    if (!source) {
+      setError("Selecione a origem do lead.");
+      return;
+    }
+
+    /**
+     * Produto é opcional.
+     *
+     * Porém, se a pessoa digitou algo no campo e não selecionou da lista,
+     * bloqueamos a criação para evitar lead sem produto por acidente.
+     */
+    if (itemSearch.trim() && !selectedItem) {
       setError(
-        "Cliente cadastrado, mas está inativo. Não é possível criar lead para cliente inativo."
+        "Você digitou um produto/referência, mas não selecionou um item da lista. Se o lead não tiver produto, limpe esse campo."
       );
       return;
     }
 
-    setSelectedClient(createdClient);
-    setCustomerId(createdClient.id);
+    const loggedUser = user as any;
 
-    setClientSearch("");
-    setClients([]);
-    setShowClientList(false);
-    setShowNewClientForm(false);
+    const teamId =
+      loggedUser?.team_id ??
+      loggedUser?.team?.id ??
+      loggedUser?.teams?.[0]?.id ??
+      loggedUser?.teams?.[0]?.team_id ??
+      loggedUser?.user_teams?.[0]?.team_id ??
+      loggedUser?.userTeams?.[0]?.team_id ??
+      defaultTeamId;
 
-    setNewClientName("");
-    setNewClientPhone("");
-    setNewClientEmail("");
-    setNewClientCpf("");
-  } catch {
-    setError(
-      "Não foi possível cadastrar o cliente. Verifique se telefone, CPF ou e-mail já estão cadastrados."
-    );
-  } finally {
-    setCreatingClient(false);
-  }
-}
-
-  async function handleSubmit() {
-    if (!customerId) {
-      setError("Selecione um cliente.");
+    if (!teamId) {
+      setError(
+        "Não foi possível identificar a equipe do usuário logado para criar o lead."
+      );
       return;
     }
-
-    if (selectedClient?.is_active === false) {
-      setError("Não é possível criar um lead para um cliente inativo.");
-      return;
-    }
-
-    const currentUser = user as any;
-    const teamId = currentUser?.team_ids?.[0] ?? currentUser?.team_id;
-
-    const payload: CreateLeadDTO = {
-      source: source || undefined,
-      customer_id: customerId,
-      attendant_id: user?.id,
-      interest_item_id: interestItemId || undefined,
-      team_id: teamId || undefined,
-    };
 
     try {
-      setLoading(true);
+      setCreatingLead(true);
       setError(null);
 
-      await createLead(payload);
+      await createLead({
+        customer_id: customerId,
+        team_id: teamId,
+        attendant_id: loggedUser?.id,
+        source,
+        status: "new",
+        interest_item_id: selectedItem?.id,
+      });
 
       onCreated();
       onClose();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao criar lead.";
-      setError(msg);
+    } catch {
+      setError("Não foi possível criar o lead. Tente novamente.");
     } finally {
-      setLoading(false);
+      setCreatingLead(false);
     }
   }
 
+  // ─────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl shadow-xl bg-white"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+      <div className="w-full max-w-2xl max-h-[88vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden">
+        {/* Cabeçalho fixo */}
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Novo Lead</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Preencha os dados do lead
-            </p>
+            <h2 className="text-lg font-bold text-gray-900">Novo Lead</h2>
+            <p className="text-sm text-gray-400">Preencha os dados do lead</p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-400"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Fechar modal"
           >
-            <X size={16} />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-          {/* Cliente */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              Cliente <span className="text-red-500">*</span>
-            </label>
+        {/* Conteúdo com rolagem controlada */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          {showNewClientForm ? (
+            <div className="space-y-5">
+              <button
+                type="button"
+                onClick={handleCancelNewClientForm}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
+                <ArrowLeft size={16} />
+                Voltar para busca de cliente
+              </button>
 
-            <div className="relative">
-              <div className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
-                <User size={14} className="text-gray-400 shrink-0" />
-
-                {selectedClient ? (
-                  <div className="flex-1 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {selectedClient.name}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {selectedClient.phone ||
-                          selectedClient.email ||
-                          "Sem contato"}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedClient(null);
-                        setCustomerId("");
-                        setClientSearch("");
-                        setClients([]);
-                        setShowClientList(false);
-                      }}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={clientSearch}
-                    onChange={(e) => {
-                      setClientSearch(e.target.value);
-                      setError(null);
-                    }}
-                    placeholder="Buscar por nome..."
-                    className="flex-1 text-sm outline-none bg-transparent text-gray-700 placeholder-gray-400"
-                  />
-                )}
-
-                {loadingClients && (
-                  <Loader2
-                    size={14}
-                    className="animate-spin text-blue-500 shrink-0"
-                  />
-                )}
-              </div>
-
-              {/* Dropdown clientes */}
-              {showClientList && clients.length > 0 && !selectedClient && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-48 overflow-y-auto">
-                  {clients.map((c) => (
-                    <button
-                      type="button"
-                      key={c.id}
-                      onClick={() => {
-                        setSelectedClient(c);
-                        setCustomerId(c.id);
-                        setShowClientList(false);
-                        setClientSearch("");
-                        setClients([]);
-                        setError(null);
-                      }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
-                    >
-                      <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-semibold shrink-0">
-                        {c.name?.[0]?.toUpperCase() ?? "C"}
-                      </div>
-
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {c.name}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {c.phone || c.email || "Sem contato"}
-                          {c.cpf ? ` · ${c.cpf}` : ""}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Nenhum cliente encontrado */}
-              {showClientList &&
-                clients.length === 0 &&
-                !loadingClients &&
-                clientSearch.trim().length >= 2 &&
-                !selectedClient && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4 text-center">
-                    <p className="text-sm text-gray-400 mb-3">
-                      Nenhum cliente encontrado
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNewClientForm(true);
-                        setNewClientName(clientSearch);
-                        setShowClientList(false);
-                      }}
-                      className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-                    >
-                      Cadastrar novo cliente
-                    </button>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Formulário novo cliente */}
-          {showNewClientForm && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
+                <div className="mb-4">
+                  <h3 className="text-base font-bold text-gray-900">
                     Cadastrar novo cliente
                   </h3>
-                  <p className="text-xs text-gray-500">
-                    Nome e telefone são obrigatórios.
+
+                  <p className="text-sm text-gray-500">
+                    Salve o cliente para continuar o cadastro do lead.
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowNewClientForm(false)}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      Nome completo <span className="text-red-500">*</span>
+                    </label>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Nome completo <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  placeholder="Ex: Maria Silva"
-                  className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Telefone <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newClientPhone}
-                  onChange={(e) => setNewClientPhone(e.target.value)}
-                  placeholder="Ex: 11999999999"
-                  className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">
-                    E-mail
-                  </label>
-                  <input
-                    type="email"
-                    value={newClientEmail}
-                    onChange={(e) => setNewClientEmail(e.target.value)}
-                    placeholder="cliente@email.com"
-                    className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">
-                    CPF
-                  </label>
-                  <input
-                    type="text"
-                    value={newClientCpf}
-                    onChange={(e) => setNewClientCpf(e.target.value)}
-                    placeholder="00000000000"
-                    className="w-full text-sm py-2 px-3 border border-gray-200 rounded-lg bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCreateClient}
-                disabled={creatingClient}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {creatingClient ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Cadastrando...
-                  </>
-                ) : (
-                  "Salvar cliente"
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Origem */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              Origem
-            </label>
-
-            <select
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              className="w-full text-sm py-2.5 px-3 border border-gray-200 rounded-xl bg-white text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all appearance-none"
-            >
-              <option value="">Selecionar origem...</option>
-              {SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Produto / Item de Interesse */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              Veículo / Produto de Interesse
-              <span className="text-gray-400 font-normal normal-case">
-                {" "}
-                opcional
-              </span>
-            </label>
-
-            <div className="relative">
-              <div className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
-                <Package size={14} className="text-gray-400 shrink-0" />
-
-                {selectedItem ? (
-                  <div className="flex-1 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {selectedItem.description || "Item sem descrição"}
-                      </p>
-
-                      {selectedItem.reference_code && (
-                        <p className="text-xs text-gray-400">
-                          Ref: {selectedItem.reference_code}
-                        </p>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedItem(null);
-                        setInterestItemId("");
-                        setItemSearch("");
-                        setItems([]);
-                        setShowItemList(false);
-                      }}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
+                    <input
+                      type="text"
+                      value={newClientName}
+                      onChange={(event) => setNewClientName(event.target.value)}
+                      placeholder="Nome do cliente"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                    />
                   </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={itemSearch}
-                    onChange={(e) => {
-                      setItemSearch(e.target.value);
-                      setError(null);
-                    }}
-                    placeholder="Digite a referência ou nome do produto..."
-                    className="flex-1 text-sm outline-none bg-transparent text-gray-700 placeholder-gray-400"
-                  />
-                )}
 
-                {loadingItems && (
-                  <Loader2
-                    size={14}
-                    className="animate-spin text-blue-500 shrink-0"
-                  />
-                )}
-              </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      Telefone <span className="text-red-500">*</span>
+                    </label>
 
-              {/* Dropdown itens */}
-              {showItemList && items.length > 0 && !selectedItem && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-48 overflow-y-auto">
-                  {items.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setInterestItemId(item.id);
-                        setShowItemList(false);
-                        setItemSearch("");
-                        setItems([]);
-                        setError(null);
-                      }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
-                    >
-                      <Package
+                    <div className="relative">
+                      <Phone
                         size={14}
-                        className="text-gray-400 mt-0.5 shrink-0"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                       />
 
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {item.description || "Item sem descrição"}
-                        </p>
+                      <input
+                        type="text"
+                        value={newClientPhone}
+                        onChange={(event) =>
+                          setNewClientPhone(event.target.value)
+                        }
+                        placeholder="11999999999"
+                        className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-9 pr-4 text-sm
+                                   focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                      />
+                    </div>
+                  </div>
 
-                        {item.reference_code && (
-                          <p className="text-xs text-gray-400">
-                            Ref: {item.reference_code}
-                          </p>
-                        )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">
+                        E-mail
+                      </label>
+
+                      <div className="relative">
+                        <Mail
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        />
+
+                        <input
+                          type="email"
+                          value={newClientEmail}
+                          onChange={(event) =>
+                            setNewClientEmail(event.target.value)
+                          }
+                          placeholder="cliente@email.com"
+                          className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-9 pr-4 text-sm
+                                     focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        />
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+                    </div>
 
-              {showItemList &&
-                items.length === 0 &&
-                !loadingItems &&
-                itemSearch.trim().length >= 2 &&
-                !selectedItem && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4 text-center">
-                    <p className="text-sm text-gray-400">
-                      Nenhum item encontrado
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">
+                        CPF
+                      </label>
+
+                      <div className="relative">
+                        <IdCard
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        />
+
+                        <input
+                          type="text"
+                          value={newClientCpf}
+                          onChange={(event) =>
+                            setNewClientCpf(event.target.value)
+                          }
+                          placeholder="00000000000"
+                          className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-9 pr-4 text-sm
+                                     focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Cliente */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <User
+                      size={15}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+
+                    <input
+                      type="text"
+                      value={clientSearch}
+                      onChange={(event) => {
+                        setClientSearch(event.target.value);
+                        setSelectedClient(null);
+                        setCustomerId("");
+                        setSource("");
+                        setSelectedItem(null);
+                        setItemSearch("");
+                        setClients([]);
+                        setShowClientList(false);
+                        setClientSearchFinished(false);
+                        setError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleSearchClients();
+                        }
+                      }}
+                      placeholder="Busque pelo nome ou CPF do cliente..."
+                      className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-10 text-sm text-gray-800
+                                 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                    />
+
+                    {selectedClient && (
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedClient}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label="Remover cliente selecionado"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSearchClients}
+                    disabled={loadingClients || clientSearch.trim().length < 2}
+                    className="rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700
+                               hover:bg-blue-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {loadingClients ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      "Buscar"
+                    )}
+                  </button>
+                </div>
+
+                {selectedClient && (
+                  <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedClient.name}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      {selectedClient.phone}
+                      {selectedClient.email ? ` • ${selectedClient.email}` : ""}
                     </p>
                   </div>
                 )}
-            </div>
-          </div>
 
-          {/* Erro */}
+                {showClientList && !selectedClient && (
+                  <div className="mt-2 rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                    {loadingClients ? (
+                      <div className="px-4 py-4 text-center text-sm text-gray-400">
+                        Buscando clientes...
+                      </div>
+                    ) : clients.length > 0 ? (
+                      clients.map((client) => (
+                        <button
+                          type="button"
+                          key={client.id}
+                          onClick={() => handleSelectClient(client)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-b-0"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold">
+                            {client.name.slice(0, 2).toUpperCase()}
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {client.name}
+                            </p>
+
+                            <p className="text-xs text-gray-400 truncate">
+                              {client.phone}
+                              {client.email ? ` • ${client.email}` : ""}
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    ) : clientSearchFinished ? (
+                      <div className="px-4 py-4 text-center">
+                        <p className="text-sm text-gray-400">
+                          Nenhum cliente encontrado.
+                        </p>
+
+                        <p className="text-xs text-gray-400 mt-1">
+                          Você pode cadastrar um novo cliente para continuar.
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={handleOpenNewClientForm}
+                          className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                        >
+                          Cadastrar novo cliente
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              {!hasSelectedClient && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  <div className="flex items-start gap-2">
+                    <Search size={16} className="mt-0.5 shrink-0" />
+                    <span>
+                      Busque e selecione um cliente existente. Se ele não existir,
+                      use o botão de cadastrar novo cliente.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {canFillLeadData && (
+                <>
+                  {/* Origem */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                      Origem <span className="text-red-500">*</span>
+                    </label>
+
+                    <select
+                      value={source}
+                      onChange={(event) => setSource(event.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800
+                                 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                    >
+                      <option value="">Selecionar origem...</option>
+
+                      {LEAD_ORIGINS.map((origin) => (
+                        <option key={origin} value={origin}>
+                          {origin}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Produto / veículo */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                      Veículo / Produto de interesse{" "}
+                      <span className="normal-case font-medium text-gray-400">
+                        opcional
+                      </span>
+                    </label>
+
+                    <div className="relative">
+                      <Package
+                        size={15}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
+
+                      <input
+                        type="text"
+                        value={itemSearch}
+                        onChange={(event) => {
+                          const value = event.target.value;
+
+                          setItemSearch(value);
+                          setSelectedItem(null);
+                          setItemSearchFinished(false);
+                          setItemError(null);
+                          setError(null);
+
+                          if (value.trim().length >= 2) {
+                            setShowItemList(true);
+                          } else {
+                            setItems([]);
+                            setShowItemList(false);
+                          }
+                        }}
+                        placeholder="Comece digitando a referência ou nome do produto..."
+                        className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-10 text-sm text-gray-800
+                                   focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                      />
+
+                      {loadingItems && items.length === 0 && (
+                        <Loader2
+                          size={16}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
+                        />
+                      )}
+
+                      {selectedItem && (
+                        <button
+                          type="button"
+                          onClick={handleClearSelectedItem}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          aria-label="Remover item selecionado"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Preview grande do veículo selecionado com placeholder */}
+                    {selectedItem ? (
+                      <div className="mt-2 overflow-hidden rounded-2xl border border-blue-100 bg-white">
+                        <div className="h-36 bg-gray-50 flex items-center justify-center border-b border-gray-100">
+                          <div className="text-center">
+                            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                              <Car size={28} />
+                            </div>
+
+                            <div className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-400 border border-gray-100">
+                              <ImageIcon size={12} />
+                              Imagem do veículo
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-gray-900 truncate">
+                                {selectedItem.description}
+                              </p>
+
+                              <p className="mt-1 text-xs text-gray-500">
+                                {selectedItem.reference_code
+                                  ? `Ref: ${selectedItem.reference_code}`
+                                  : "Sem referência"}
+                                {selectedItem.value
+                                  ? ` • ${formatCurrency(selectedItem.value)}`
+                                  : ""}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleClearSelectedItem}
+                              className="shrink-0 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : itemSearch.trim().length >= 2 ? (
+                      /*
+                        Área fixa de resultados.
+
+                        Ela só aparece depois que o usuário começa a digitar.
+                        Antes disso, não aparece caixa grande vazia.
+                      */
+                      <div className="mt-2 h-44 rounded-xl border border-gray-100 bg-white overflow-hidden">
+                        {showItemList && items.length > 0 ? (
+                          <div
+                            className="h-full overflow-y-auto"
+                            onWheel={(event) => event.stopPropagation()}
+                          >
+                            {items.map((item) => (
+                              <button
+                                type="button"
+                                key={item.id}
+                                onClick={() => handleSelectItem(item)}
+                                className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-b-0"
+                              >
+                                <div className="w-9 h-9 rounded-full bg-gray-50 text-gray-500 flex items-center justify-center shrink-0">
+                                  <Package size={15} />
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {item.description}
+                                  </p>
+
+                                  <p className="text-xs text-gray-400 truncate">
+                                    {item.reference_code
+                                      ? `Ref: ${item.reference_code}`
+                                      : "Sem referência"}
+                                    {item.value
+                                      ? ` • ${formatCurrency(item.value)}`
+                                      : ""}
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : loadingItems ? (
+                          <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                            <Loader2 size={16} className="animate-spin mr-2" />
+                            Buscando itens...
+                          </div>
+                        ) : itemError ? (
+                          <div className="h-full flex items-center justify-center px-4 text-center text-sm text-red-500">
+                            {itemError}
+                          </div>
+                        ) : itemSearchFinished ? (
+                          <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                            Nenhum item encontrado
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                            Buscando itens...
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {error && (
-            <div className="text-xs font-medium px-3 py-2 rounded-lg bg-red-50 text-red-600 border border-red-100">
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
               ⚠️ {error}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3 rounded-b-2xl">
+        {/* Rodapé fixo e contextual */}
+        <div className="grid grid-cols-2 gap-3 px-6 py-4 border-t border-gray-100 bg-white shrink-0">
           <button
             type="button"
-            onClick={onClose}
-            className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
+            onClick={showNewClientForm ? handleCancelNewClientForm : onClose}
+            className="rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
           >
-            Cancelar
+            {showNewClientForm ? "Voltar" : "Cancelar"}
           </button>
 
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={!customerId || loading || showNewClientForm || creatingClient}
-            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={handleFooterAction}
+            disabled={isFooterButtonDisabled}
+            className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white
+                       hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Criando...
-              </>
-            ) : showNewClientForm ? (
-              "Salve o cliente"
-            ) : !customerId ? (
-              "Selecione cliente"
-            ) : (
-              "Criar Lead"
+            {(creatingLead || creatingClient) && (
+              <Loader2 size={16} className="inline mr-2 animate-spin" />
             )}
+            {footerButtonText}
           </button>
         </div>
       </div>

@@ -24,14 +24,13 @@ import LeadsFilterBar from "../components/leads/LeadsFilterBar";
 import LeadsPagination from "../components/leads/LeadsPagination";
 import LeadDetailModal from "../components/leads/LeadDetailModal";
 import CreateLeadModal from "../components/leads/CreateLeadModal";
-import { STATUS_CONFIG } from "../components/leads/LeadCard";
 
-// ─────────────────────────────────────────────
-// CONSTANTES
-// ─────────────────────────────────────────────
-
+// Quantidade de leads exibidos por página.
+// Se quiser mudar a paginação da tela, altere este valor.
 const PER_PAGE = 20;
 
+// Ordem lógica do funil.
+// Isso garante que leads "new" apareçam antes de "open", "won" e "lost".
 const STATUS_ORDER: Record<string, number> = {
   new: 0,
   open: 1,
@@ -42,10 +41,15 @@ const STATUS_ORDER: Record<string, number> = {
 type StatusFilter = LeadStatus | "Todos";
 type ViewMode = "list" | "card";
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-
+/**
+ * Aplica todos os filtros usados na tela de Leads.
+ *
+ * Filtros considerados:
+ * - status/etapa;
+ * - origem;
+ * - período;
+ * - busca textual por nome, e-mail, CPF, referência ou produto.
+ */
 function filterLeads(
   leads: Lead[],
   status: StatusFilter,
@@ -100,6 +104,14 @@ function filterLeads(
   });
 }
 
+/**
+ * Ordena os leads para deixar a visualização mais útil.
+ *
+ * Primeiro ordena pela etapa do funil:
+ * Novo → Em andamento → Ganho → Perdido
+ *
+ * Dentro da mesma etapa, ordena pelos mais recentes.
+ */
 function sortLeads(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => {
     const orderA = STATUS_ORDER[a.status] ?? 99;
@@ -111,49 +123,16 @@ function sortLeads(leads: Lead[]): Lead[] {
   });
 }
 
-// ─────────────────────────────────────────────
-// RESUMO EM BADGES
-// ─────────────────────────────────────────────
-
-function StatusSummary({ leads }: { leads: Lead[] }) {
-  const counts = leads.reduce<Record<string, number>>((acc, lead) => {
-    acc[lead.status] = (acc[lead.status] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const items = [
-    { key: "new", emoji: "🆕" },
-    { key: "open", emoji: "⚡" },
-    { key: "won", emoji: "✅" },
-    { key: "lost", emoji: "❌" },
-  ];
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {items.map(({ key, emoji }) => {
-        const count = counts[key] ?? 0;
-        if (count === 0) return null;
-
-        const cfg = STATUS_CONFIG[key];
-
-        return (
-          <span
-            key={key}
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-            style={{ background: cfg.bg, color: cfg.text }}
-          >
-            {emoji} {cfg.label}: {count}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// CARDS DE INDICADORES
-// ─────────────────────────────────────────────
-
+/**
+ * Cards de resumo do funil.
+ *
+ * Esses cards substituem badges pequenos e ajudam o usuário a entender
+ * rapidamente a situação dos leads filtrados.
+ *
+ * Importante:
+ * Os valores são baseados no array recebido em "leads".
+ * Neste caso, estamos passando os leads já filtrados.
+ */
 function LeadsOverview({ leads }: { leads: Lead[] }) {
   const total = leads.length;
 
@@ -162,39 +141,46 @@ function LeadsOverview({ leads }: { leads: Lead[] }) {
     return acc;
   }, {});
 
+  const newCount = counts.new ?? 0;
+  const openCount = counts.open ?? 0;
+  const wonCount = counts.won ?? 0;
+  const lostCount = counts.lost ?? 0;
+
   const cards = [
     {
-      label: "Total de leads",
+      label: "Leads encontrados",
       value: total,
-      description: "Leads encontrados",
+      description: "Resultado atual da busca",
       icon: Users,
       className: "bg-white border-gray-100 text-gray-700",
     },
     {
       label: "Novos",
-      value: counts.new ?? 0,
-      description: "Aguardando primeiro contato",
+      value: newCount,
+      description:
+        newCount === 0 ? "Sem novos leads" : "Aguardando primeiro contato",
       icon: Sparkles,
       className: "bg-blue-50 border-blue-100 text-blue-700",
     },
     {
-      label: "Em aberto",
-      value: counts.open ?? 0,
-      description: "Em acompanhamento",
+      label: "Em andamento",
+      value: openCount,
+      description:
+        openCount === 0 ? "Nenhum lead em andamento" : "Em acompanhamento",
       icon: Clock,
       className: "bg-violet-50 border-violet-100 text-violet-700",
     },
     {
       label: "Ganhos",
-      value: counts.won ?? 0,
-      description: "Convertidos",
+      value: wonCount,
+      description: wonCount === 0 ? "Nenhuma conversão" : "Convertidos",
       icon: CheckCircle2,
       className: "bg-emerald-50 border-emerald-100 text-emerald-700",
     },
     {
       label: "Perdidos",
-      value: counts.lost ?? 0,
-      description: "Sem conversão",
+      value: lostCount,
+      description: lostCount === 0 ? "Sem perdas registradas" : "Sem conversão",
       icon: XCircle,
       className: "bg-red-50 border-red-100 text-red-700",
     },
@@ -208,19 +194,23 @@ function LeadsOverview({ leads }: { leads: Lead[] }) {
         return (
           <div
             key={card.label}
-            className={`rounded-2xl border p-4 shadow-sm ${card.className}`}
+            className={`rounded-2xl border px-4 py-3 shadow-sm ${card.className}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
                   {card.label}
                 </p>
-                <p className="text-2xl font-bold mt-1">{card.value}</p>
-                <p className="text-xs mt-1 opacity-70">{card.description}</p>
+
+                <p className="text-xl font-bold mt-1">{card.value}</p>
+
+                <p className="text-xs mt-1 opacity-70 leading-snug">
+                  {card.description}
+                </p>
               </div>
 
-              <div className="w-9 h-9 rounded-xl bg-white/70 flex items-center justify-center shrink-0">
-                <Icon size={17} />
+              <div className="w-8 h-8 rounded-xl bg-white/70 flex items-center justify-center shrink-0">
+                <Icon size={15} />
               </div>
             </div>
           </div>
@@ -229,10 +219,6 @@ function LeadsOverview({ leads }: { leads: Lead[] }) {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// COMPONENTE PRINCIPAL
-// ─────────────────────────────────────────────
 
 export default function Leads() {
   const { user } = useAuth();
@@ -253,6 +239,15 @@ export default function Leads() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
 
+  /**
+   * Busca os leads do usuário logado.
+   *
+   * Atualmente a tela filtra por attendant_id.
+   * Isso significa que o atendente vê apenas os leads atribuídos a ele.
+   *
+   * Atenção:
+   * Se o seed/banco local criar leads sem attendant_id, a tela ficará vazia.
+   */
   async function fetchLeads() {
     if (!user?.id) return;
 
@@ -274,11 +269,19 @@ export default function Leads() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  /**
+   * Chamado depois que um novo lead é criado no modal.
+   * Atualiza a listagem e volta para a primeira página.
+   */
   async function handleLeadCreated() {
     await fetchLeads();
     setPage(1);
   }
 
+  /**
+   * useMemo evita refazer filtros e ordenação em todo render.
+   * Só recalcula quando leads ou filtros mudam.
+   */
   const filtered = useMemo(
     () =>
       sortLeads(filterLeads(leads, status, source, search, dateFrom, dateTo)),
@@ -309,7 +312,7 @@ export default function Leads() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Cabeçalho da página */}
       <div className="mb-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-4">
           <div>
@@ -332,6 +335,7 @@ export default function Leads() {
             </p>
           </div>
 
+          {/* Ações principais da tela */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -342,6 +346,7 @@ export default function Leads() {
               <span className="hidden sm:inline">Novo Lead</span>
             </button>
 
+            {/* Alternância entre visualização em lista e cards */}
             <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
               <button
                 type="button"
@@ -372,14 +377,11 @@ export default function Leads() {
           </div>
         </div>
 
-        {/* Indicadores do funil */}
+        {/* Indicadores do funil. Aparecem somente quando já existem leads carregados. */}
         {!loading && leads.length > 0 && <LeadsOverview leads={filtered} />}
-
-        {/* Badges de resumo */}
-        {!loading && leads.length > 0 && <StatusSummary leads={filtered} />}
       </div>
 
-      {/* Filtros */}
+      {/* Barra de filtros principais */}
       <LeadsFilterBar
         search={search}
         onSearch={(value) => {
@@ -393,7 +395,7 @@ export default function Leads() {
         onClear={handleClear}
       />
 
-      {/* Filtro de data */}
+      {/* Filtro por período */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <span className="text-xs text-gray-400 font-medium">Período:</span>
 
@@ -418,14 +420,14 @@ export default function Leads() {
         />
       </div>
 
-      {/* Erro */}
+      {/* Mensagem de erro */}
       {error && (
         <div className="rounded-xl p-4 mb-4 text-sm font-medium bg-red-50 text-red-700 border border-red-200">
           ⚠️ {error}
         </div>
       )}
 
-      {/* Loading - Cards */}
+      {/* Loading da visualização em cards */}
       {loading && viewMode === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -434,7 +436,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Loading - Lista */}
+      {/* Loading da visualização em lista */}
       {loading && viewMode === "list" && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -478,7 +480,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Card View */}
+      {/* Visualização em cards */}
       {!loading && !error && paginated.length > 0 && viewMode === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginated.map((lead) => (
@@ -487,48 +489,51 @@ export default function Leads() {
         </div>
       )}
 
-      {/* List View */}
+      {/* Visualização em lista */}
       {!loading && !error && paginated.length > 0 && viewMode === "list" && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-            <div className="w-9 shrink-0" />
+        <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          {/* min-w evita que colunas importantes sejam comprimidas demais */}
+          <div className="min-w-[1180px]">
+            <div className="flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+              <div className="w-9 shrink-0" />
 
-            <div className="flex-1 flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              <ArrowUpDown size={10} /> Cliente
+              <div className="flex-1 min-w-[220px] flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                <ArrowUpDown size={10} /> Cliente
+              </div>
+
+              <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Status
+              </div>
+
+              <div className="w-40 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:block">
+                Atenção
+              </div>
+
+              <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:block">
+                Origem
+              </div>
+
+              <div className="w-48 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
+                Produto
+              </div>
+
+              <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
+                Valor
+              </div>
+
+              <div className="w-24 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden 2xl:block">
+                Equipe
+              </div>
+
+              <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:block text-right">
+                Criado em
+              </div>
             </div>
 
-            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              Status
-            </div>
-
-            <div className="w-40 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:block">
-              Atenção
-            </div>
-
-            <div className="w-32 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:block">
-              Origem
-            </div>
-
-            <div className="w-48 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:block">
-              Produto
-            </div>
-
-            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
-              Valor
-            </div>
-
-            <div className="w-24 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden xl:block">
-              Equipe
-            </div>
-
-            <div className="w-28 shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:block text-right">
-              Criado em
-            </div>
+            {paginated.map((lead) => (
+              <LeadRow key={lead.id} lead={lead} onClick={setSelectedLead} />
+            ))}
           </div>
-
-          {paginated.map((lead) => (
-            <LeadRow key={lead.id} lead={lead} onClick={setSelectedLead} />
-          ))}
         </div>
       )}
 
@@ -543,7 +548,7 @@ export default function Leads() {
         />
       )}
 
-      {/* Modal de detalhe */}
+      {/* Modal de detalhes do lead */}
       {selectedLead && (
         <LeadDetailModal
           lead={selectedLead}
@@ -551,9 +556,9 @@ export default function Leads() {
         />
       )}
 
-      {/* Modal de criação */}
       {showCreateModal && (
         <CreateLeadModal
+          defaultTeamId={leads[0]?.team_id ?? undefined}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleLeadCreated}
         />

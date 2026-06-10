@@ -8,13 +8,21 @@ import {
   Calendar,
   Clock,
   AlertTriangle,
+  Users,
 } from "lucide-react";
 import type { Lead } from "../../services/leadService";
 
-// ─────────────────────────────────────────────
-// CONSTANTES
-// ─────────────────────────────────────────────
-
+/**
+ * Configuração visual dos status do lead.
+ *
+ * Os valores técnicos vêm do backend/banco:
+ * - new
+ * - open
+ * - won
+ * - lost
+ *
+ * A label é o texto exibido para o usuário final.
+ */
 export const STATUS_CONFIG: Record<
   string,
   { bg: string; text: string; dot: string; label: string }
@@ -45,6 +53,12 @@ export const STATUS_CONFIG: Record<
   },
 };
 
+/**
+ * Ícones visuais por origem do lead.
+ *
+ * A chave é comparada em lowercase.
+ * Por isso existem algumas variações com e sem acento.
+ */
 export const SOURCE_ICONS: Record<string, string> = {
   instagram: "📸",
   whatsapp: "💬",
@@ -58,6 +72,11 @@ export const SOURCE_ICONS: Record<string, string> = {
   "mercado livre": "🛒",
 };
 
+/**
+ * Paleta simples para os avatares com iniciais.
+ *
+ * Não depende do banco. A cor é escolhida com base no id do lead.
+ */
 const AVATAR_COLORS = [
   { bg: "#DBEAFE", text: "#1E40AF" },
   { bg: "#EDE9FE", text: "#5B21B6" },
@@ -68,10 +87,13 @@ const AVATAR_COLORS = [
   { bg: "#FFE4E6", text: "#9F1239" },
 ];
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-
+/**
+ * Gera as iniciais do cliente.
+ *
+ * Exemplo:
+ * "Maria Silva" → "MS"
+ * "Cliente Exemplo" → "CE"
+ */
 export function getInitials(name: string) {
   return name
     .split(" ")
@@ -82,11 +104,20 @@ export function getInitials(name: string) {
     .toUpperCase();
 }
 
+/**
+ * Escolhe uma cor de avatar com base no id do lead.
+ *
+ * Isso mantém uma variação visual entre cards/linhas sem precisar salvar
+ * uma cor específica no banco.
+ */
 export function getAvatarColor(id: string) {
   const idx = id.charCodeAt(0) % AVATAR_COLORS.length;
   return AVATAR_COLORS[idx];
 }
 
+/**
+ * Formata data para o padrão brasileiro.
+ */
 export function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString("pt-BR", {
@@ -99,6 +130,12 @@ export function formatDate(iso: string) {
   }
 }
 
+/**
+ * Formata valor monetário.
+ *
+ * O Prisma Decimal normalmente chega no frontend como string.
+ * Por isso a função recebe string e converte com parseFloat.
+ */
 export function formatCurrency(value?: string) {
   if (!value) return null;
 
@@ -112,6 +149,11 @@ export function formatCurrency(value?: string) {
   });
 }
 
+/**
+ * Calcula quantos dias se passaram desde uma data.
+ *
+ * Usado para definir se o lead está recente, parado ou crítico.
+ */
 function getDaysSince(date?: string) {
   if (!date) return 0;
 
@@ -125,6 +167,19 @@ function getDaysSince(date?: string) {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
+/**
+ * Define a tag de atenção do lead.
+ *
+ * Regra atual:
+ * - won/lost: finalizado;
+ * - 30+ dias sem atualização: crítico;
+ * - 7 a 29 dias sem atualização: parado;
+ * - 3 a 6 dias sem atualização: sem avanço;
+ * - 0 a 2 dias: recente.
+ *
+ * A data usada é updated_at quando existir.
+ * Se não existir, usa created_at.
+ */
 function getLeadAttentionInfo(lead: Lead) {
   const referenceDate = lead.updated_at ?? lead.created_at;
   const days = getDaysSince(referenceDate);
@@ -135,6 +190,15 @@ function getLeadAttentionInfo(lead: Lead) {
       detail: "Lead encerrado",
       className: "bg-gray-50 text-gray-500 border-gray-100",
       icon: Calendar,
+    };
+  }
+
+  if (days >= 30) {
+    return {
+      label: `Crítico há ${days} dias`,
+      detail: "Sem movimentação há muito tempo",
+      className: "bg-red-50 text-red-700 border-red-100",
+      icon: AlertTriangle,
     };
   }
 
@@ -164,10 +228,9 @@ function getLeadAttentionInfo(lead: Lead) {
   };
 }
 
-// ─────────────────────────────────────────────
-// SKELETON
-// ─────────────────────────────────────────────
-
+/**
+ * Skeleton usado enquanto os cards carregam.
+ */
 export function LeadCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
@@ -191,6 +254,9 @@ export function LeadCardSkeleton() {
   );
 }
 
+/**
+ * Skeleton usado enquanto a visualização em lista carrega.
+ */
 export function LeadRowSkeleton() {
   return (
     <div className="flex items-center gap-4 p-4 border-b border-gray-50 animate-pulse">
@@ -209,10 +275,6 @@ export function LeadRowSkeleton() {
   );
 }
 
-// ─────────────────────────────────────────────
-// PROPS
-// ─────────────────────────────────────────────
-
 interface LeadCardProps {
   lead: Lead;
   onClick: (lead: Lead) => void;
@@ -222,10 +284,12 @@ interface LeadCardProps {
   onCheckChange?: (id: string, checked: boolean) => void;
 }
 
-// ─────────────────────────────────────────────
-// CARD VIEW
-// ─────────────────────────────────────────────
-
+/**
+ * Card visual do lead.
+ *
+ * Usado na visualização "Cards".
+ * Mostra dados principais do lead em formato mais visual e amigável.
+ */
 export default function LeadCard({
   lead,
   onClick,
@@ -281,7 +345,7 @@ export default function LeadCard({
         </div>
       )}
 
-      {/* Avatar + nome + status */}
+      {/* Cabeçalho do card: avatar, nome, status e atenção */}
       <div className="flex items-start gap-3 mb-4">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
@@ -291,7 +355,10 @@ export default function LeadCard({
         </div>
 
         <div className="flex-1 min-w-0 pr-6">
-          <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+          <p
+            title={name}
+            className="text-sm font-semibold text-gray-900 truncate leading-tight"
+          >
             {name}
           </p>
 
@@ -309,6 +376,7 @@ export default function LeadCard({
 
             <span
               className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${attention.className}`}
+              title={attention.detail}
             >
               <AttentionIcon size={11} />
               {attention.label}
@@ -317,7 +385,7 @@ export default function LeadCard({
         </div>
       </div>
 
-      {/* Detalhes */}
+      {/* Informações principais do lead */}
       <div className="space-y-2">
         <div className="flex items-start gap-2 text-xs text-gray-500">
           <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
@@ -328,7 +396,9 @@ export default function LeadCard({
 
         <div className="flex items-start gap-2 text-xs text-gray-500">
           <Package size={12} className="mt-0.5 shrink-0 text-gray-400" />
-          <span className="truncate">{interestLabel}</span>
+          <span title={interestLabel} className="truncate">
+            {interestLabel}
+          </span>
         </div>
 
         {price && (
@@ -338,10 +408,13 @@ export default function LeadCard({
           </div>
         )}
 
+        {/* Exibe apenas o nome da equipe para evitar repetição tipo "Equipe: Equipe PA" */}
         {lead.teams?.name && (
           <div className="flex items-start gap-2 text-xs text-gray-500">
-            <span className="text-gray-400 text-[10px] font-medium">TIME</span>
-            <span className="text-gray-600">{lead.teams.name}</span>
+            <Users size={12} className="mt-0.5 shrink-0 text-gray-400" />
+            <span title={lead.teams.name} className="text-gray-600 truncate">
+              {lead.teams.name}
+            </span>
           </div>
         )}
 
@@ -353,7 +426,7 @@ export default function LeadCard({
         )}
       </div>
 
-      {/* Data */}
+      {/* Rodapé do card: data de criação e indicação textual de atualização */}
       <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-50">
         <div className="flex items-center gap-1.5">
           <Calendar size={11} className="text-gray-300" />
@@ -368,10 +441,12 @@ export default function LeadCard({
   );
 }
 
-// ─────────────────────────────────────────────
-// LIST ROW VIEW
-// ─────────────────────────────────────────────
-
+/**
+ * Linha do lead.
+ *
+ * Usada na visualização "Lista".
+ * É mais compacta e melhor para análise rápida de muitos registros.
+ */
 export function LeadRow({
   lead,
   onClick,
@@ -423,7 +498,6 @@ export function LeadRow({
         </div>
       )}
 
-      {/* Avatar */}
       <div
         className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
         style={{ background: avatar.bg, color: avatar.text }}
@@ -431,9 +505,12 @@ export function LeadRow({
         {getInitials(name)}
       </div>
 
-      {/* Nome + email */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+      {/* Cliente com largura mínima para evitar corte excessivo na tabela */}
+      <div className="flex-1 min-w-[220px]">
+        <p
+          title={name}
+          className="text-sm font-semibold text-gray-900 truncate leading-tight"
+        >
           {name}
         </p>
 
@@ -444,7 +521,6 @@ export function LeadRow({
         )}
       </div>
 
-      {/* Status */}
       <div className="w-32 shrink-0">
         <span
           className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
@@ -458,44 +534,41 @@ export function LeadRow({
         </span>
       </div>
 
-      {/* Atenção */}
       <div className="w-40 shrink-0 hidden lg:block">
         <span
           className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border ${attention.className}`}
+          title={attention.detail}
         >
           <AttentionIcon size={11} />
           {attention.label}
         </span>
       </div>
 
-      {/* Origem */}
       <div className="w-32 shrink-0 text-xs text-gray-500 truncate hidden md:block">
         {sourceIcon} {lead.source ?? "—"}
       </div>
 
-      {/* Produto */}
-      <div className="w-48 shrink-0 text-xs text-gray-500 truncate hidden xl:block">
+      <div
+        title={interestLabel}
+        className="w-48 shrink-0 text-xs text-gray-500 truncate hidden xl:block"
+      >
         {interestLabel}
       </div>
 
-      {/* Valor */}
       <div className="w-28 shrink-0 text-xs font-semibold text-emerald-700 hidden xl:block">
         {price ?? "—"}
       </div>
 
-      {/* Time */}
       <div className="w-24 shrink-0 text-xs text-gray-400 truncate hidden 2xl:block">
         {lead.teams?.name ?? "—"}
       </div>
 
-      {/* Atendente */}
       {showAttendant && (
         <div className="w-32 shrink-0 text-xs text-gray-500 truncate hidden lg:block">
           {lead.attendant?.name ?? "Não atribuído"}
         </div>
       )}
 
-      {/* Data */}
       <div className="w-28 shrink-0 text-xs text-gray-400 hidden sm:block text-right">
         {formatDate(lead.created_at)}
       </div>
