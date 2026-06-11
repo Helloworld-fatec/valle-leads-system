@@ -88,11 +88,11 @@ export default function UserStatsCards({ users, loading = false }: UserStatsCard
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-      {/* Card Total */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow duration-200 col-span-2 lg:col-span-1 xl:col-span-1">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
-          <Users size={18} />
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Total */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+          <Users size={20} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
@@ -132,25 +132,24 @@ export default function UserStatsCards({ users, loading = false }: UserStatsCard
             fill="currentColor"
             className="w-5 h-5"
           >
-            <path
-              fillRule="evenodd"
-              d="M12 2a1 1 0 0 1 .894.553l3 6a1 1 0 0 1-1.788.894L12 5.236l-2.106 4.21A1 1 0 0 1 9 10H5a1 1 0 1 1 0-2h3.382l2.724-5.447A1 1 0 0 1 12 2ZM4.667 13.333a.667.667 0 1 0 0 1.334.667.667 0 0 0 0-1.334ZM2 14a2.667 2.667 0 1 1 5.333 0A2.667 2.667 0 0 1 2 14Zm10.667-.667a.667.667 0 1 0 0 1.334.667.667 0 0 0 0-1.334ZM10 14a2.667 2.667 0 1 1 5.333 0A2.667 2.667 0 0 1 10 14Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-            Atividade
-          </p>
-          <p className="text-2xl font-bold text-gray-900 mt-0.5 leading-none">
-            {activePct}%
-          </p>
-          <p className="text-xs text-emerald-600 mt-1.5">
-            taxa de ativos
-          </p>
-        </div>
-      </div>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: bg, color: text }}
+            >
+              {roleIcons[role]}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                {roleLabels[role]}s
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-0.5">{count}</p>
+              <p className="text-xs mt-1" style={{ color: text }}>
+                {active} ativo{active !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

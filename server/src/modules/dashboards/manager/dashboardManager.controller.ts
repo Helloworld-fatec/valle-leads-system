@@ -13,20 +13,12 @@ import { RequisicaoInvalidaError } from '../../../middlewares/errors/domainError
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Query params que chegam neste router após validação pelo schema Zod.
- * teamId é string | undefined; startDate/endDate chegam como strings brutas
- * do Express — o transform do schema já os converteu em Date no req.query,
- * mas a tipagem do Express sempre os expõe como string-based.
- * O controller delega o cast para o service via DTO.
- */
 type DashboardManagerQueryParams = ParsedQs & {
   teamId?: string;
   startDate?: string;
   endDate?: string;
 };
 
-/** Especialização de AuthRequest para as rotas deste controller. */
 type DashboardManagerRequest = AuthRequest<
   Record<string, never>,
   unknown,
@@ -34,7 +26,7 @@ type DashboardManagerRequest = AuthRequest<
 >;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD MANAGER CONTROLLER
+// DASHBOARD MANAGER CONTROLLER — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardManagerController {
@@ -48,12 +40,8 @@ export class DashboardManagerController {
 
   /**
    * Resolve o ID da equipa alvo:
-   *   1. Query param `teamId` (GENERAL_MANAGER/ADMIN navegando entre equipas).
+   *   1. Query param `teamId` (GM/ADMIN navegando entre equipas).
    *   2. Primeiro team_id do token (MANAGER consultando a própria equipa).
-   *
-   * Lança RequisicaoInvalidaError se nenhum ID estiver disponível — o que
-   * indica um estado inválido de pipeline (token sem team_ids e sem query param).
-   * A validação de permissão (403) ocorre depois no service.assertCanAccess().
    */
   private resolveTargetTeamId(req: DashboardManagerRequest): string {
     const targetId = req.query.teamId ?? req.user.team_ids[0];
@@ -65,11 +53,7 @@ export class DashboardManagerController {
     return targetId;
   }
 
-  /**
-   * Mapeia req.user para AuthenticatedRequester.
-   * O role já foi validado pelo authMiddleware + permission.middleware,
-   * portanto o cast para AccessLevel é seguro neste ponto.
-   */
+  /** Mapeia req.user para o tipo esperado pelo service. */
   private buildRequester(req: DashboardManagerRequest): AuthenticatedRequester {
     return {
       id: req.user.id,
@@ -78,117 +62,67 @@ export class DashboardManagerController {
     };
   }
 
-  /**
-   * req.query foi validado e transformado pelo validateQuery(managerDashboardFilterSchema),
-   * portanto o cast para ManagerDashboardFilterDTO é seguro neste ponto.
-   */
+  /** req.query já validado/transformado pelo validateQuery(schema). */
   private extractFilters(req: DashboardManagerRequest): ManagerDashboardFilterDTO {
     return req.query as unknown as ManagerDashboardFilterDTO;
   }
 
+  /**
+   * Fábrica de handlers — elimina os blocos try/catch repetidos.
+   * Métricas de snapshot simplesmente ignoram o terceiro argumento.
+   */
+  private handle(
+    serviceCall: (
+      requester: AuthenticatedRequester,
+      targetTeamId: string,
+      filters: ManagerDashboardFilterDTO,
+    ) => Promise<unknown>,
+  ) {
+    return async (
+      req: DashboardManagerRequest,
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      try {
+        const data = await serviceCall(
+          this.buildRequester(req),
+          this.resolveTargetTeamId(req),
+          this.extractFilters(req),
+        );
+        res.status(200).json(data);
+      } catch (error) {
+        next(error);
+      }
+    };
+  }
+
   // ─── KPI HANDLERS ────────────────────────────────────────────────────────
 
-  public getTeamKpis = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTeamKpis(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getActiveNegotiations = this.handle((r, t) =>
+    this.service.getActiveNegotiations(r, t),
+  );
 
-  public getTopAttendant = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTopAttendant(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSales = this.handle((r, t, f) => this.service.getSales(r, t, f));
+
+  public getClosingRate = this.handle((r, t, f) => this.service.getClosingRate(r, t, f));
+
+  public getStagnantNegotiations = this.handle((r, t) =>
+    this.service.getStagnantNegotiations(r, t),
+  );
 
   // ─── CHART HANDLERS ──────────────────────────────────────────────────────
 
-  public getLeadsByAttendant = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getLeadsByAttendant(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getStageFunnel = this.handle((r, t) => this.service.getStageFunnel(r, t));
 
-  public getConversionsByAttendant = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getConversionsByAttendant(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSalesByAttendant = this.handle((r, t, f) =>
+    this.service.getSalesByAttendant(r, t, f),
+  );
 
-  public getTeamEvolution = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTeamEvolution(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getWorkloadByAttendant = this.handle((r, t) =>
+    this.service.getWorkloadByAttendant(r, t),
+  );
 
-  public getTeamFunnel = async (
-    req: DashboardManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTeamFunnel(
-        this.buildRequester(req),
-        this.resolveTargetTeamId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getEvolution = this.handle((r, t, f) => this.service.getEvolution(r, t, f));
+
+  public getIdleLeads = this.handle((r, t) => this.service.getIdleLeads(r, t));
 }

@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: prod
+    container_name: valle_server_cloud
+    restart: unless-stopped
+    env_file:
+      - .env.cloud
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
+    container_name: valle_client_cloud
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy

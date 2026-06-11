@@ -1,27 +1,18 @@
 // src/components/dashboards/attendant/SalesFunnelChart.tsx
-import { ChartFunnelItem } from "../../../services/dashboardService";
+import {
+  ChartFunnelItem,
+  getStageColor,
+  getStageLabel,
+} from "../../../services/dashboardService";
 
 interface SalesFunnelChartProps {
   data: ChartFunnelItem[];
   loading?: boolean;
 }
 
-const FUNNEL_COLORS: Record<string, string> = {
-  Novo: "#3B82F6",
-  "Contato Inicial": "#8B5CF6",
-  Qualificação: "#F59E0B",
-  Proposta: "#F97316",
-  Negociação: "#EF4444",
-  Fechamento: "#10B981",
-};
-
-function getColor(status: string, index: number): string {
-  const fallbacks = ["#3B82F6", "#8B5CF6", "#F59E0B", "#F97316", "#EF4444", "#10B981"];
-  return FUNNEL_COLORS[status] ?? fallbacks[index % fallbacks.length];
-}
-
 export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProps) {
-  const max = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 1;
+  const max = data.length > 0 ? Math.max(...data.map((d) => d.count), 1) : 1;
+  const totalLeads = data.reduce((acc, d) => acc + d.count, 0);
 
   if (loading) {
     return (
@@ -29,7 +20,7 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
         <div className="w-40 h-5 bg-gray-100 rounded mb-1" />
         <div className="w-24 h-4 bg-gray-100 rounded mb-6" />
         <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
+          {[...Array(7)].map((_, i) => (
             <div key={i} className="h-7 bg-gray-100 rounded-lg" />
           ))}
         </div>
@@ -37,9 +28,11 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
     );
   }
 
-  if (!data.length) {
+  // O backend sempre retorna os 7 estágios (com zeros); "sem dados" agora
+  // significa array vazio OU todos os counts zerados.
+  if (!data.length || totalLeads === 0) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[220px]">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-55">
         <p className="text-sm font-medium" style={{ color: "#6B7280" }}>
           Nenhum dado no período
         </p>
@@ -62,35 +55,37 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
           className="text-xs px-2 py-1 rounded-full font-medium"
           style={{ background: "#EFF6FF", color: "#2563EB" }}
         >
-          {data.reduce((acc, d) => acc + d.count, 0)} leads
+          {totalLeads} negociações
         </span>
       </div>
 
       <div className="space-y-3">
-        {data.map((stage, i) => {
-          const pct = Math.round((stage.count / max) * 100);
-          const color = getColor(stage.status, i);
+        {data.map((item) => {
+          const pct = Math.round((item.count / max) * 100);
+          const color = getStageColor(item.stage);
           return (
-            <div key={stage.status} className="flex items-center gap-3">
+            <div key={item.stage} className="flex items-center gap-3">
               <span
                 className="text-xs font-medium w-28 shrink-0 text-right"
                 style={{ color: "#6B7280" }}
               >
-                {stage.status}
+                {getStageLabel(item.stage)}
               </span>
               <div
                 className="flex-1 h-7 rounded-lg overflow-hidden"
                 style={{ background: "#F1F5F9" }}
               >
-                <div
-                  className="h-full rounded-lg flex items-center px-3 transition-all duration-700"
-                  style={{
-                    width: `${Math.max(pct, 8)}%`,
-                    background: color,
-                  }}
-                >
-                  <span className="text-white text-xs font-semibold">{stage.count}</span>
-                </div>
+                {item.count > 0 && (
+                  <div
+                    className="h-full rounded-lg flex items-center px-3 transition-all duration-700"
+                    style={{
+                      width: `${Math.max(pct, 8)}%`,
+                      background: color,
+                    }}
+                  >
+                    <span className="text-white text-xs font-semibold">{item.count}</span>
+                  </div>
+                )}
               </div>
               <span
                 className="text-xs font-semibold w-10 text-right"

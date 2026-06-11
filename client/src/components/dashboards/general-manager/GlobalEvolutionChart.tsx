@@ -1,5 +1,5 @@
 // src/components/dashboards/general-manager/GlobalEvolutionChart.tsx
-import { useMemo } from "react";
+// Linha dupla: negociações ABERTAS × GANHAS por dia, em toda a empresa.
 import type { GlobalEvolutionResponse } from "../../../services/dashboardService";
 
 interface Props {
@@ -7,42 +7,56 @@ interface Props {
   loading: boolean;
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso);
+const OPENED_COLOR = "#3B82F6";
+const WON_COLOR = "#10B981";
+
+function formatDate(dateStr: string) {
+  const d = new Date(`${dateStr}T12:00:00`); // meio-dia evita shift de timezone
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
 export default function GlobalEvolutionChart({ data, loading }: Props) {
   const points = data?.evolution ?? [];
 
-  const { path, areaPath, viewBox, ticks, maxVal } = useMemo(() => {
-    if (points.length === 0) return { path: "", areaPath: "", viewBox: "0 0 600 200", ticks: [], maxVal: 0 };
+  if (loading) {
+    return (
+      <div
+        className="rounded-2xl p-6 shadow-sm border animate-pulse"
+        style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
+      >
+        <div className="w-40 h-5 bg-slate-100 rounded mb-1" />
+        <div className="w-24 h-4 bg-slate-100 rounded mb-6" />
+        <div className="h-44 bg-slate-50 rounded-lg" />
+      </div>
+    );
+  }
 
-    const W = 560;
-    const H = 160;
-    const padL = 8;
-    const padR = 8;
-    const padT = 10;
-    const padB = 10;
+  if (!points.length) {
+    return (
+      <div
+        className="rounded-2xl p-6 shadow-sm border flex flex-col items-center justify-center min-h-[220px]"
+        style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
+      >
+        <p className="text-sm font-medium" style={{ color: "#6B7280" }}>
+          Nenhum dado no período
+        </p>
+      </div>
+    );
+  }
 
-    const maxVal = Math.max(...points.map((p) => p.count), 1);
-    const xs = points.map((_, i) => padL + (i / (points.length - 1)) * (W - padL - padR));
-    const ys = points.map((p) => padT + (1 - p.count / maxVal) * (H - padT - padB));
+  const HEIGHT = 160;
+  const PAD_TOP = 10;
+  const STEP_X = 36;
+  const width = Math.max(points.length * STEP_X, 320);
+  const max = Math.max(...points.map((d) => Math.max(d.opened, d.won)), 1);
+  const labelStep = Math.max(1, Math.ceil(points.length / 10));
 
-    const pathD = xs.map((x, i) => `${i === 0 ? "M" : "L"} ${x} ${ys[i]}`).join(" ");
-    const areaD =
-      `M ${xs[0]} ${H - padB} ` +
-      xs.map((x, i) => `L ${x} ${ys[i]}`).join(" ") +
-      ` L ${xs[xs.length - 1]} ${H - padB} Z`;
+  const x = (i: number) =>
+    points.length === 1 ? width / 2 : (i / (points.length - 1)) * (width - STEP_X) + STEP_X / 2;
+  const y = (v: number) => PAD_TOP + (1 - v / max) * (HEIGHT - PAD_TOP);
 
-    // Pick up to 6 tick labels evenly
-    const step = Math.max(1, Math.floor(points.length / 5));
-    const ticks = points
-      .map((p, i) => ({ label: formatDate(p.date), x: xs[i], i }))
-      .filter((_, i) => i % step === 0 || i === points.length - 1);
-
-    return { path: pathD, areaPath: areaD, viewBox: `0 0 ${W} ${H}`, ticks, maxVal };
-  }, [points]);
+  const linePoints = (key: "opened" | "won") =>
+    points.map((d, i) => `${x(i)},${y(d[key])}`).join(" ");
 
   return (
     <div
@@ -52,77 +66,84 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="font-semibold text-sm" style={{ color: "#111827" }}>
-            Evolução Global de Leads
+            Evolução Global
           </h3>
           <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
-            Total de leads ao longo do período
+            Abertas × ganhas por dia — todas as equipes
           </p>
         </div>
-        {!loading && points.length > 0 && (
-          <span
-            className="text-xs px-2 py-1 rounded-full font-medium"
-            style={{ background: "#ECFDF5", color: "#059669" }}
-          >
-            {points.reduce((s, p) => s + p.count, 0).toLocaleString("pt-BR")} leads
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6B7280" }}>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: OPENED_COLOR }} />
+            Abertas
           </span>
-        )}
+          <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6B7280" }}>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: WON_COLOR }} />
+            Ganhas
+          </span>
+        </div>
       </div>
 
-      {loading ? (
-        <div
-          className="w-full h-48 rounded-xl animate-pulse"
-          style={{ background: "#F1F5F9" }}
-        />
-      ) : points.length === 0 ? (
-        <div className="w-full h-48 flex items-center justify-center">
-          <p className="text-sm" style={{ color: "#9CA3AF" }}>
-            Nenhum dado disponível
-          </p>
-        </div>
-      ) : (
-        <div className="w-full overflow-x-auto">
-          <svg
-            viewBox={viewBox}
-            className="w-full"
-            style={{ minWidth: "260px", height: "auto", maxHeight: "220px" }}
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="gmEvolutionGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
-            {/* Area */}
-            <path d={areaPath} fill="url(#gmEvolutionGrad)" />
-            {/* Line */}
-            <path
-              d={path}
-              fill="none"
-              stroke="#3B82F6"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-              strokeLinecap="round"
+      <div className="relative w-full overflow-x-auto">
+        <svg
+          width="100%"
+          viewBox={`0 0 ${width} ${HEIGHT + 40}`}
+          preserveAspectRatio="none"
+          className="w-full"
+          style={{ minHeight: `${HEIGHT + 40}px` }}
+        >
+          {[0.25, 0.5, 0.75, 1].map((f) => (
+            <line
+              key={f}
+              x1={0}
+              x2={width}
+              y1={y(max * f)}
+              y2={y(max * f)}
+              stroke="#F1F5F9"
+              strokeWidth={1}
             />
-            {/* Dots */}
-            {points.map((p, i) => {
-              const xs2 = 8 + (i / (points.length - 1)) * (560 - 16);
-              const ys2 = 10 + (1 - p.count / maxVal) * 140;
-              return (
-                <circle key={i} cx={xs2} cy={ys2} r="3.5" fill="#3B82F6" stroke="#fff" strokeWidth="1.5" />
-              );
-            })}
-          </svg>
-          {/* X-axis labels */}
-          <div className="flex justify-between mt-1 px-1">
-            {ticks.map((t) => (
-              <span key={t.i} className="text-xs" style={{ color: "#9CA3AF" }}>
-                {t.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+          ))}
+
+          <polyline
+            points={linePoints("opened")}
+            fill="none"
+            stroke={OPENED_COLOR}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <polyline
+            points={linePoints("won")}
+            fill="none"
+            stroke={WON_COLOR}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {points.map((d, i) => (
+            <g key={d.date}>
+              <circle cx={x(i)} cy={y(d.opened)} r={3} fill={OPENED_COLOR}>
+                <title>{`${formatDate(d.date)} — abertas: ${d.opened}`}</title>
+              </circle>
+              <circle cx={x(i)} cy={y(d.won)} r={3} fill={WON_COLOR}>
+                <title>{`${formatDate(d.date)} — ganhas: ${d.won}`}</title>
+              </circle>
+              {i % labelStep === 0 && (
+                <text
+                  x={x(i)}
+                  y={HEIGHT + 24}
+                  textAnchor="middle"
+                  fontSize={10}
+                  fill="#9CA3AF"
+                >
+                  {formatDate(d.date)}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
     </div>
   );
 }

@@ -10,7 +10,6 @@ import type {
 // CUSTOMER REPOSITORY
 // ─────────────────────────────────────────────
 
-
 // Select padrão — sem campos pesados
 const customerSelect = {
   id: true,
@@ -48,17 +47,31 @@ export type CustomerWithRelations = Prisma.CustomersGetPayload<{
 export const CustomersRepository = {
   async findAll(filters: QueryCustomerDTO): Promise<CustomerRow[]> {
     const where: Prisma.CustomersWhereInput = {};
-    if (filters.is_active !== undefined) where.is_active = filters.is_active;
-    if (filters.cpf !== undefined) where.cpf = filters.cpf;
+
+    const parsedPage = Number(filters.page) || 1;
+    const parsedLimit = Number(filters.limit) || 20;
+
+    if (filters.is_active !== undefined) {
+      const rawIsActive = filters.is_active as unknown;
+      where.is_active = rawIsActive === true || rawIsActive === "true";
+    }
+
+    if (filters.cpf !== undefined) {
+      where.cpf = filters.cpf;
+    }
+
     if (filters.name !== undefined) {
-      where.name = { contains: filters.name, mode: "insensitive" };
+      where.name = {
+        contains: String(filters.name),
+        mode: "insensitive",
+      };
     }
 
     return prisma.customers.findMany({
       where,
       select: customerSelect,
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
+      skip: (parsedPage - 1) * parsedLimit,
+      take: parsedLimit,
       orderBy: { created_at: "desc" },
     });
   },
@@ -72,7 +85,7 @@ export const CustomersRepository = {
 
   // Lookup leve para validações no service
   async findLightById(
-    id: string
+    id: string,
   ): Promise<{ id: string; is_active: boolean; cpf: string | null } | null> {
     return prisma.customers.findUnique({
       where: { id },
@@ -113,6 +126,10 @@ export const CustomersRepository = {
       address_city: dto.address_city ?? null,
       address_state: dto.address_state ?? null,
       address_zip: dto.address_zip ?? null,
+
+      // Cliente novo precisa nascer ativo para poder criar lead
+      is_active: true,
+
       created_by_user_id: actorId,
       updated_by_user_id: actorId,
     };
@@ -137,15 +154,26 @@ export const CustomersRepository = {
     if (dto.cpf !== undefined) data.cpf = dto.cpf ?? null;
     if (dto.phone !== undefined) data.phone = dto.phone;
     if (dto.is_active !== undefined) data.is_active = dto.is_active;
-    if (dto.address_street !== undefined) data.address_street = dto.address_street ?? null;
-    if (dto.address_number !== undefined) data.address_number = dto.address_number ?? null;
-    if (dto.address_complement !== undefined) data.address_complement = dto.address_complement ?? null;
-    if (dto.address_neighborhood !== undefined) data.address_neighborhood = dto.address_neighborhood ?? null;
-    if (dto.address_city !== undefined) data.address_city = dto.address_city ?? null;
-    if (dto.address_state !== undefined) data.address_state = dto.address_state ?? null;
-    if (dto.address_zip !== undefined) data.address_zip = dto.address_zip ?? null;
+    if (dto.address_street !== undefined)
+      data.address_street = dto.address_street ?? null;
+    if (dto.address_number !== undefined)
+      data.address_number = dto.address_number ?? null;
+    if (dto.address_complement !== undefined)
+      data.address_complement = dto.address_complement ?? null;
+    if (dto.address_neighborhood !== undefined)
+      data.address_neighborhood = dto.address_neighborhood ?? null;
+    if (dto.address_city !== undefined)
+      data.address_city = dto.address_city ?? null;
+    if (dto.address_state !== undefined)
+      data.address_state = dto.address_state ?? null;
+    if (dto.address_zip !== undefined)
+      data.address_zip = dto.address_zip ?? null;
 
-    return prisma.customers.update({ where: { id }, data, select: customerSelect });
+    return prisma.customers.update({
+      where: { id },
+      data,
+      select: customerSelect,
+    });
   },
 
   async softDelete(params: {

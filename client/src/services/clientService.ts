@@ -1,11 +1,10 @@
-// src/services/clientService.ts
 import { useApi } from "./api";
 
 // ─────────────────────────────────────────────
-// Tipos — alinhados a customer.dto.ts (backend)
-// "client" no frontend == "customer" no backend (/api/customers).
-// phone é obrigatório e único; team_id é opcional (FK para Teams).
+// TIPOS
+// "client" no frontend == "customer" no backend (/api/customers)
 // ─────────────────────────────────────────────
+
 export interface Client {
   id: string;
   name: string;
@@ -25,13 +24,13 @@ export interface Client {
   address_zip?: string | null;
 }
 
-// createCustomerSchema: name + phone obrigatórios; resto opcional
 export interface CreateClientDTO {
   name: string;
   phone: string;
   email?: string;
   cpf?: string;
   team_id?: string;
+  is_active?: boolean;
   address_street?: string;
   address_number?: string;
   address_complement?: string;
@@ -41,7 +40,6 @@ export interface CreateClientDTO {
   address_zip?: string;
 }
 
-// updateCustomerSchema: todos opcionais; team_id pode ser null (desvincular); is_active editável
 export interface UpdateClientDTO {
   name?: string;
   email?: string;
@@ -58,7 +56,6 @@ export interface UpdateClientDTO {
   address_zip?: string;
 }
 
-// queryCustomerSchema
 export interface ListClientsQuery {
   team_id?: string;
   is_active?: boolean;
@@ -69,67 +66,140 @@ export interface ListClientsQuery {
 }
 
 export interface PaginatedClients {
+  success?: boolean;
   data: Client[];
   total?: number;
   page?: number;
   limit?: number;
 }
 
-function unwrap<T>(json: any): T {
-  return (json && typeof json === "object" && "data" in json ? json.data : json) as T;
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+
+function unwrap<T>(json: unknown): T {
+  if (json && typeof json === "object" && "data" in json) {
+    return (json as { data: T }).data;
+  }
+
+  return json as T;
 }
+
+function unwrapList(json: unknown): PaginatedClients {
+  if (Array.isArray(json)) {
+    return { data: json };
+  }
+
+  if (json && typeof json === "object" && "data" in json) {
+    const response = json as PaginatedClients;
+
+    return {
+      success: response.success,
+      data: response.data ?? [],
+      total: response.total,
+      page: response.page,
+      limit: response.limit,
+    };
+  }
+
+  return { data: [] };
+}
+
+// ─────────────────────────────────────────────
+// SERVICE
+// ─────────────────────────────────────────────
 
 export const useClientService = () => {
   const { apiFetch } = useApi();
 
-  // GET /api/customers → qualquer autenticado
-  const getClients = async (query?: ListClientsQuery): Promise<PaginatedClients> => {
-    const p = new URLSearchParams();
-    if (query?.team_id) p.append("team_id", query.team_id);
-    if (query?.is_active !== undefined) p.append("is_active", String(query.is_active));
-    if (query?.name) p.append("name", query.name);
-    if (query?.cpf) p.append("cpf", query.cpf);
-    if (query?.page) p.append("page", String(query.page));
-    if (query?.limit) p.append("limit", String(query.limit));
-    const qs = p.toString();
-    const res = await apiFetch(`/api/customers${qs ? `?${qs}` : ""}`);
+  // GET /api/customers
+  const getClients = async (
+    query?: ListClientsQuery
+  ): Promise<PaginatedClients> => {
+    const params = new URLSearchParams();
+
+    if (query?.team_id) {
+      params.append("team_id", query.team_id);
+    }
+
+    if (query?.is_active !== undefined) {
+      params.append("is_active", String(query.is_active));
+    }
+
+    if (query?.name) {
+      params.append("name", query.name);
+    }
+
+    if (query?.cpf) {
+      params.append("cpf", query.cpf);
+    }
+
+    if (query?.page) {
+      params.append("page", String(query.page));
+    }
+
+    if (query?.limit) {
+      params.append("limit", String(query.limit));
+    }
+
+    const queryString = params.toString();
+
+    const res = await apiFetch(
+      `/api/customers${queryString ? `?${queryString}` : ""}`
+    );
+
     const json = await res.json();
-    if (Array.isArray(json)) return { data: json };
-    return json as PaginatedClients;
+
+    return unwrapList(json);
   };
 
-  // GET /api/customers/:id → qualquer autenticado
+  // GET /api/customers/:id
   const getClientById = async (id: string): Promise<Client> => {
     const res = await apiFetch(`/api/customers/${id}`);
-    return unwrap<Client>(await res.json());
+    const json = await res.json();
+
+    return unwrap<Client>(json);
   };
 
-  // POST /api/customers → qualquer autenticado
+  // POST /api/customers
   const createClient = async (data: CreateClientDTO): Promise<Client> => {
     const res = await apiFetch("/api/customers", {
       method: "POST",
       body: JSON.stringify(data),
     });
-    return unwrap<Client>(await res.json());
+
+    const json = await res.json();
+
+    return unwrap<Client>(json);
   };
 
-  // PATCH /api/customers/:id → qualquer autenticado
-  const updateClient = async (id: string, data: UpdateClientDTO): Promise<Client> => {
+  // PATCH /api/customers/:id
+  const updateClient = async (
+    id: string,
+    data: UpdateClientDTO
+  ): Promise<Client> => {
     const res = await apiFetch(`/api/customers/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
-    return unwrap<Client>(await res.json());
+
+    const json = await res.json();
+
+    return unwrap<Client>(json);
   };
 
-  // DELETE /api/customers/:id → soft delete (qualquer autenticado)
+  // DELETE /api/customers/:id
   const deleteClient = async (id: string): Promise<void> => {
-    await apiFetch(`/api/customers/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/customers/${id}`, {
+      method: "DELETE",
+    });
   };
 
-  // DELETE /api/customers/:id/hard → hard delete (somente ADMIN)
+  // DELETE /api/customers/:id/hard
   const hardDeleteClient = async (id: string): Promise<void> => {
-    await apiFetch(`/api/customers/${id}/hard`, { method: "DELETE" });
+    await apiFetch(`/api/customers/${id}/hard`, {
+      method: "DELETE",
+    });
   };
 
   return {

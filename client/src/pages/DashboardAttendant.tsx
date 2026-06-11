@@ -1,15 +1,25 @@
 // src/pages/DashboardAttendant.tsx
+// REFACTOR negociação-cêntrico:
+//   - KPIs e charts agora medem NEGOCIAÇÕES (aberturas, vendas, fechamento),
+//     não mais leads criados.
+//   - Snapshot (carteira atual): negociações ativas, funil, temperatura,
+//     leads parados → não mudam com o filtro de período.
+//   - Janela: vendas, taxa de fechamento, tempo médio, evolução, por origem.
+//   - BUGFIX: TODAS as chamadas usam finalFilters (a versão antiga passava
+//     `filters` da closure nos charts, perdendo o targetAttendantId e as
+//     datas atualizadas).
 import { useState, useEffect, useCallback } from "react";
 import { useDashboardService, DashboardFilters } from "../services/dashboardService";
 import type {
-  ActiveLeadsResponse,
-  ConvertedLeadsResponse,
-  ConversionRateResponse,
-  AvgServiceTimeResponse,
-  EvolutionResponse,
-  FunnelResponse,
-  SourcesResponse,
-  ConversionsPeriodResponse,
+  ActiveNegotiationsResponse,
+  SalesResponse,
+  ClosingRateResponse,
+  AvgClosingTimeResponse,
+  StageFunnelResponse,
+  NegotiationsEvolutionResponse,
+  TemperatureResponse,
+  NegotiationsBySourceResponse,
+  IdleLeadsResponse,
 } from "../services/dashboardService";
 
 import { useAuth } from "../hook/useAuth";
@@ -17,26 +27,20 @@ import { useAuth } from "../hook/useAuth";
 // Child components
 import KpiCard from "../components/dashboards/attendant/KpiCard";
 import DateRangeFilter from "../components/dashboards/attendant/DateRangeFilter";
-import LeadsEvolutionChart from "../components/dashboards/attendant/LeadsEvolutionChart";
-import SalesFunnelChart from "../components/dashboards/attendant/SalesFunnelChart";
-import LeadsBySourceChart from "../components/dashboards/attendant/LeadsBySourceChart";
-import ConversionsByPeriodChart from "../components/dashboards/attendant/ConversionsByPeriodChart";
+import EvolutionChart from "../components/dashboards/attendant/EvolutionChart";
+import StageFunnelChart from "../components/dashboards/attendant/StageFunnelChart";
+import TemperatureChart from "../components/dashboards/attendant/TemperatureChart";
+import NegotiationsBySourceChart from "../components/dashboards/attendant/NegotiationsBySourceChart";
+import IdleLeadsChart from "../components/dashboards/attendant/IdleLeadsChart";
 import DashboardError from "../components/dashboards/attendant/DashboardError";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
-function IconUsers({ color = "#2563EB" }: { color?: string }) {
+function IconBriefcase({ color = "#2563EB" }: { color?: string }) {
   return (
     <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <rect x={2} y={7} width={20} height={14} rx={2} stroke={color} strokeWidth={2} />
       <path
-        d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx={9} cy={7} r={4} stroke={color} strokeWidth={2} />
-      <path
-        d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+        d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"
         stroke={color}
         strokeWidth={2}
         strokeLinecap="round"
@@ -68,15 +72,7 @@ function IconCheck({ color = "#16A34A" }: { color?: string }) {
 function IconPercent({ color = "#F59E0B" }: { color?: string }) {
   return (
     <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <line
-        x1={19}
-        y1={5}
-        x2={5}
-        y2={19}
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
+      <line x1={19} y1={5} x2={5} y2={19} stroke={color} strokeWidth={2} strokeLinecap="round" />
       <circle cx={6.5} cy={6.5} r={2.5} stroke={color} strokeWidth={2} />
       <circle cx={17.5} cy={17.5} r={2.5} stroke={color} strokeWidth={2} />
     </svg>
@@ -98,27 +94,29 @@ function IconClock({ color = "#8B5CF6" }: { color?: string }) {
   );
 }
 
-// ─── State shape ─────────────────────────────────────────────────────────────
+// ─── Data shape ──────────────────────────────────────────────────────────────
 interface DashboardData {
-  activeLeads: ActiveLeadsResponse | null;
-  convertedLeads: ConvertedLeadsResponse | null;
-  conversionRate: ConversionRateResponse | null;
-  avgServiceTime: AvgServiceTimeResponse | null;
-  evolution: EvolutionResponse | null;
-  funnel: FunnelResponse | null;
-  sources: SourcesResponse | null;
-  conversionsPeriod: ConversionsPeriodResponse | null;
+  activeNegotiations: ActiveNegotiationsResponse | null;
+  sales: SalesResponse | null;
+  closingRate: ClosingRateResponse | null;
+  avgClosingTime: AvgClosingTimeResponse | null;
+  stageFunnel: StageFunnelResponse | null;
+  evolution: NegotiationsEvolutionResponse | null;
+  temperature: TemperatureResponse | null;
+  sources: NegotiationsBySourceResponse | null;
+  idleLeads: IdleLeadsResponse | null;
 }
 
 const EMPTY_DATA: DashboardData = {
-  activeLeads: null,
-  convertedLeads: null,
-  conversionRate: null,
-  avgServiceTime: null,
+  activeNegotiations: null,
+  sales: null,
+  closingRate: null,
+  avgClosingTime: null,
+  stageFunnel: null,
   evolution: null,
-  funnel: null,
+  temperature: null,
   sources: null,
-  conversionsPeriod: null,
+  idleLeads: null,
 };
 
 // ─── Default filter: últimos 30 dias ─────────────────────────────────────────
@@ -154,8 +152,10 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
     async (f: DashboardFilters) => {
       setLoading(true);
       setError(null);
-      
-      // Mescla os filtros de data com o targetAttendantId recebido por prop
+
+      // Mescla as datas com o targetAttendantId do drill-down.
+      // TODAS as chamadas usam finalFilters — os endpoints de snapshot
+      // aproveitam só o attendantId (o service descarta as datas).
       const finalFilters: DashboardFilters = {
         ...f,
         targetAttendantId,
@@ -163,33 +163,36 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
 
       try {
         const [
-          activeLeads,
-          convertedLeads,
-          conversionRate,
-          avgServiceTime,
+          activeNegotiations,
+          sales,
+          closingRate,
+          avgClosingTime,
+          stageFunnel,
           evolution,
-          funnel,
+          temperature,
           sources,
-          conversionsPeriod,
+          idleLeads,
         ] = await Promise.all([
-          dashboard.attendant.getActiveLeads(finalFilters),
-          dashboard.attendant.getConvertedLeads(finalFilters),
-          dashboard.attendant.getConversionRate(finalFilters),
-          dashboard.attendant.getAvgServiceTime(finalFilters),
-          dashboard.attendant.getLeadsEvolution(filters),       
-          dashboard.attendant.getSalesFunnel(filters),          
-          dashboard.attendant.getLeadsBySource(filters),        
-          dashboard.attendant.getConversionsByPeriod(filters),
+          dashboard.attendant.getActiveNegotiations(finalFilters),
+          dashboard.attendant.getSales(finalFilters),
+          dashboard.attendant.getClosingRate(finalFilters),
+          dashboard.attendant.getAvgClosingTime(finalFilters),
+          dashboard.attendant.getStageFunnel(finalFilters),
+          dashboard.attendant.getEvolution(finalFilters),
+          dashboard.attendant.getTemperature(finalFilters),
+          dashboard.attendant.getNegotiationsBySource(finalFilters),
+          dashboard.attendant.getIdleLeads(finalFilters),
         ]);
         setData({
-          activeLeads,
-          convertedLeads,
-          conversionRate,
-          avgServiceTime,
+          activeNegotiations,
+          sales,
+          closingRate,
+          avgClosingTime,
+          stageFunnel,
           evolution,
-          funnel,
+          temperature,
           sources,
-          conversionsPeriod,
+          idleLeads,
         });
       } catch (err) {
         console.error(err);
@@ -198,15 +201,13 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
         setLoading(false);
       }
     },
-    // O useCallback agora depende do targetAttendantId. 
-    // Se o gerente trocar o usuário no menu, a função é recriada.
-    [dashboard, targetAttendantId]
+    [dashboard, targetAttendantId],
   );
 
-  // Como o fetchAll está nas dependências do useEffect, a tela vai atualizar 
-  // automaticamente toda vez que o targetAttendantId mudar!
   useEffect(() => {
     fetchAll(filters);
+    // fetchAll é recriado quando targetAttendantId muda → refetch automático
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAll]);
 
   function handleFilterChange(newFilters: DashboardFilters) {
@@ -215,7 +216,7 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
   }
 
   // ─── Derived values ──────────────────────────────────────────────────────
-  const avgHours = data.avgServiceTime?.avgServiceTimeHours ?? 0;
+  const avgHours = data.avgClosingTime?.avgClosingTimeHours ?? 0;
   const avgTimeLabel =
     avgHours >= 24
       ? `${(avgHours / 24).toFixed(1)}d`
@@ -223,7 +224,7 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
       ? `${avgHours.toFixed(1)}h`
       : `${Math.round(avgHours * 60)}min`;
 
-  const convRate = data.conversionRate?.conversionRate ?? 0;
+  const closingRate = data.closingRate?.closingRate ?? 0;
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
@@ -250,43 +251,43 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
         </span>
       </div>
 
-      {/* Filter */}
+      {/* Filter — aplica-se às métricas de período (vendas, taxa, tempo,
+          evolução, origem). Carteira ativa, funil, temperatura e leads
+          parados são snapshots do estado atual. */}
       <DateRangeFilter onFilterChange={handleFilterChange} loading={loading} />
 
       {/* Error */}
-      {error && (
-        <DashboardError message={error} onRetry={() => fetchAll(filters)} />
-      )}
+      {error && <DashboardError message={error} onRetry={() => fetchAll(filters)} />}
 
       {/* KPIs */}
       {!error && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
-              title="Leads Ativos"
-              value={data.activeLeads?.activeLeads ?? "—"}
-              icon={<IconUsers />}
+              title="Negociações Ativas"
+              value={data.activeNegotiations?.activeNegotiations ?? "—"}
+              icon={<IconBriefcase />}
               iconBg="#EFF6FF"
               loading={loading}
-              subtitle="em andamento"
+              subtitle="carteira atual"
             />
             <KpiCard
-              title="Leads Convertidos"
-              value={data.convertedLeads?.convertedLeads ?? "—"}
+              title="Vendas"
+              value={data.sales?.sales ?? "—"}
               icon={<IconCheck />}
               iconBg="#F0FDF4"
               loading={loading}
               subtitle="no período"
             />
             <KpiCard
-              title="Taxa de Conversão"
-              value={loading ? "—" : `${convRate.toFixed(1)}%`}
+              title="Taxa de Fechamento"
+              value={loading ? "—" : `${closingRate.toFixed(1)}%`}
               icon={<IconPercent />}
               iconBg="#FFFBEB"
               loading={loading}
               subtitle={
-                data.conversionRate
-                  ? `${data.conversionRate.convertedLeads} / ${data.conversionRate.totalLeads} leads`
+                data.closingRate
+                  ? `${data.closingRate.wonCount} ganhas / ${data.closingRate.lostCount} perdidas`
                   : undefined
               }
             />
@@ -296,32 +297,25 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
               icon={<IconClock />}
               iconBg="#F5F3FF"
               loading={loading}
-              subtitle="por atendimento"
+              subtitle="abertura → venda"
             />
           </div>
 
-          {/* Charts row 1 */}
+          {/* Charts row 1: atividade do período */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <LeadsEvolutionChart
-              data={data.evolution?.evolution ?? []}
-              loading={loading}
-            />
-            <SalesFunnelChart
-              data={data.funnel?.funnel ?? []}
-              loading={loading}
-            />
+            <EvolutionChart data={data.evolution?.evolution ?? []} loading={loading} />
+            <StageFunnelChart data={data.stageFunnel?.funnel ?? []} loading={loading} />
           </div>
 
-          {/* Charts row 2 */}
+          {/* Charts row 2: composição da carteira */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <LeadsBySourceChart
-              data={data.sources?.sources ?? []}
-              loading={loading}
-            />
-            <ConversionsByPeriodChart
-              data={data.conversionsPeriod?.conversions ?? []}
-              loading={loading}
-            />
+            <TemperatureChart data={data.temperature?.temperature ?? []} loading={loading} />
+            <NegotiationsBySourceChart data={data.sources?.sources ?? []} loading={loading} />
+          </div>
+
+          {/* Charts row 3: backlog acionável */}
+          <div className="grid grid-cols-1 gap-4">
+            <IdleLeadsChart data={data.idleLeads?.idleLeads ?? null} loading={loading} />
           </div>
         </>
       )}

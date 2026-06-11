@@ -27,7 +27,7 @@ export default function UserAvatar({ name, role, size = "md" }: UserAvatarProps)
 
   return (
     <div
-      className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold flex-shrink-0`}
+      className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold shrink-0`}
       style={{ backgroundColor: colors.bg, color: colors.text }}
     >
       {getInitials(name)}

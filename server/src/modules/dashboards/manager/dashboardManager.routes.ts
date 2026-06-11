@@ -8,49 +8,41 @@ import { managerDashboardFilterSchema } from './dashboardManager.dto.js';
 import { DashboardManagerController } from './dashboardManager.controller.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD MANAGER ROUTES
+// DASHBOARD MANAGER ROUTES — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Pipeline aplicada a TODAS as rotas via .use():
+//   1. authMiddleware            → JWT válido, injeta req.user.
+//   2. checkPermission('MANAGER') → nível mínimo MANAGER (GM/ADMIN passam por
+//      hierarquia; o escopo fino "manager só vê a própria equipa" é do service).
+//   3. validateQuery(schema)     → query params tipados via Zod.
 //
-//   1. authMiddleware
-//      → Valida o access token JWT e injeta req.user com { id, email, role, team_ids }.
-//        Qualquer requisição sem token válido é rejeitada com 403 antes de chegar
-//        ao controller.
-//
-//   2. checkPermission('MANAGER')
-//      → Hierárquico: MANAGER, GENERAL_MANAGER e ADMIN passam; ATTENDANT recebe 403.
-//        Aqui a hierarquia resolve bem porque quem tem mais privilégio
-//        (GENERAL_MANAGER, ADMIN) também pode visualizar o dashboard de gerente.
-//
-//   3. validateQuery(managerDashboardFilterSchema)
-//      → Valida e transforma os query params via Zod. Após este middleware,
-//        req.query contém valores já tipados (Dates em vez de strings brutas).
-//        Requisições com params inválidos recebem 422 antes de chegar ao controller.
-//
-// Restrição granular ("manager vê apenas dados dos próprios times"):
-// responsabilidade do DashboardManagerService.assertCanAccess() — que
-// tem contexto de runtime (req.user.team_ids vs targetTeamId) para aplicar
-// a regra. Não cabe na rota, que só conhece papel, não escopo.
+// SEMÂNTICA DOS ENDPOINTS:
+//   - SNAPSHOT (ignoram startDate/endDate): active-negotiations,
+//     stagnant-negotiations, stage-funnel, workload-by-attendant, idle-leads.
+//   - JANELA (âncora na data do EVENTO da negociação): sales, closing-rate,
+//     sales-by-attendant, evolution.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
 const dashboardManagerRoutes = Router();
 const controller = new DashboardManagerController();
 
-// Aplica a pipeline de segurança e validação globalmente neste router
 dashboardManagerRoutes.use(authMiddleware);
 dashboardManagerRoutes.use(checkPermission('MANAGER'));
 dashboardManagerRoutes.use(validateQuery(managerDashboardFilterSchema));
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────
-dashboardManagerRoutes.get('/kpi/team', controller.getTeamKpis);
-dashboardManagerRoutes.get('/kpi/top-attendant', controller.getTopAttendant);
+dashboardManagerRoutes.get('/kpi/active-negotiations', controller.getActiveNegotiations);
+dashboardManagerRoutes.get('/kpi/sales', controller.getSales);
+dashboardManagerRoutes.get('/kpi/closing-rate', controller.getClosingRate);
+dashboardManagerRoutes.get('/kpi/stagnant-negotiations', controller.getStagnantNegotiations);
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────
-dashboardManagerRoutes.get('/charts/leads-by-attendant', controller.getLeadsByAttendant);
-dashboardManagerRoutes.get('/charts/conversions-by-attendant', controller.getConversionsByAttendant);
-dashboardManagerRoutes.get('/charts/team-evolution', controller.getTeamEvolution);
-dashboardManagerRoutes.get('/charts/team-funnel', controller.getTeamFunnel);
+dashboardManagerRoutes.get('/charts/stage-funnel', controller.getStageFunnel);
+dashboardManagerRoutes.get('/charts/sales-by-attendant', controller.getSalesByAttendant);
+dashboardManagerRoutes.get('/charts/workload-by-attendant', controller.getWorkloadByAttendant);
+dashboardManagerRoutes.get('/charts/evolution', controller.getEvolution);
+dashboardManagerRoutes.get('/charts/idle-leads', controller.getIdleLeads);
 
 export default dashboardManagerRoutes;

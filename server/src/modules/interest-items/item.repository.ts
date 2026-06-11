@@ -1,4 +1,3 @@
-// server/src/modules/interest-items/item.repository.ts
 import { prisma } from "../../config/prisma.js";
 import type {
   CreateInterestItemDTO,
@@ -9,8 +8,9 @@ import type {
 // ─────────────────────────────────────────────
 // INTEREST ITEMS REPOSITORY
 // ─────────────────────────────────────────────
-// Camada de acesso a dados — sem regras de negócio.
-// Campos de auditoria recebidos prontos do service.
+// Camada de acesso a dados.
+// Aqui não colocamos regra de negócio pesada.
+// A função principal deste arquivo é conversar com o Prisma.
 // ─────────────────────────────────────────────
 
 export const InterestItemsRepository = {
@@ -23,19 +23,72 @@ export const InterestItemsRepository = {
       limit = 20,
     } = filters;
 
+    /**
+     * page e limit podem chegar como string pela URL.
+     *
+     * Exemplo:
+     * /api/interest-items?page=1&limit=8
+     *
+     * O Prisma precisa receber números em skip/take,
+     * então fazemos a conversão antes.
+     */
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 20;
+
+    /**
+     * is_active pode chegar de duas formas:
+     *
+     * - boolean true/false, se já vier tratado pelo DTO;
+     * - string "true"/"false", se vier direto da query string.
+     *
+     * O erro que estava acontecendo era porque o Prisma recebia:
+     * is_active: "true"
+     *
+     * Mas ele espera:
+     * is_active: true
+     */
+    const rawIsActive = is_active as unknown;
+
+    const parsedIsActive =
+      rawIsActive === undefined || rawIsActive === null || rawIsActive === ""
+        ? undefined
+        : rawIsActive === true || rawIsActive === "true";
+
+    /**
+     * Montamos o where dinamicamente.
+     *
+     * Importante:
+     * - Só adiciona description se foi enviada.
+     * - Só adiciona reference_code se foi enviado.
+     * - Só adiciona is_active se ele foi convertido para boolean.
+     */
+    const where = {
+      ...(description && {
+        description: {
+          contains: String(description),
+          mode: "insensitive" as const,
+        },
+      }),
+
+      ...(reference_code && {
+        reference_code: {
+          contains: String(reference_code),
+          mode: "insensitive" as const,
+        },
+      }),
+
+      ...(parsedIsActive !== undefined && {
+        is_active: parsedIsActive,
+      }),
+    };
+
     return prisma.interestItems.findMany({
-      where: {
-        ...(description && {
-          description: { contains: description, mode: "insensitive" },
-        }),
-        ...(reference_code && {
-          reference_code: { contains: reference_code, mode: "insensitive" },
-        }),
-        ...(is_active !== undefined && { is_active }),
+      where,
+      skip: (parsedPage - 1) * parsedLimit,
+      take: parsedLimit,
+      orderBy: {
+        created_at: "desc",
       },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { created_at: "desc" },
     });
   },
 
@@ -51,10 +104,9 @@ export const InterestItemsRepository = {
     });
   },
 
-  async create(
-    dto: CreateInterestItemDTO & { created_by_user_id: string }
-  ) {
+  async create(dto: CreateInterestItemDTO & { created_by_user_id: string }) {
     const { created_by_user_id, ...fields } = dto;
+
     return prisma.interestItems.create({
       data: {
         description: fields.description,
@@ -71,31 +123,53 @@ export const InterestItemsRepository = {
     dto: UpdateInterestItemDTO & { updated_by_user_id: string }
   ) {
     const { updated_by_user_id, ...fields } = dto;
+
     return prisma.interestItems.update({
       where: { id },
       data: {
         ...(fields.description !== undefined && {
           description: fields.description,
         }),
+
         ...(fields.reference_code !== undefined && {
           reference_code: fields.reference_code ?? null,
         }),
-        ...(fields.value !== undefined && { value: fields.value ?? null }),
-        ...(fields.is_active !== undefined && { is_active: fields.is_active }),
+
+        ...(fields.value !== undefined && {
+          value: fields.value ?? null,
+        }),
+
+        ...(fields.is_active !== undefined && {
+          is_active: fields.is_active,
+        }),
+
         updated_by_user_id,
       },
     });
   },
 
-  // Soft delete — marca como inativo, preserva o registro
+  /**
+   * Soft delete.
+   *
+   * Não apaga o registro do banco.
+   * Apenas marca como inativo.
+   */
   async softDelete(id: string, updated_by_user_id: string) {
     return prisma.interestItems.update({
       where: { id },
-      data: { is_active: false, updated_by_user_id },
+      data: {
+        is_active: false,
+        updated_by_user_id,
+      },
     });
   },
 
-  // Hard delete — remoção física, exclusivo para ADMIN
+  /**
+   * Hard delete.
+   *
+   * Remove fisicamente do banco.
+   * Deve ser usado apenas em casos restritos.
+   */
   async hardDelete(id: string) {
     return prisma.interestItems.delete({
       where: { id },

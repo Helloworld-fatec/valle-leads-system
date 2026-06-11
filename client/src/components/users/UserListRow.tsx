@@ -97,63 +97,26 @@ export default function UserListRow({ user, onEdit, onToggleStatus }: UserListRo
         </span>
       </td>
 
-      {/* Menu de Ações de 3 pontos */}
-      <td className="px-4 py-3.5 text-right relative">
-        {(onEdit || onToggleStatus) && (
-          <div className="inline-block text-left" ref={menuRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen(!menuOpen);
-              }}
-              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
-            >
-              <MoreVertical size={16} />
-            </button>
-
-            {menuOpen && (
-              <div className="absolute right-4 mt-1 w-44 bg-white border border-gray-100 rounded-xl shadow-xl z-30 py-1.5 text-left">
-                {onEdit && (
-                  <button
-                    onClick={() => {
-                      onEdit();
-                      setMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Pencil size={14} className="text-gray-400" />
-                    Editar Usuário
-                  </button>
-                )}
-                {onToggleStatus && (
-                  <button
-                    onClick={() => {
-                      onToggleStatus(user.id);
-                      setMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors border-t border-gray-50 ${
-                      user.is_active 
-                        ? "text-red-600 hover:bg-red-50/50" 
-                        : "text-green-600 hover:bg-green-50/50"
-                    }`}
-                  >
-                    {user.is_active ? (
-                      <>
-                        <ShieldAlert size={14} className="text-red-400" />
-                        Desativar Conta
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck size={14} className="text-green-400" />
-                        Reativar Conta
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+      {/* Actions */}
+      <td className="px-4 py-3.5">
+        <div className="relative flex justify-end">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <MoreVertical size={15} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-35">
+              <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <Pencil size={13} className="text-gray-400" /> Editar
+              </button>
+              <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                <Trash2 size={13} className="text-red-400" /> Desativar
+              </button>
+            </div>
+          )}
+        </div>
       </td>
     </tr>
   );
