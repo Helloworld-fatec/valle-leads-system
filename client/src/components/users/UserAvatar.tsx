@@ -1,4 +1,5 @@
-import { UserRole, roleColors } from "../../data/mockUsers";
+import { UserRole } from "../../services/userService";
+import { roleColors } from "../../constants/userConstants";
 
 interface UserAvatarProps {
   name: string;
@@ -6,7 +7,7 @@ interface UserAvatarProps {
   size?: "sm" | "md" | "lg";
 }
 
-function getInitials(name: string) {
+function getInitials(name: string): string {
   return name
     .split(" ")
     .slice(0, 2)
@@ -22,7 +23,7 @@ export default function UserAvatar({ name, role, size = "md" }: UserAvatarProps)
     lg: "w-14 h-14 text-lg",
   };
 
-  const colors = roleColors[role];
+  const colors = roleColors[role] ?? roleColors.ATTENDANT;
 
   return (
     <div

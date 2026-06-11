@@ -1,19 +1,45 @@
-import { User } from "../../data/mockUsers";
+import { useState, useRef, useEffect } from "react";
+import { User } from "../../services/userService";
+import { formatPhone, getTeamNames } from "../../constants/userConstants";
 import UserAvatar from "./UserAvatar";
 import RoleBadge from "./RoleBadge";
-import { Mail, Phone, Users, MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Phone, Users, MoreVertical, Pencil, ShieldAlert, ShieldCheck } from "lucide-react";
 
 interface UserListRowProps {
   user: User;
+  onEdit?: () => void;
+  onToggleStatus?: (id: string) => void;
 }
 
-export default function UserListRow({ user }: UserListRowProps) {
+export default function UserListRow({ user, onEdit, onToggleStatus }: UserListRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const phone = formatPhone(user.phone_1_ddd, user.phone_1_number);
+  const teamNames = getTeamNames(
+    user.user_teams as Array<{
+      id: string;
+      team_id: string;
+      team?: { id: string; name: string; store_id: string; is_active: boolean };
+    }>
+  );
+
+  // Fecha o menu de 3 pontos se clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   return (
     <tr className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group">
-      {/* User */}
+      {/* Usuário */}
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -25,47 +51,48 @@ export default function UserListRow({ user }: UserListRowProps) {
             />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+            <p className="text-sm font-semibold text-gray-900 leading-tight">
+              {user.name}
+            </p>
             <p className="text-xs text-gray-400">{user.email}</p>
           </div>
         </div>
       </td>
 
-      {/* Role */}
-      <td className="px-4 py-3.5">
+      {/* Perfil */}
+      <td className="px-4 py-3.5 vertical-align-middle">
         <RoleBadge role={user.role} />
       </td>
 
-      {/* Team */}
-      <td className="px-4 py-3.5 hidden md:table-cell">
-        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-          <Users size={13} className="text-gray-400" />
-          {user.team}
+      {/* Equipe */}
+      <td className="px-4 py-3.5 hidden md:table-cell max-w-[180px] truncate text-sm text-gray-500">
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-gray-400 flex-shrink-0" />
+          <span className="truncate" title={teamNames}>{teamNames}</span>
         </div>
       </td>
 
-      {/* Phone */}
-      <td className="px-4 py-3.5 hidden lg:table-cell">
-        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-          <Phone size={13} className="text-gray-400" />
-          {user.phone ?? "—"}
-        </div>
+      {/* Telefone */}
+      <td className="px-4 py-3.5 hidden lg:table-cell text-sm text-gray-500">
+        {phone !== "—" ? (
+          <div className="flex items-center gap-2">
+            <Phone size={14} className="text-gray-400 flex-shrink-0" />
+            <span>{phone}</span>
+          </div>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
       </td>
 
       {/* Status */}
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3.5 text-sm">
         <span
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
             user.is_active
-              ? "bg-green-50 text-green-700"
-              : "bg-gray-100 text-gray-500"
+              ? "text-green-700 bg-green-50"
+              : "text-gray-500 bg-gray-100"
           }`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              user.is_active ? "bg-green-500" : "bg-gray-400"
-            }`}
-          />
           {user.is_active ? "Ativo" : "Inativo"}
         </span>
       </td>

@@ -1,79 +1,45 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
-import { useUserService, UserRole, CreateUserDTO } from "../../services/userService";
-import { useTeamsService, Team } from "../../services/teamService";
+import { useUserService, User, UserRole } from "../../services/userService";
 import { roleLabels } from "../../constants/userConstants";
 
-interface InviteUserModalProps {
+interface EditUserModalProps {
+  user: User;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (updated: User) => void;
 }
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
-const CREATABLE_ROLES: UserRole[] = [
+const EDITABLE_ROLES: UserRole[] = [
   "ATTENDANT",
   "MANAGER",
   "GENERAL_MANAGER",
   "ADMIN",
 ];
 
-const INITIAL_FORM = {
-  name:        "",
-  email:       "",
-  password:    "",
-  role:        "ATTENDANT" as UserRole,
-  team_ids:    [] as string[],
-  phone_ddd:   "",
-  phone_num:   "",
-};
+export default function EditUserModal({ user, onClose, onSuccess }: EditUserModalProps) {
+  const { updateUser } = useUserService();
 
-export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalProps) {
-  const { createUser }  = useUserService();
-  const { getTeams }    = useTeamsService();
+  const [form, setForm] = useState({
+    name:      user.name,
+    email:     user.email,
+    role:      user.role as UserRole,
+    phone_ddd: user.phone_1_ddd  ?? "",
+    phone_num: user.phone_1_number ?? "",
+    password:  "",
+  });
 
-  const [form, setForm]         = useState(INITIAL_FORM);
   const [status, setStatus]     = useState<FormStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [showPass, setShowPass] = useState(false);
 
-  const [teams, setTeams]           = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(true);
-
-  // Busca times reais do banco na abertura do modal
-  useEffect(() => {
-    let cancelled = false;
-    setTeamsLoading(true);
-
-    getTeams()
-      .then((data) => {
-        if (!cancelled) {
-          setTeams(data.filter((t) => t.is_active));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setTeams([]);
-      })
-      .finally(() => {
-        if (!cancelled) setTeamsLoading(false);
-      });
-
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function toggleTeam(teamId: string) {
-    setForm((prev) => ({
-      ...prev,
-      team_ids: prev.team_ids.includes(teamId)
-        ? prev.team_ids.filter((id) => id !== teamId)
-        : [...prev.team_ids, teamId],
-    }));
-  }
+  const isLoading = status === "loading";
+  const isSuccess = status === "success";
 
   async function handleSubmit() {
-    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
-      setErrorMsg("Nome, e-mail e senha são obrigatórios.");
+    if (!form.name.trim() || !form.email.trim()) {
+      setErrorMsg("Nome e e-mail são obrigatórios.");
       setStatus("error");
       return;
     }
@@ -81,37 +47,41 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
     setStatus("loading");
     setErrorMsg("");
 
-    const dto: CreateUserDTO = {
-      name:     form.name.trim(),
-      email:    form.email.trim(),
-      password: form.password,
-      role:     form.role,
-      ...(form.team_ids.length > 0 && { team_ids: form.team_ids }),
-      ...(form.phone_ddd && form.phone_num && {
-        phone_1_ddd:    form.phone_ddd,
-        phone_1_number: form.phone_num,
-      }),
+    const dto: Record<string, unknown> = {
+      name:  form.name.trim(),
+      email: form.email.trim(),
+      role:  form.role,
     };
 
+    if (form.phone_ddd && form.phone_num) {
+      dto.phone_1_ddd    = form.phone_ddd;
+      dto.phone_1_number = form.phone_num;
+    } else {
+      // Limpa o telefone se ambos estiverem vazios
+      dto.phone_1_ddd    = null;
+      dto.phone_1_number = null;
+    }
+
+    if (form.password.trim()) {
+      dto.password = form.password;
+    }
+
     try {
-      await createUser(dto);
+      const updated = await updateUser(user.id, dto as any);
       setStatus("success");
       setTimeout(() => {
-        onSuccess?.();
+        onSuccess?.(updated);
         onClose();
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       const msg =
         err?.message?.includes("409") || err?.message?.toLowerCase().includes("conflict")
           ? "Já existe um usuário com este e-mail."
-          : err?.message || "Erro ao criar usuário. Tente novamente.";
+          : err?.message || "Erro ao atualizar usuário. Tente novamente.";
       setErrorMsg(msg);
       setStatus("error");
     }
   }
-
-  const isLoading = status === "loading";
-  const isSuccess = status === "success";
 
   return (
     <div
@@ -122,9 +92,9 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Novo Usuário</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Adicione um membro à equipe
+            <h2 className="text-lg font-bold text-gray-900">Editar Usuário</h2>
+            <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[260px]">
+              {user.email}
             </p>
           </div>
           <button
@@ -136,17 +106,14 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
           </button>
         </div>
 
-        {/* Success state */}
+        {/* Success */}
         {isSuccess ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 p-10 text-center">
             <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
               <CheckCircle2 size={28} className="text-green-500" />
             </div>
             <p className="text-base font-semibold text-gray-900">
-              Usuário criado com sucesso!
-            </p>
-            <p className="text-sm text-gray-500">
-              A lista será atualizada em instantes.
+              Usuário atualizado!
             </p>
           </div>
         ) : (
@@ -162,7 +129,6 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Ex: João Silva"
                   disabled={isLoading}
                   className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all disabled:opacity-60"
                 />
@@ -177,37 +143,9 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="joao@empresa.com"
                   disabled={isLoading}
                   className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all disabled:opacity-60"
                 />
-              </div>
-
-              {/* Senha */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Senha <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPass ? "text" : "password"}
-                    value={form.password}
-                    onChange={(e) =>
-                      setForm({ ...form, password: e.target.value })
-                    }
-                    placeholder="Mínimo 6 caracteres"
-                    disabled={isLoading}
-                    className="w-full px-3.5 py-2.5 pr-10 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all disabled:opacity-60"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    tabIndex={-1}
-                  >
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
               </div>
 
               {/* Perfil */}
@@ -217,13 +155,11 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
                 </label>
                 <select
                   value={form.role}
-                  onChange={(e) =>
-                    setForm({ ...form, role: e.target.value as UserRole })
-                  }
+                  onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
                   disabled={isLoading}
                   className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 appearance-none cursor-pointer text-gray-700 disabled:opacity-60"
                 >
-                  {CREATABLE_ROLES.map((r) => (
+                  {EDITABLE_ROLES.map((r) => (
                     <option key={r} value={r}>
                       {roleLabels[r]}
                     </option>
@@ -260,42 +196,30 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
                 </div>
               </div>
 
-              {/* Times */}
+              {/* Nova senha (opcional) */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Equipe(s) (opcional)
+                  Nova senha{" "}
+                  <span className="text-gray-400 font-normal">(deixe em branco para manter)</span>
                 </label>
-                {teamsLoading ? (
-                  <div className="flex items-center gap-2 py-3 text-sm text-gray-400">
-                    <Loader2 size={14} className="animate-spin" />
-                    Carregando equipes...
-                  </div>
-                ) : teams.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-2">
-                    Nenhuma equipe ativa encontrada.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                    {teams.map((team) => {
-                      const selected = form.team_ids.includes(team.id);
-                      return (
-                        <button
-                          key={team.id}
-                          type="button"
-                          onClick={() => toggleTeam(team.id)}
-                          disabled={isLoading}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                            selected
-                              ? "bg-blue-600 border-blue-600 text-white"
-                              : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"
-                          }`}
-                        >
-                          {team.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="relative">
+                  <input
+                    type={showPass ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="••••••••"
+                    disabled={isLoading}
+                    className="w-full px-3.5 py-2.5 pr-10 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                  >
+                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               {/* Erro */}
@@ -324,10 +248,10 @@ export default function InviteUserModal({ onClose, onSuccess }: InviteUserModalP
                 {isLoading ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
-                    Criando...
+                    Salvando...
                   </>
                 ) : (
-                  "Criar usuário"
+                  "Salvar alterações"
                 )}
               </button>
             </div>
