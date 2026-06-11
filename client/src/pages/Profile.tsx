@@ -2,19 +2,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../hook/useAuth";
 import { useProfileService } from "../services/profileService";
-import type { UserProfile, UpdateProfileDTO } from "../services/profileService";
+import type { UserProfile, UpdateSelfDTO as UpdateProfileDTO } from "../services/profileService";
 
 import ProfileHeader    from "../components/profile/ProfileHeader";
 import AccountInfo      from "../components/profile/AccountInfo";
 import EditPasswordForm  from "../components/profile/EditPasswordForm";
 import AccessLevelCards from "../components/profile/AccessLevelCards";
-import ActivityStats    from "../components/profile/ActivityStats";
 import DangerZone       from "../components/profile/DangerZone";
 import EditContactModal from "../components/profile/EditContactModal";
-
-// ─────────────────────────────────────────────
-// Skeleton de loading
-// ─────────────────────────────────────────────
 
 function ProfileSkeleton() {
   return (
@@ -33,10 +28,6 @@ function ProfileSkeleton() {
   );
 }
 
-// ─────────────────────────────────────────────
-// Página
-// ─────────────────────────────────────────────
-
 export default function Profile() {
   const { user }                          = useAuth();
   const { getProfileWithTeam, updateProfile, updatePassword } = useProfileService();
@@ -45,8 +36,6 @@ export default function Profile() {
   const [isLoading, setIsLoading]         = useState(true);
   const [error, setError]                 = useState<string | null>(null);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
-
-  // ── Fetch ───────────────────────────────────
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -66,20 +55,16 @@ export default function Profile() {
     fetchProfile();
   }, [fetchProfile]);
 
-  // ── Handlers ────────────────────────────────
-
   async function handleUpdateProfile(userId: string, data: UpdateProfileDTO): Promise<UserProfile> {
     const updated = await updateProfile(userId, data);
     setProfile(updated);
     return updated;
   }
 
-  async function handleUpdatePassword(password: string): Promise<void> {
+  async function handleUpdatePassword(currentPassword: string, newPassword: string): Promise<void> {
     if (!user?.id) return;
-    await updatePassword(user.id, password);
+    await updatePassword(user.id, currentPassword, newPassword);
   }
-
-  // ── Estados da tela ─────────────────────────
 
   if (isLoading) {
     return (
@@ -109,34 +94,26 @@ export default function Profile() {
 
   if (!profile) return null;
 
-  // ── Render principal ─────────────────────────
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-      {/* Título */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Meu perfil</h1>
         <p className="text-sm text-gray-500 mt-0.5">Gerencie suas informações e preferências</p>
       </div>
 
-      {/* Header */}
       <div className="mb-6">
         <ProfileHeader profile={profile} />
       </div>
 
-      {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Coluna esquerda */}
         <div className="lg:col-span-1 flex flex-col gap-6">
           <AccountInfo
             profile={profile}
             onEditContact={() => setIsEditContactOpen(true)}
           />
-          <ActivityStats />
           <DangerZone />
         </div>
 
-        {/* Coluna direita */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           <EditPasswordForm
             profile={profile}
@@ -145,12 +122,10 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* AccessLevelCards — só visível para GENERAL_MANAGER */}
       {user?.role === "GENERAL_MANAGER" && (
         <AccessLevelCards currentRole={profile.role} />
       )}
 
-      {/* Modal de edição de contato e endereço */}
       <EditContactModal
         isOpen={isEditContactOpen}
         onClose={() => setIsEditContactOpen(false)}
