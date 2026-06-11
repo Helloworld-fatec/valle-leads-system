@@ -103,6 +103,15 @@ export interface PaginatedLeadsResponse {
   limit: number;
 }
 
+export interface CreateLeadDTO {
+  source?: string;
+  status?: string;
+  customer_id: string;
+  team_id?: string;
+  attendant_id?: string;
+  interest_item_id?: string;
+}
+
 // ─────────────────────────────────────────────
 // HOOK
 // ─────────────────────────────────────────────
@@ -190,13 +199,13 @@ export function useLeadService() {
   }
 
   async function bulkAssignLeads(
-    leadIds: string[],
-    attendantId: string
-  ): Promise<PromiseSettledResult<Lead>[]> {
-    return Promise.allSettled(
-      leadIds.map((id) => assignLead(id, attendantId))
-    );
-  }
+  leadIds: string[],
+  attendantId: string,
+): Promise<PromiseSettledResult<Lead>[]> {
+  return Promise.allSettled(
+    leadIds.map((id) => assignLead(id, attendantId))
+  );
+}
 
   async function bulkAssignTeam(
     leadIds: string[],
@@ -219,6 +228,15 @@ export function useLeadService() {
     return json.data ?? json;
   }
 
+  async function createLead(data: CreateLeadDTO): Promise<Lead> {
+  const res = await apiFetch("/api/leads", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  return json.data ?? json;
+}
+
   return {
     getLeads,
     getAllLeads,
@@ -228,5 +246,6 @@ export function useLeadService() {
     bulkAssignLeads,
     bulkAssignTeam,
     createNegotiation,
+    createLead, 
   };
 }
