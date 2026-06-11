@@ -1,5 +1,3 @@
-// src/pages/Leads.tsx
-
 import { useState, useEffect, useMemo } from "react";
 import {
   LayoutList,
@@ -42,6 +40,63 @@ type StatusFilter = LeadStatus | "Todos";
 type ViewMode = "list" | "card";
 
 /**
+ * Converte a data da lead para uma chave local no formato YYYY-MM-DD.
+ *
+ * Isso evita problema de timezone/horário no filtro por calendário.
+ *
+ * Exemplo:
+ * lead.created_at = "2026-06-10T23:30:00.000Z"
+ *
+ * Em vez de comparar Date com hora, comparamos só:
+ * "2026-06-10"
+ */
+function getLocalDateKey(date?: string | null) {
+  if (!date) return "";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) return "";
+
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Verifica se a lead está dentro do período selecionado.
+ *
+ * dateFrom e dateTo vêm do input type="date" como "YYYY-MM-DD".
+ * A data da lead também é convertida para "YYYY-MM-DD".
+ *
+ * Assim, lead do dia 10 só aparece no dia 10.
+ */
+function isLeadInsideDateFilter(
+  leadCreatedAt: string,
+  dateFrom: string,
+  dateTo: string,
+) {
+  const leadDate = getLocalDateKey(leadCreatedAt);
+
+  if (!leadDate) return false;
+
+  if (dateFrom && !dateTo) {
+    return leadDate === dateFrom;
+  }
+
+  if (!dateFrom && dateTo) {
+    return leadDate <= dateTo;
+  }
+
+  if (dateFrom && dateTo) {
+    return leadDate >= dateFrom && leadDate <= dateTo;
+  }
+
+  return true;
+}
+
+/**
  * Aplica todos os filtros usados na tela de Leads.
  *
  * Filtros considerados:
@@ -66,27 +121,29 @@ function filterLeads(
       if (src !== source.toLowerCase()) return false;
     }
 
-    if (dateFrom) {
-      const from = new Date(dateFrom);
-      from.setHours(0, 0, 0, 0);
+    /**
+     * Filtro de data corrigido.
+     *
+     * Antes comparava Date completo com hora/timezone:
+     * new Date(dateFrom), new Date(dateTo), new Date(lead.created_at)
+     *
+     * Agora compara apenas o dia local no formato YYYY-MM-DD.
+     */
+    const matchesDate = isLeadInsideDateFilter(
+      lead.created_at,
+      dateFrom,
+      dateTo,
+    );
 
-      if (new Date(lead.created_at) < from) return false;
-    }
-
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-
-      if (new Date(lead.created_at) > to) return false;
-    }
+    if (!matchesDate) return false;
 
     if (search) {
-      const query = search.toLowerCase();
+      const query = search.trim().toLowerCase();
 
       const name = lead.customers?.name?.toLowerCase() ?? "";
       const email = lead.customers?.email?.toLowerCase() ?? "";
       const cpf = lead.customers?.cpf ?? "";
-      const ref = lead.interest_item?.reference_code ?? "";
+      const ref = lead.interest_item?.reference_code?.toLowerCase() ?? "";
       const product = lead.interest_item?.description?.toLowerCase() ?? "";
 
       if (
@@ -553,6 +610,15 @@ export default function Leads() {
         <LeadDetailModal
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
+          onLeadUpdated={(updatedLead) => {
+            setSelectedLead(updatedLead);
+
+            setLeads((prev) =>
+              prev.map((lead) =>
+                lead.id === updatedLead.id ? updatedLead : lead,
+              ),
+            );
+          }}
         />
       )}
 

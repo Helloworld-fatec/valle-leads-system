@@ -1,13 +1,10 @@
-// src/components/leads/LeadCard.tsx
-
-import {
+﻿import {
   MapPin,
   Tag,
   User,
   Package,
   Calendar,
   Clock,
-  AlertTriangle,
   Users,
 } from "lucide-react";
 import type { Lead } from "../../services/leadService";
@@ -15,13 +12,12 @@ import type { Lead } from "../../services/leadService";
 /**
  * Configuração visual dos status do lead.
  *
- * Os valores técnicos vêm do backend/banco:
- * - new
- * - open
- * - won
- * - lost
- *
- * A label é o texto exibido para o usuário final.
+ * Esses status são o estado comercial real da oportunidade.
+ * Por isso eles continuam coloridos:
+ * - new  -> Novo
+ * - open -> Em andamento
+ * - won  -> Ganho
+ * - lost -> Perdido
  */
 export const STATUS_CONFIG: Record<
   string,
@@ -57,7 +53,6 @@ export const STATUS_CONFIG: Record<
  * Ícones visuais por origem do lead.
  *
  * A chave é comparada em lowercase.
- * Por isso existem algumas variações com e sem acento.
  */
 export const SOURCE_ICONS: Record<string, string> = {
   instagram: "📸",
@@ -74,8 +69,6 @@ export const SOURCE_ICONS: Record<string, string> = {
 
 /**
  * Paleta simples para os avatares com iniciais.
- *
- * Não depende do banco. A cor é escolhida com base no id do lead.
  */
 const AVATAR_COLORS = [
   { bg: "#DBEAFE", text: "#1E40AF" },
@@ -91,8 +84,8 @@ const AVATAR_COLORS = [
  * Gera as iniciais do cliente.
  *
  * Exemplo:
- * "Maria Silva" → "MS"
- * "Cliente Exemplo" → "CE"
+ * "Maria Silva" -> "MS"
+ * "Cliente Exemplo" -> "CE"
  */
 export function getInitials(name: string) {
   return name
@@ -106,9 +99,6 @@ export function getInitials(name: string) {
 
 /**
  * Escolhe uma cor de avatar com base no id do lead.
- *
- * Isso mantém uma variação visual entre cards/linhas sem precisar salvar
- * uma cor específica no banco.
  */
 export function getAvatarColor(id: string) {
   const idx = id.charCodeAt(0) % AVATAR_COLORS.length;
@@ -134,7 +124,6 @@ export function formatDate(iso: string) {
  * Formata valor monetário.
  *
  * O Prisma Decimal normalmente chega no frontend como string.
- * Por isso a função recebe string e converte com parseFloat.
  */
 export function formatCurrency(value?: string) {
   if (!value) return null;
@@ -152,37 +141,59 @@ export function formatCurrency(value?: string) {
 /**
  * Calcula quantos dias se passaram desde uma data.
  *
- * Usado para definir se o lead está recente, parado ou crítico.
+ * Regra corrigida:
+ * agora o cálculo considera a diferença entre dias do calendário,
+ * e não apenas blocos completos de 24 horas.
+ *
+ * Exemplo:
+ * Criado em 10/06 às 23:50
+ * Hoje 11/06 às 00:10
+ *
+ * Antes: 0 dias.
+ * Agora: 1 dia.
  */
-function getDaysSince(date?: string) {
+function getDaysSince(date?: string | null) {
   if (!date) return 0;
 
-  const dateValue = new Date(date).getTime();
+  const parsedDate = new Date(date);
 
-  if (Number.isNaN(dateValue)) return 0;
+  if (Number.isNaN(parsedDate.getTime())) return 0;
 
-  const today = new Date().getTime();
-  const diff = today - dateValue;
+  const createdDay = new Date(
+    parsedDate.getFullYear(),
+    parsedDate.getMonth(),
+    parsedDate.getDate()
+  );
 
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  const today = new Date();
+  const todayDay = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+
+  const diffInMs = todayDay.getTime() - createdDay.getTime();
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  return Math.max(0, diffInDays);
 }
 
 /**
- * Define a tag de atenção do lead.
+ * Define a informação de tempo da lead na carteira.
  *
- * Regra atual:
- * - won/lost: finalizado;
- * - 30+ dias sem atualização: crítico;
- * - 7 a 29 dias sem atualização: parado;
- * - 3 a 6 dias sem atualização: sem avanço;
- * - 0 a 2 dias: recente.
+ * Regra importante:
+ * usamos created_at, e não updated_at.
  *
- * A data usada é updated_at quando existir.
- * Se não existir, usa created_at.
+ * Motivo:
+ * updated_at muda quando a lead é editada, quando o status muda,
+ * quando roda seed/migração ou quando algum campo é atualizado.
+ * Se usarmos updated_at, leads antigas podem aparecer como "Recente".
+ *
+ * Também deixamos essa informação com visual neutro para não competir
+ * com as cores dos status e dos cards superiores.
  */
 function getLeadAttentionInfo(lead: Lead) {
-  const referenceDate = lead.updated_at ?? lead.created_at;
-  const days = getDaysSince(referenceDate);
+  const days = getDaysSince(lead.created_at);
 
   if (lead.status === "won" || lead.status === "lost") {
     return {
@@ -195,35 +206,35 @@ function getLeadAttentionInfo(lead: Lead) {
 
   if (days >= 30) {
     return {
-      label: `Crítico há ${days} dias`,
-      detail: "Sem movimentação há muito tempo",
-      className: "bg-red-50 text-red-700 border-red-100",
-      icon: AlertTriangle,
+      label: `${days} dias na carteira`,
+      detail: "Lead antigo na carteira",
+      className: "bg-gray-50 text-gray-500 border-gray-100",
+      icon: Clock,
     };
   }
 
   if (days >= 7) {
     return {
-      label: `Parado há ${days} dias`,
-      detail: "Precisa de atenção",
-      className: "bg-red-50 text-red-700 border-red-100",
-      icon: AlertTriangle,
+      label: `${days} dias na carteira`,
+      detail: "Acompanhar oportunidade",
+      className: "bg-gray-50 text-gray-500 border-gray-100",
+      icon: Clock,
     };
   }
 
   if (days >= 3) {
     return {
-      label: `Sem avanço há ${days} dias`,
-      detail: "Acompanhar lead",
-      className: "bg-amber-50 text-amber-700 border-amber-100",
+      label: `${days} dias na carteira`,
+      detail: "Criado há alguns dias",
+      className: "bg-gray-50 text-gray-500 border-gray-100",
       icon: Clock,
     };
   }
 
   return {
     label: "Recente",
-    detail: "Atualizado recentemente",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    detail: "Criado recentemente",
+    className: "bg-gray-50 text-gray-500 border-gray-100",
     icon: Clock,
   };
 }
@@ -287,8 +298,12 @@ interface LeadCardProps {
 /**
  * Card visual do lead.
  *
- * Usado na visualização "Cards".
- * Mostra dados principais do lead em formato mais visual e amigável.
+ * Refinamento final:
+ * - Status continua colorido.
+ * - Informação de tempo não aparece mais como badge colorida no topo.
+ * - O tempo na carteira fica discreto no rodapé.
+ * - Removemos equipe do card para reduzir poluição visual.
+ * - A visão em lista continua mais completa.
  */
 export default function LeadCard({
   lead,
@@ -311,7 +326,6 @@ export default function LeadCard({
   const avatar = getAvatarColor(lead.id);
 
   const attention = getLeadAttentionInfo(lead);
-  const AttentionIcon = attention.icon;
 
   const interestLabel =
     lead.interest_item?.description ??
@@ -345,7 +359,7 @@ export default function LeadCard({
         </div>
       )}
 
-      {/* Cabeçalho do card: avatar, nome, status e atenção */}
+      {/* Cabeçalho do card: avatar, nome e status comercial */}
       <div className="flex items-start gap-3 mb-4">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
@@ -373,14 +387,6 @@ export default function LeadCard({
               />
               {status.label}
             </span>
-
-            <span
-              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${attention.className}`}
-              title={attention.detail}
-            >
-              <AttentionIcon size={11} />
-              {attention.label}
-            </span>
           </div>
         </div>
       </div>
@@ -389,7 +395,7 @@ export default function LeadCard({
       <div className="space-y-2">
         <div className="flex items-start gap-2 text-xs text-gray-500">
           <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
-          <span>
+          <span className="truncate">
             {sourceIcon} {lead.source ?? "Origem não informada"}
           </span>
         </div>
@@ -408,16 +414,6 @@ export default function LeadCard({
           </div>
         )}
 
-        {/* Exibe apenas o nome da equipe para evitar repetição tipo "Equipe: Equipe PA" */}
-        {lead.teams?.name && (
-          <div className="flex items-start gap-2 text-xs text-gray-500">
-            <Users size={12} className="mt-0.5 shrink-0 text-gray-400" />
-            <span title={lead.teams.name} className="text-gray-600 truncate">
-              {lead.teams.name}
-            </span>
-          </div>
-        )}
-
         {showAttendant && (
           <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-50">
             <User size={12} className="shrink-0 text-gray-400" />
@@ -426,16 +422,21 @@ export default function LeadCard({
         )}
       </div>
 
-      {/* Rodapé do card: data de criação e indicação textual de atualização */}
-      <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-50">
-        <div className="flex items-center gap-1.5">
-          <Calendar size={11} className="text-gray-300" />
-          <span className="text-[11px] text-gray-400">
+      {/* Rodapé discreto: data + tempo na carteira */}
+      <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-50">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Calendar size={11} className="text-gray-300 shrink-0" />
+          <span className="text-[11px] text-gray-400 truncate">
             {formatDate(lead.created_at)}
           </span>
         </div>
 
-        <span className="text-[11px] text-gray-400">{attention.detail}</span>
+        <span
+          className="text-[11px] text-gray-400 truncate"
+          title={attention.detail}
+        >
+          {attention.label}
+        </span>
       </div>
     </div>
   );
@@ -444,8 +445,12 @@ export default function LeadCard({
 /**
  * Linha do lead.
  *
- * Usada na visualização "Lista".
- * É mais compacta e melhor para análise rápida de muitos registros.
+ * A lista é mais analítica que os cards:
+ * - mantém equipe;
+ * - mantém produto;
+ * - mantém valor;
+ * - mantém origem;
+ * - mantém a coluna Atenção, mas com visual neutro.
  */
 export function LeadRow({
   lead,
@@ -505,7 +510,6 @@ export function LeadRow({
         {getInitials(name)}
       </div>
 
-      {/* Cliente com largura mínima para evitar corte excessivo na tabela */}
       <div className="flex-1 min-w-[220px]">
         <p
           title={name}
@@ -534,6 +538,7 @@ export function LeadRow({
         </span>
       </div>
 
+      {/* Atenção neutra para não competir com status/cards superiores */}
       <div className="w-40 shrink-0 hidden lg:block">
         <span
           className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border ${attention.className}`}
