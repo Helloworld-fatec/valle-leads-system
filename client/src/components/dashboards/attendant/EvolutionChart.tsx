@@ -1,10 +1,11 @@
-// src/components/dashboards/general-manager/GlobalEvolutionChart.tsx
-// Linha dupla: negociações ABERTAS × GANHAS por dia, em toda a empresa.
-import type { GlobalEvolutionResponse } from "../../../services/dashboardService";
+// src/components/dashboards/attendant/EvolutionChart.tsx
+// Linha dupla: negociações ABERTAS × GANHAS por dia, dentro da janela.
+// Substitui o antigo LeadsEvolutionChart (série única de leads criados).
+import { EvolutionPoint } from "../../../services/dashboardService";
 
-interface Props {
-  data: GlobalEvolutionResponse | null;
-  loading: boolean;
+interface EvolutionChartProps {
+  data: EvolutionPoint[];
+  loading?: boolean;
 }
 
 const OPENED_COLOR = "#3B82F6";
@@ -15,28 +16,20 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-export default function GlobalEvolutionChart({ data, loading }: Props) {
-  const points = data?.evolution ?? [];
-
+export default function EvolutionChart({ data, loading }: EvolutionChartProps) {
   if (loading) {
     return (
-      <div
-        className="rounded-2xl p-6 shadow-sm border animate-pulse"
-        style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
-      >
-        <div className="w-40 h-5 bg-slate-100 rounded mb-1" />
-        <div className="w-24 h-4 bg-slate-100 rounded mb-6" />
-        <div className="h-44 bg-slate-50 rounded-lg" />
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
+        <div className="w-40 h-5 bg-gray-100 rounded mb-1" />
+        <div className="w-24 h-4 bg-gray-100 rounded mb-6" />
+        <div className="h-44 bg-gray-50 rounded-lg" />
       </div>
     );
   }
 
-  if (!points.length) {
+  if (!data.length) {
     return (
-      <div
-        className="rounded-2xl p-6 shadow-sm border flex flex-col items-center justify-center min-h-[220px]"
-        style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
-      >
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[220px]">
         <p className="text-sm font-medium" style={{ color: "#6B7280" }}>
           Nenhum dado no período
         </p>
@@ -47,29 +40,28 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
   const HEIGHT = 160;
   const PAD_TOP = 10;
   const STEP_X = 36;
-  const width = Math.max(points.length * STEP_X, 320);
-  const max = Math.max(...points.map((d) => Math.max(d.opened, d.won)), 1);
-  const labelStep = Math.max(1, Math.ceil(points.length / 10));
+  const width = Math.max(data.length * STEP_X, 320);
+  const max = Math.max(...data.map((d) => Math.max(d.opened, d.won)), 1);
+
+  // No máximo 10 labels no eixo X, para legibilidade
+  const labelStep = Math.max(1, Math.ceil(data.length / 10));
 
   const x = (i: number) =>
-    points.length === 1 ? width / 2 : (i / (points.length - 1)) * (width - STEP_X) + STEP_X / 2;
+    data.length === 1 ? width / 2 : (i / (data.length - 1)) * (width - STEP_X) + STEP_X / 2;
   const y = (v: number) => PAD_TOP + (1 - v / max) * (HEIGHT - PAD_TOP);
 
   const linePoints = (key: "opened" | "won") =>
-    points.map((d, i) => `${x(i)},${y(d[key])}`).join(" ");
+    data.map((d, i) => `${x(i)},${y(d[key])}`).join(" ");
 
   return (
-    <div
-      className="rounded-2xl p-6 shadow-sm border"
-      style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
-    >
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="font-semibold text-sm" style={{ color: "#111827" }}>
-            Evolução Global
+            Evolução de Negociações
           </h3>
           <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
-            Abertas × ganhas por dia — todas as equipes
+            Abertas × ganhas por dia
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -92,6 +84,7 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
           className="w-full"
           style={{ minHeight: `${HEIGHT + 40}px` }}
         >
+          {/* Linhas-guia horizontais */}
           {[0.25, 0.5, 0.75, 1].map((f) => (
             <line
               key={f}
@@ -104,6 +97,7 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
             />
           ))}
 
+          {/* Série: abertas */}
           <polyline
             points={linePoints("opened")}
             fill="none"
@@ -112,6 +106,7 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
             strokeLinejoin="round"
             strokeLinecap="round"
           />
+          {/* Série: ganhas */}
           <polyline
             points={linePoints("won")}
             fill="none"
@@ -121,7 +116,8 @@ export default function GlobalEvolutionChart({ data, loading }: Props) {
             strokeLinecap="round"
           />
 
-          {points.map((d, i) => (
+          {/* Pontos + labels do eixo X */}
+          {data.map((d, i) => (
             <g key={d.date}>
               <circle cx={x(i)} cy={y(d.opened)} r={3} fill={OPENED_COLOR}>
                 <title>{`${formatDate(d.date)} — abertas: ${d.opened}`}</title>

@@ -25,7 +25,7 @@ export default function UserStatsCards({ users }: UserStatsCardsProps) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {/* Total */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
           <Users size={20} />
         </div>
         <div>
@@ -46,7 +46,7 @@ export default function UserStatsCards({ users }: UserStatsCardsProps) {
             className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm"
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: bg, color: text }}
             >
               {roleIcons[role]}

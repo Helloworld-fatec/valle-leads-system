@@ -1,12 +1,14 @@
-// src/modules/dashboards/general-manager/dashboardGeneralManager.dto.ts
+// src/modules/dashboards/dashboard-general-manager/dashboardGeneralManager.dto.ts
 
 import { z } from 'zod';
+import type { NegotiationStage } from '../../negotiation-stage-history/negotiationStageHistory.dto.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FILTER SCHEMA
 // ─────────────────────────────────────────────────────────────────────────────
-// Não há teamId nem attendantId aqui: a visão do General Manager é sempre
-// global — cobre todas as equipas sem restrição de escopo.
+// Visão global: SEM parâmetro de escopo (toda a empresa). A janela ancora na
+// data do EVENTO da negociação (abertura, won/lost). Métricas de SNAPSHOT
+// (carteira ativa, pipeline, funil, leads parados) ignoram a janela.
 
 export const generalManagerDashboardFilterSchema = z.object({
   startDate: z
@@ -33,83 +35,103 @@ export const generalManagerDashboardFilterSchema = z.object({
   },
 );
 
-export type GeneralManagerDashboardFilterDTO = z.infer<typeof generalManagerDashboardFilterSchema>;
+export type GeneralManagerDashboardFilterDTO = z.infer<
+  typeof generalManagerDashboardFilterSchema
+>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE TYPES
+// RESPONSE TYPES — KPIs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface GlobalKpisResponse {
-  totalLeads: number;
-  totalSales: number;
-  globalConversionRate: number;
+/** KPI 1 — Negociações ativas em toda a empresa (snapshot). */
+export interface GlobalActiveNegotiationsResponse {
+  activeNegotiations: number;
 }
 
-export interface TopTeamInfo {
-  id: string;
-  name: string;
-  conversions: number;
+/** KPI 2 — Vendas no período (eventos 'won' na janela, contagem). */
+export interface GlobalSalesResponse {
+  sales: number;
 }
 
-export interface TopTeamResponse {
-  topTeam: TopTeamInfo | null;
+/**
+ * KPI 3 — Valor vendido (R$): soma de interest_items.value dos leads das
+ * negociações ganhas na janela. Vendas sem item de interesse (ou item sem
+ * valor) entram com 0 — `salesWithoutValue` expõe quantas são, para o
+ * gestor saber o quanto o número está subestimado.
+ */
+export interface SalesValueResponse {
+  salesValue: number;
+  salesWithoutValue: number;
 }
 
-export interface TeamLeadsItem {
-  teamId: string | null;
-  teamName: string;
+/**
+ * KPI 4 — Valor em pipeline (R$): soma de interest_items.value dos leads
+ * das negociações ATIVAS (snapshot) — quanto há "na mesa" agora.
+ */
+export interface PipelineValueResponse {
+  pipelineValue: number;
+  negotiationsWithoutValue: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESPONSE TYPES — CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Chart 1 — Funil global: negociações ATIVAS pelo estágio atual. */
+export interface GlobalStageFunnelItem {
+  stage: NegotiationStage;
   count: number;
 }
 
-export interface LeadsByTeamResponse {
-  leadsByTeam: TeamLeadsItem[];
+export interface GlobalStageFunnelResponse {
+  funnel: GlobalStageFunnelItem[];
 }
 
-export interface TeamRankingItem {
-  teamId: string | null;
+/** Chart 2 — Ranking de vendas por equipe (eventos 'won' na janela). */
+export interface SalesByTeamItem {
+  teamId: string;
   teamName: string;
-  conversions: number;
+  sales: number;
 }
 
-export interface TeamRankingResponse {
-  teamRanking: TeamRankingItem[];
+export interface SalesByTeamResponse {
+  salesByTeam: SalesByTeamItem[];
 }
 
+/** Chart 3 — Vendas por loja (Stores → Teams → Negotiations), com valor. */
+export interface SalesByStoreItem {
+  storeId: string;
+  storeName: string;
+  sales: number;
+  salesValue: number;
+}
+
+export interface SalesByStoreResponse {
+  salesByStore: SalesByStoreItem[];
+}
+
+/** Chart 4 — Evolução global diária: abertas × ganhas. */
 export interface GlobalEvolutionPoint {
-  date: string;
-  count: number;
+  date: string; // YYYY-MM-DD
+  opened: number;
+  won: number;
 }
 
 export interface GlobalEvolutionResponse {
   evolution: GlobalEvolutionPoint[];
 }
 
-export interface GlobalFunnelItem {
-  status: string;
+/** Chart 5 — Leads parados (global): sem nenhuma negociação aberta. */
+export interface GlobalIdleLeadsBySourceItem {
+  source: string;
   count: number;
 }
 
-export interface GlobalFunnelResponse {
-  funnel: GlobalFunnelItem[];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INTERNAL TYPES (usados entre repository e service)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Retorno bruto do repository para o cálculo de KPIs globais de conversão. */
-export interface GlobalConversionData {
-  totalLeads: number;
-  convertedLeads: number;
-}
-
-/**
- * Linha bruta retornada pelo groupBy de team_id.
- * Representa uma agregação de leads por equipa (total ou convertidos).
- * Mesmo padrão de AttendantLeadsRow no manager — o Prisma infere
- * o tipo internamente; mapeamos explicitamente antes de retornar.
- */
-export interface TeamLeadsRow {
-  team_id: string;
-  _count: { id: number };
+export interface GlobalIdleLeadsResponse {
+  idleLeads: {
+    total: number;
+    neverNegotiated: number;
+    closedOnly: number;
+    bySource: GlobalIdleLeadsBySourceItem[];
+  };
 }

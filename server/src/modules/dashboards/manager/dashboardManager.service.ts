@@ -8,25 +8,23 @@ import {
 } from '../../../middlewares/errors/domainErrors.middleware.js';
 import {
   DashboardManagerRepository,
-  groupDatesByDay,
+  mergeEvolution,
 } from './dashboardManager.repository.js';
 import type {
   ManagerDashboardFilterDTO,
-  AttendantLeadsRow,
-  TeamKpisResponse,
-  TopAttendantResponse,
-  LeadsByAttendantResponse,
-  ConversionsByAttendantResponse,
+  SalesByAttendantResponse,
+  StagnantNegotiationsResponse,
+  TeamActiveNegotiationsResponse,
+  TeamClosingRateResponse,
   TeamEvolutionResponse,
-  TeamFunnelResponse,
+  TeamIdleLeadsResponse,
+  TeamSalesResponse,
+  TeamStageFunnelResponse,
+  WorkloadByAttendantResponse,
 } from './dashboardManager.dto.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQUESTER TYPE
-// Mesmo contrato usado no dashboardAttendant — representa o subconjunto de
-// req.user necessário para as regras de autorização deste módulo.
-// Importar de um shared types seria o ideal num monorepo; aqui redeclaramos
-// para manter os módulos de dashboard independentes entre si.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface AuthenticatedRequester {
@@ -36,7 +34,9 @@ export interface AuthenticatedRequester {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD MANAGER SERVICE
+// DASHBOARD MANAGER SERVICE — negociação-cêntrico
+// ─────────────────────────────────────────────────────────────────────────────
+// Autorização idêntica à versão anterior (regras inalteradas pelo refactor).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardManagerService {
@@ -46,15 +46,13 @@ export class DashboardManagerService {
     this.repository = DashboardManagerRepository.getInstance();
   }
 
-  // ─── AUTORIZAÇÃO ─────────────────────────────────────────────────────────
+  // ─── AUTORIZAÇÃO ──────────────────────────────────────────────────────────
 
   /**
-   * Valida se o requester pode consultar dados da equipa alvo.
-   *
-   * Regras (ordem de precedência):
-   *   1. ADMIN ou GENERAL_MANAGER → acesso total, sem restrição de equipa.
-   *   2. MANAGER → apenas se o targetTeamId estiver no seu token (team_ids).
-   *   3. Qualquer outro papel (ex: ATTENDANT) → negado.
+   * Valida se o requester pode consultar dados da targetTeamId.
+   *   1. ADMIN ou GENERAL_MANAGER → acesso total.
+   *   2. MANAGER → apenas as suas próprias equipas.
+   *   3. Qualquer outro papel → negado.
    */
   private assertCanAccess(
     requester: AuthenticatedRequester,
@@ -64,10 +62,8 @@ export class DashboardManagerService {
       throw new RequisicaoInvalidaError('ID da equipa é obrigatório.');
     }
 
-    // Regra 1 — papéis com visibilidade global
     if (requester.role === 'ADMIN' || requester.role === 'GENERAL_MANAGER') return;
 
-    // Regra 2 — MANAGER vê apenas as suas próprias equipas
     if (requester.role === 'MANAGER') {
       if (!requester.team_ids.includes(targetTeamId)) {
         throw new AcessoNaoAutorizadoError(
@@ -77,16 +73,12 @@ export class DashboardManagerService {
       return;
     }
 
-    // Regra 3 — qualquer outro papel
     throw new AcessoNaoAutorizadoError('Acesso negado ao dashboard de gerência.');
   }
 
   // ─── HELPERS PRIVADOS ────────────────────────────────────────────────────
 
-  /**
-   * Busca o nome dos atendentes a partir de uma lista de IDs válidos.
-   * Retorna um mapa { id → name } para lookups O(1) nas formatações.
-   */
+  /** Mapa { id → name } dos atendentes, para lookups O(1) nas formatações. */
   private async fetchAttendantNames(
     attendantIds: string[],
   ): Promise<Record<string, string>> {
@@ -97,140 +89,149 @@ export class DashboardManagerService {
       select: { id: true, name: true },
     });
 
-    return users.reduce<Record<string, string>>((acc, user) => {
-      acc[user.id] = user.name;
-      return acc;
-    }, {});
+    return Object.fromEntries(users.map((u) => [u.id, u.name]));
   }
 
-  /**
-   * Extrai IDs de atendente não-nulos de um array de linhas de groupBy.
-   * Centraliza o filter + cast que se repetia em múltiplos métodos.
-   */
-  private extractAttendantIds(rows: AttendantLeadsRow[]): string[] {
-    return rows.map((r) => r.attendant_id).filter((id): id is string => id !== null);
+  /** Extrai os IDs não-nulos de linhas agregadas por atendente. */
+  private extractAttendantIds(rows: Array<{ attendant_id: string | null }>): string[] {
+    return rows
+      .map((r) => r.attendant_id)
+      .filter((id): id is string => id !== null);
   }
 
-  // ─── KPIs ────────────────────────────────────────────────────────────────
+  // ─── KPIs ─────────────────────────────────────────────────────────────────
 
-  /** 1. KPIs consolidados da equipa: totais, taxa de conversão e leads estagnados. */
-  public async getTeamKpis(
+  /** 1. Negociações ativas da equipa (snapshot). */
+  public async getActiveNegotiations(
+    requester: AuthenticatedRequester,
+    targetTeamId: string,
+  ): Promise<TeamActiveNegotiationsResponse> {
+    this.assertCanAccess(requester, targetTeamId);
+    const activeNegotiations = await this.repository.countActiveNegotiations(targetTeamId);
+    return { activeNegotiations };
+  }
+
+  /** 2. Vendas da equipa no período. */
+  public async getSales(
     requester: AuthenticatedRequester,
     targetTeamId: string,
     filters?: ManagerDashboardFilterDTO,
-  ): Promise<TeamKpisResponse> {
+  ): Promise<TeamSalesResponse> {
     this.assertCanAccess(requester, targetTeamId);
+    const sales = await this.repository.countSales(targetTeamId, filters);
+    return { sales };
+  }
 
-    const [conversionData, stagnantLeads] = await Promise.all([
-      this.repository.getTeamConversionData(targetTeamId, filters),
-      this.repository.countStagnantLeads(targetTeamId, filters),
-    ]);
+  /** 3. Taxa de fechamento da equipa: won / (won + lost) na janela. */
+  public async getClosingRate(
+    requester: AuthenticatedRequester,
+    targetTeamId: string,
+    filters?: ManagerDashboardFilterDTO,
+  ): Promise<TeamClosingRateResponse> {
+    this.assertCanAccess(requester, targetTeamId);
+    const { wonCount, lostCount } = await this.repository.getClosingData(
+      targetTeamId,
+      filters,
+    );
 
-    const { totalLeads, convertedLeads } = conversionData;
-    const rate = totalLeads === 0 ? 0 : (convertedLeads / totalLeads) * 100;
+    const closed = wonCount + lostCount;
+    const closingRate = closed === 0 ? 0 : (wonCount / closed) * 100;
 
     return {
-      totalLeads,
-      convertedLeads,
-      conversionRate: Number(rate.toFixed(2)),
-      stagnantLeads,
+      closingRate: Number(closingRate.toFixed(1)),
+      wonCount,
+      lostCount,
     };
   }
 
-  /** 2. Atendente com mais conversões no período. */
-  public async getTopAttendant(
+  /** 4. Negociações estagnadas (snapshot, corte de 7 dias). */
+  public async getStagnantNegotiations(
     requester: AuthenticatedRequester,
     targetTeamId: string,
-    filters?: ManagerDashboardFilterDTO,
-  ): Promise<TopAttendantResponse> {
+  ): Promise<StagnantNegotiationsResponse> {
     this.assertCanAccess(requester, targetTeamId);
-
-    const conversions = await this.repository.getConversionsByAttendant(targetTeamId, filters);
-
-    // Sem conversões ou sem atendente associado ao topo → retorna null
-    const topRow = conversions[0];
-    if (!topRow?.attendant_id) {
-      return { topAttendant: null };
-    }
-
-    const namesMap = await this.fetchAttendantNames([topRow.attendant_id]);
-
-    return {
-      topAttendant: {
-        id: topRow.attendant_id,
-        name: namesMap[topRow.attendant_id] ?? 'Atendente Desconhecido',
-        conversions: topRow._count.id,
-      },
-    };
+    const stagnantNegotiations =
+      await this.repository.countStagnantNegotiations(targetTeamId);
+    return { stagnantNegotiations };
   }
 
-  // ─── CHARTS ──────────────────────────────────────────────────────────────
+  // ─── CHARTS ───────────────────────────────────────────────────────────────
 
-  /** 3. Distribuição de leads (todos os status) por atendente. */
-  public async getLeadsByAttendant(
+  /** 5. Funil de estágios da carteira ativa da equipa (snapshot). */
+  public async getStageFunnel(
+    requester: AuthenticatedRequester,
+    targetTeamId: string,
+  ): Promise<TeamStageFunnelResponse> {
+    this.assertCanAccess(requester, targetTeamId);
+    const funnel = await this.repository.getStageFunnel(targetTeamId);
+    return { funnel };
+  }
+
+  /** 6. Ranking de vendas por atendente na janela. */
+  public async getSalesByAttendant(
     requester: AuthenticatedRequester,
     targetTeamId: string,
     filters?: ManagerDashboardFilterDTO,
-  ): Promise<LeadsByAttendantResponse> {
+  ): Promise<SalesByAttendantResponse> {
     this.assertCanAccess(requester, targetTeamId);
 
-    const rows = await this.repository.getLeadsByAttendant(targetTeamId, filters);
+    const rows = await this.repository.getSalesByAttendant(targetTeamId, filters);
     const namesMap = await this.fetchAttendantNames(this.extractAttendantIds(rows));
 
     return {
-      leadsByAttendant: rows.map((item) => ({
-        attendantId: item.attendant_id,
-        attendantName: item.attendant_id
-          ? (namesMap[item.attendant_id] ?? 'Desconhecido')
+      salesByAttendant: rows.map((row) => ({
+        attendantId: row.attendant_id,
+        attendantName: row.attendant_id
+          ? (namesMap[row.attendant_id] ?? 'Desconhecido')
           : 'Sem Atendente',
-        count: item._count.id,
+        sales: row.sales,
       })),
     };
   }
 
-  /** 4. Distribuição de leads convertidos por atendente. */
-  public async getConversionsByAttendant(
+  /** 7. Carga de trabalho: negociações ativas por atendente (snapshot). */
+  public async getWorkloadByAttendant(
     requester: AuthenticatedRequester,
     targetTeamId: string,
-    filters?: ManagerDashboardFilterDTO,
-  ): Promise<ConversionsByAttendantResponse> {
+  ): Promise<WorkloadByAttendantResponse> {
     this.assertCanAccess(requester, targetTeamId);
 
-    const rows = await this.repository.getConversionsByAttendant(targetTeamId, filters);
+    const rows = await this.repository.getWorkloadByAttendant(targetTeamId);
     const namesMap = await this.fetchAttendantNames(this.extractAttendantIds(rows));
 
     return {
-      conversionsByAttendant: rows.map((item) => ({
-        attendantId: item.attendant_id,
-        attendantName: item.attendant_id
-          ? (namesMap[item.attendant_id] ?? 'Desconhecido')
+      workloadByAttendant: rows.map((row) => ({
+        attendantId: row.attendant_id,
+        attendantName: row.attendant_id
+          ? (namesMap[row.attendant_id] ?? 'Desconhecido')
           : 'Sem Atendente',
-        count: item._count.id,
+        active: row.active,
       })),
     };
   }
 
-  /** 5. Evolução de volume de leads da equipa ao longo do período. */
-  public async getTeamEvolution(
+  /** 8. Evolução diária da equipa: abertas × ganhas na janela. */
+  public async getEvolution(
     requester: AuthenticatedRequester,
     targetTeamId: string,
     filters?: ManagerDashboardFilterDTO,
   ): Promise<TeamEvolutionResponse> {
     this.assertCanAccess(requester, targetTeamId);
 
-    const dates = await this.repository.getTeamLeadsCreatedDates(targetTeamId, filters);
-    return { evolution: groupDatesByDay(dates) };
+    const [openedDates, wonDates] = await Promise.all([
+      this.repository.getNegotiationsCreatedDates(targetTeamId, filters),
+      this.repository.getWonDates(targetTeamId, filters),
+    ]);
+
+    return { evolution: mergeEvolution(openedDates, wonDates) };
   }
 
-  /** 6. Funil da equipa — contagem de leads por status. */
-  public async getTeamFunnel(
+  /** 9. Leads parados da equipa (snapshot). */
+  public async getIdleLeads(
     requester: AuthenticatedRequester,
     targetTeamId: string,
-    filters?: ManagerDashboardFilterDTO,
-  ): Promise<TeamFunnelResponse> {
+  ): Promise<TeamIdleLeadsResponse> {
     this.assertCanAccess(requester, targetTeamId);
-
-    const funnel = await this.repository.getTeamFunnel(targetTeamId, filters);
-    return { funnel };
+    return this.repository.getIdleLeads(targetTeamId);
   }
 }
