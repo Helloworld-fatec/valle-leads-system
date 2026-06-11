@@ -5,6 +5,8 @@ import NegotiationCard from "./NegotiationCard";
 import type { Negotiation, NegotiationStage, ImportanceLevel } from "../../types/negotiations";
 import { AlertCircle, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 
+// ─── Tipos e constantes ───────────────────────────────────────────────────────
+
 type StageDef = {
   key: NegotiationStage;
   label: string;
@@ -25,10 +27,10 @@ const STAGES: StageDef[] = [
 
 const CLOSING_STAGES = new Set<NegotiationStage>(["fechamento_com_venda", "fechamento_sem_venda"]);
 
-// STAGES continua sendo a fonte de verdade para indexação/avanço;
-// estas listas são usadas apenas na renderização para separar visualmente.
-const PIPELINE_STAGES = STAGES.filter((s) => !CLOSING_STAGES.has(s.key));
-const CLOSING_STAGE_LIST = STAGES.filter((s) => CLOSING_STAGES.has(s.key));
+const PIPELINE_STAGES    = STAGES.filter((s) => !CLOSING_STAGES.has(s.key));
+const CLOSING_STAGE_LIST = STAGES.filter((s) =>  CLOSING_STAGES.has(s.key));
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   negotiations: Negotiation[];
@@ -45,10 +47,12 @@ interface DroppableColumnProps {
   variant?: "pipeline" | "closing";
 }
 
-function DroppableColumn({ 
-  stage, 
-  negotiations, 
-  onAdvance, 
+// ─── Coluna droppable ─────────────────────────────────────────────────────────
+
+function DroppableColumn({
+  stage,
+  negotiations,
+  onAdvance,
   onDropCard,
   onChangeImportance,
   variant = "pipeline",
@@ -57,7 +61,7 @@ function DroppableColumn({
   const [isOver, setIsOver] = useState(false);
 
   function handleDragOver(e: React.DragEvent) {
-    e.preventDefault(); 
+    e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   }
 
@@ -76,47 +80,55 @@ function DroppableColumn({
     e.preventDefault();
     setIsOver(false);
     const cardId = e.dataTransfer.getData("application/json");
-    if (cardId) {
-      onDropCard(cardId, stage.key);
-    }
+    if (cardId) onDropCard(cardId, stage.key);
   }
 
   return (
     <div
-      className={`relative shrink-0 flex flex-col min-h-[65vh] transition-all duration-300 group ${isClosing ? "w-72" : "w-85"}`}
+      className={`
+        shrink-0 flex flex-col transition-all duration-300
+        ${isClosing ? "w-72 rounded-2xl" : "w-85 rounded-l-2xl"}
+        ${isOver ? "ring-2 ring-blue-400 ring-inset" : ""}
+      `}
+      style={{
+        // ✅ FIX: background aplicado diretamente no container (não em filho absolute)
+        // Isso garante que o fundo colorido acompanha o scroll junto com os cards
+        backgroundColor: isOver ? "#EFF6FF" : stage.bg,
+        border: isClosing
+          ? `1px dashed ${stage.border}`
+          : `1px solid ${stage.border}`,
+        // Trapézio apenas no pipeline — aplicado no container direto
+        clipPath: isClosing
+          ? undefined
+          : "polygon(0 0, 100% 0, 94% 100%, 0% 100%)",
+      }}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Fundo: trapezoidal no pipeline, retângulo arredondado no fechamento */}
-      <div
-        className={`absolute inset-0 transition-all duration-300 shadow-sm ${
-          isClosing ? "rounded-2xl" : "rounded-l-2xl"
-        } ${
-          isOver ? "opacity-100 ring-2 ring-blue-400 ring-inset bg-blue-50/50" : "opacity-70"
-        }`}
-        style={{
-          background: stage.bg,
-          clipPath: isClosing ? undefined : "polygon(0 0, 100% 0, 94% 100%, 0% 100%)",
-          border: isClosing ? `1px dashed ${stage.border}` : undefined,
-          borderLeft: isClosing ? undefined : `1px solid ${stage.border}`,
-          borderTop: isClosing ? undefined : `1px solid ${stage.border}`,
-          borderBottom: isClosing ? undefined : `1px solid ${stage.border}`,
-        }}
-      />
+      {/* Conteúdo da coluna */}
+      <div className={`flex flex-col h-full p-4 ${isClosing ? "" : "pr-6"}`}>
 
-      {/* Conteúdo da Coluna */}
-      <div className={`relative z-10 flex flex-col h-full p-4 ${isClosing ? "" : "pr-6"}`}>
+        {/* Cabeçalho: nome da etapa + contador */}
         <div className="flex justify-between items-center mb-5 px-1">
-          <h3 className="font-semibold text-sm tracking-wide flex items-center gap-1.5" style={{ color: stage.color }}>
-            {isClosing && (stage.key === "fechamento_com_venda" ? <CheckCircle2 size={14} /> : <XCircle size={14} />)}
+          <h3
+            className="font-semibold text-sm tracking-wide flex items-center gap-1.5"
+            style={{ color: stage.color }}
+          >
+            {isClosing && (
+              stage.key === "fechamento_com_venda"
+                ? <CheckCircle2 size={14} />
+                : <XCircle size={14} />
+            )}
             {stage.label}
           </h3>
           <span className="text-xs font-bold px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm text-slate-700 shadow-sm border border-slate-100">
             {negotiations.length}
           </span>
         </div>
+
+        {/* Lista de cards */}
         <div className="flex flex-col gap-3 flex-1 pb-4">
           {negotiations.map((n: Negotiation) => (
             <NegotiationCard
@@ -128,40 +140,59 @@ function DroppableColumn({
             />
           ))}
         </div>
+
       </div>
     </div>
   );
 }
 
-export default function KanbanBoard({ 
-  negotiations, 
+// ─── KanbanBoard ──────────────────────────────────────────────────────────────
+
+export default function KanbanBoard({
+  negotiations,
   onUpdate,
-  onChangeImportance
+  onChangeImportance,
 }: Props) {
   const { createStageHistory } = useNegotiationsService();
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Movimento pendente de confirmação ao entrar num estágio de fechamento.
-  const [pendingMove, setPendingMove] = useState<
-    { id: string; oldStage: NegotiationStage; newStage: NegotiationStage } | null
-  >(null);
+
+  const [errorMsg,    setErrorMsg]    = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<{
+    id: string;
+    oldStage: NegotiationStage;
+    newStage: NegotiationStage;
+  } | null>(null);
+
+  // ─── Agrupamento por etapa ──────────────────────────────────────────────────
 
   function groupByStage(items: Negotiation[]): Record<NegotiationStage, Negotiation[]> {
-    const groups = Object.fromEntries(STAGES.map((s) => [s.key, [] as Negotiation[]])) as Record<NegotiationStage, Negotiation[]>;
+    const groups = Object.fromEntries(
+      STAGES.map((s) => [s.key, [] as Negotiation[]])
+    ) as Record<NegotiationStage, Negotiation[]>;
+
     for (const neg of items) {
-      const history = neg.stage_history ?? [];
-      const lastStage: NegotiationStage = history.length > 0 ? history[history.length - 1].new_stage : "contato_inicial";
+      const history   = neg.stage_history ?? [];
+      const lastStage: NegotiationStage =
+        history.length > 0 ? history[history.length - 1].new_stage : "contato_inicial";
       if (groups[lastStage]) groups[lastStage].push(neg);
       else groups["contato_inicial"].push(neg);
     }
+
     return groups;
   }
 
   const columns = groupByStage(negotiations);
 
-  // Executa de fato a movimentação (optimistic update + persistência).
-  async function commitMove(negotiationId: string, oldStage: NegotiationStage, newStage: NegotiationStage) {
+  // ─── Movimentação de cards ──────────────────────────────────────────────────
+
+  // Executa a movimentação com optimistic update + persistência no backend
+  async function commitMove(
+    negotiationId: string,
+    oldStage: NegotiationStage,
+    newStage: NegotiationStage
+  ) {
     if (oldStage === newStage || CLOSING_STAGES.has(oldStage)) return;
 
+    // Optimistic update
     onUpdate((prev) =>
       prev.map((n) =>
         n.id === negotiationId
@@ -184,22 +215,31 @@ export default function KanbanBoard({
     );
 
     try {
-      // Chamada única: ao registrar um estágio de fechamento, o backend cria
-      // o status terminal (won/lost) e sincroniza o lead na mesma transação.
-      await createStageHistory({ negotiation_id: negotiationId, old_stage: oldStage, new_stage: newStage });
+      await createStageHistory({
+        negotiation_id: negotiationId,
+        old_stage: oldStage,
+        new_stage: newStage,
+      });
       setErrorMsg(null);
     } catch {
+      // Reverte o optimistic update em caso de erro
       onUpdate((prev) =>
         prev.map((n) =>
-          n.id === negotiationId ? { ...n, stage_history: (n.stage_history ?? []).filter((h) => h.id !== "temp") } : n
+          n.id === negotiationId
+            ? { ...n, stage_history: (n.stage_history ?? []).filter((h) => h.id !== "temp") }
+            : n
         )
       );
       setErrorMsg("Erro ao mover card. Tente novamente.");
     }
   }
 
-  // Decide se a movimentação pode ocorrer direto ou precisa de confirmação.
-  function requestMove(negotiationId: string, oldStage: NegotiationStage, newStage: NegotiationStage) {
+  // Verifica se precisa de confirmação antes de mover (estágios de fechamento)
+  function requestMove(
+    negotiationId: string,
+    oldStage: NegotiationStage,
+    newStage: NegotiationStage
+  ) {
     if (oldStage === newStage || CLOSING_STAGES.has(oldStage)) return;
     if (CLOSING_STAGES.has(newStage)) {
       setPendingMove({ id: negotiationId, oldStage, newStage });
@@ -217,23 +257,26 @@ export default function KanbanBoard({
   function handleNativeDrop(negotiationId: string, newStage: NegotiationStage) {
     const card = negotiations.find((n) => n.id === negotiationId);
     if (!card) return;
-
-    const history = card.stage_history ?? [];
-    const oldStage: NegotiationStage = history.length > 0 ? history[history.length - 1].new_stage : "contato_inicial";
-    
+    const history  = card.stage_history ?? [];
+    const oldStage: NegotiationStage =
+      history.length > 0 ? history[history.length - 1].new_stage : "contato_inicial";
     requestMove(negotiationId, oldStage, newStage);
   }
 
   function handleAdvance(negotiationId: string, currentStageKey: NegotiationStage) {
-    const currentIndex = STAGES.findIndex(s => s.key === currentStageKey);
+    const currentIndex = STAGES.findIndex((s) => s.key === currentStageKey);
     if (currentIndex >= 0 && currentIndex < STAGES.length - 1) {
       const nextStage = STAGES[currentIndex + 1].key;
       requestMove(negotiationId, currentStageKey, nextStage);
     }
   }
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col h-full w-full">
+
+      {/* Mensagem de erro ao mover card */}
       {errorMsg && (
         <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm text-red-700 bg-red-50 border border-red-200">
           <AlertCircle size={16} />
@@ -241,8 +284,10 @@ export default function KanbanBoard({
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-6 h-full custom-scrollbar items-stretch snap-x snap-mandatory">
-        {/* Etapas do pipeline (avançáveis) */}
+      {/* Board horizontal com scroll */}
+      <div className="flex gap-2 overflow-x-auto pb-6 h-full custom-scrollbar items-start snap-x snap-mandatory">
+
+        {/* Colunas do pipeline (etapas avançáveis) */}
         {PIPELINE_STAGES.map((stage) => {
           const canAdvance = !CLOSING_STAGES.has(stage.key);
           return (
@@ -259,16 +304,19 @@ export default function KanbanBoard({
           );
         })}
 
-        {/* Divisor + zona de fechamento (estágios terminais) */}
-        <div className="flex items-stretch shrink-0 snap-start">
-          <div className="flex flex-col items-center justify-center px-3">
-            <div className="w-px flex-1 bg-linear-to-b from-transparent via-slate-300 to-transparent" />
+        {/* Divisor visual + zona de fechamento */}
+        <div className="flex items-start shrink-0 snap-start">
+
+          {/* Linha divisória com label "Encerramento" */}
+          <div className="flex flex-col items-center justify-start px-3 self-stretch">
+            <div className="w-px flex-1 bg-gradient-to-b from-transparent via-slate-300 to-transparent" />
             <span className="my-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 [writing-mode:vertical-rl] rotate-180">
               Encerramento
             </span>
-            <div className="w-px flex-1 bg-linear-to-b from-transparent via-slate-300 to-transparent" />
+            <div className="w-px flex-1 bg-gradient-to-b from-transparent via-slate-300 to-transparent" />
           </div>
 
+          {/* Colunas de fechamento agrupadas */}
           <div className="flex gap-2 rounded-2xl bg-slate-100/60 p-2 border border-slate-200/80">
             {CLOSING_STAGE_LIST.map((stage) => (
               <DroppableColumn
@@ -283,9 +331,10 @@ export default function KanbanBoard({
             ))}
           </div>
         </div>
+
       </div>
 
-      {/* Aviso antes de encerrar a negociação */}
+      {/* Modal de confirmação antes de encerrar negociação */}
       {pendingMove && (
         <div
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-60 p-4"
@@ -327,6 +376,7 @@ export default function KanbanBoard({
           </div>
         </div>
       )}
+
     </div>
   );
 }
