@@ -325,3 +325,45 @@ export function useDashboardService() {
     buildGlobalQuery,
   ]);
 }
+
+// src/services/dashboardService.ts
+
+export interface LeadsByTeamItem {
+  teamId: string;
+  teamName: string;
+  count: number;
+}
+
+export interface LeadsByTeamResponse {
+  leadsByTeam: LeadsByTeamItem[];
+}
+
+export interface TeamRankingItem {
+  teamId: string;
+  teamName: string;
+  conversions: number;
+}
+
+export interface TeamRankingResponse {
+  teamRanking: TeamRankingItem[];
+}
+
+export interface ConversionsByAttendantItem {
+  attendantId: string;
+  attendantName: string;
+  count: number;
+}
+
+export interface ConversionsByAttendantResponse {
+  conversionsByAttendant: ConversionsByAttendantItem[];
+}
+
+export interface LeadsByAttendantItem {
+  attendantId: string;
+  attendantName: string;
+  count: number;
+}
+
+export interface LeadsByAttendantResponse {
+  leadsByAttendant: LeadsByAttendantItem[];
+}
