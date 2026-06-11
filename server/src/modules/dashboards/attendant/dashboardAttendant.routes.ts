@@ -8,48 +8,49 @@ import { attendantDashboardFilterSchema } from './dashboardAttendant.dto.js';
 import { DashboardAttendantController } from './dashboardAttendant.controller.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD ATTENDANT ROUTES
+// DASHBOARD ATTENDANT ROUTES — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Pipeline aplicada a TODAS as rotas via .use():
 //
 //   1. authMiddleware
-//      → Valida o access token JWT e injeta req.user com { id, email, role, team_ids }.
-//        Qualquer requisição sem token válido é rejeitada com 403 antes de chegar
-//        ao controller.
+//      → Valida o access token JWT e injeta req.user. Sem token válido → 403.
 //
 //   2. checkPermission('ATTENDANT')
-//      → Nível hierárquico mínimo: deixa passar ATTENDANT, MANAGER,
-//        GENERAL_MANAGER e ADMIN. O controle granular de escopo
-//        ("atendente vê APENAS os próprios dados") é responsabilidade do
-//        DashboardAttendantService.assertCanAccess(), que tem contexto de
-//        runtime (req.user.id vs targetId) para aplicar a regra.
+//      → Nível hierárquico mínimo. O controle granular de escopo
+//        ("atendente vê APENAS os próprios dados") é do service
+//        (assertCanAccess), que tem contexto de runtime.
 //
 //   3. validateQuery(attendantDashboardFilterSchema)
-//      → Valida e transforma os query params via Zod. Após este middleware,
-//        req.query contém valores já tipados (Dates em vez de strings brutas).
-//        Requisições com params inválidos recebem 422 antes de chegar ao controller.
+//      → Valida e transforma query params via Zod (Dates tipadas).
+//        Params inválidos → 422 antes do controller.
+//
+// SEMÂNTICA DOS ENDPOINTS:
+//   - SNAPSHOT (ignoram startDate/endDate): active-negotiations, stage-funnel,
+//     temperature, idle-leads — representam a carteira ATUAL.
+//   - JANELA (âncora na data do EVENTO da negociação): sales, closing-rate,
+//     avg-closing-time, evolution, negotiations-by-source.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
 const dashboardAttendantRoutes = Router();
 const controller = new DashboardAttendantController();
 
-// Aplica a pipeline de segurança e validação globalmente neste router
 dashboardAttendantRoutes.use(authMiddleware);
 dashboardAttendantRoutes.use(checkPermission('ATTENDANT'));
 dashboardAttendantRoutes.use(validateQuery(attendantDashboardFilterSchema));
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────
-dashboardAttendantRoutes.get('/kpi/active-leads', controller.getActiveLeads);
-dashboardAttendantRoutes.get('/kpi/converted-leads', controller.getConvertedLeads);
-dashboardAttendantRoutes.get('/kpi/conversion-rate', controller.getConversionRate);
-dashboardAttendantRoutes.get('/kpi/avg-service-time', controller.getAvgServiceTime);
+dashboardAttendantRoutes.get('/kpi/active-negotiations', controller.getActiveNegotiations);
+dashboardAttendantRoutes.get('/kpi/sales', controller.getSales);
+dashboardAttendantRoutes.get('/kpi/closing-rate', controller.getClosingRate);
+dashboardAttendantRoutes.get('/kpi/avg-closing-time', controller.getAvgClosingTime);
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────
-dashboardAttendantRoutes.get('/charts/leads-evolution', controller.getLeadsEvolution);
-dashboardAttendantRoutes.get('/charts/sales-funnel', controller.getSalesFunnel);
-dashboardAttendantRoutes.get('/charts/leads-by-source', controller.getLeadsBySource);
-dashboardAttendantRoutes.get('/charts/conversions-by-period', controller.getConversionsByPeriod);
+dashboardAttendantRoutes.get('/charts/stage-funnel', controller.getStageFunnel);
+dashboardAttendantRoutes.get('/charts/evolution', controller.getEvolution);
+dashboardAttendantRoutes.get('/charts/temperature', controller.getTemperature);
+dashboardAttendantRoutes.get('/charts/negotiations-by-source', controller.getNegotiationsBySource);
+dashboardAttendantRoutes.get('/charts/idle-leads', controller.getIdleLeads);
 
 export default dashboardAttendantRoutes;

@@ -47,17 +47,17 @@ export default function UserCard({ user }: UserCardProps) {
         {/* Info */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Mail size={13} className="text-gray-400 flex-shrink-0" />
+            <Mail size={13} className="text-gray-400 shrink-0" />
             <span className="truncate">{user.email}</span>
           </div>
           {user.phone && (
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Phone size={13} className="text-gray-400 flex-shrink-0" />
+              <Phone size={13} className="text-gray-400 shrink-0" />
               <span>{user.phone}</span>
             </div>
           )}
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Users size={13} className="text-gray-400 flex-shrink-0" />
+            <Users size={13} className="text-gray-400 shrink-0" />
             <span>{user.team}</span>
           </div>
         </div>

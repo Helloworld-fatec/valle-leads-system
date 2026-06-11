@@ -1,18 +1,20 @@
-// src/components/dashboards/attendant/SalesFunnelChart.tsx
+// src/components/dashboards/attendant/StageFunnelChart.tsx
+// Substitui o antigo SalesFunnelChart. Mostra o estágio ATUAL das negociações
+// ATIVAS (snapshot da carteira) — não muda com o filtro de período.
 import {
-  ChartFunnelItem,
+  StageFunnelItem,
   getStageColor,
   getStageLabel,
 } from "../../../services/dashboardService";
 
-interface SalesFunnelChartProps {
-  data: ChartFunnelItem[];
+interface StageFunnelChartProps {
+  data: StageFunnelItem[];
   loading?: boolean;
 }
 
-export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProps) {
+export default function StageFunnelChart({ data, loading }: StageFunnelChartProps) {
   const max = data.length > 0 ? Math.max(...data.map((d) => d.count), 1) : 1;
-  const totalLeads = data.reduce((acc, d) => acc + d.count, 0);
+  const total = data.reduce((acc, d) => acc + d.count, 0);
 
   if (loading) {
     return (
@@ -28,13 +30,11 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
     );
   }
 
-  // O backend sempre retorna os 7 estágios (com zeros); "sem dados" agora
-  // significa array vazio OU todos os counts zerados.
-  if (!data.length || totalLeads === 0) {
+  if (!data.length || total === 0) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-55">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[220px]">
         <p className="text-sm font-medium" style={{ color: "#6B7280" }}>
-          Nenhum dado no período
+          Nenhuma negociação ativa
         </p>
       </div>
     );
@@ -45,17 +45,17 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="font-semibold text-sm" style={{ color: "#111827" }}>
-            Funil de Vendas
+            Funil de Negociações
           </h3>
           <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
-            Distribuição por etapa
+            Carteira ativa por estágio atual
           </p>
         </div>
         <span
           className="text-xs px-2 py-1 rounded-full font-medium"
           style={{ background: "#EFF6FF", color: "#2563EB" }}
         >
-          {totalLeads} negociações
+          {total} ativas
         </span>
       </div>
 
@@ -78,10 +78,7 @@ export default function SalesFunnelChart({ data, loading }: SalesFunnelChartProp
                 {item.count > 0 && (
                   <div
                     className="h-full rounded-lg flex items-center px-3 transition-all duration-700"
-                    style={{
-                      width: `${Math.max(pct, 8)}%`,
-                      background: color,
-                    }}
+                    style={{ width: `${Math.max(pct, 8)}%`, background: color }}
                   >
                     <span className="text-white text-xs font-semibold">{item.count}</span>
                   </div>

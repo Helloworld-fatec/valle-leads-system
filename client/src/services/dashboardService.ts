@@ -1,4 +1,6 @@
 // src/services/dashboardService.ts
+// VERSÃO FINAL DO REFACTOR — as três visões (atendente, gerente, gerente
+// geral) no contrato negociação-cêntrico.
 import { useCallback, useMemo } from "react";
 import { useApi } from "./api";
 
@@ -13,64 +15,163 @@ export interface DashboardFilters {
 }
 
 // ─────────────────────────────────────────────
+// Metadados de exibição — Estágios do funil
+// (chaves espelham NegotiationStageEnum do backend)
+// ─────────────────────────────────────────────
+export const FUNNEL_STAGE_META: Record<string, { label: string; color: string }> = {
+  qualificacao:         { label: "Qualificação",     color: "#3B82F6" },
+  contato_inicial:      { label: "Contato Inicial",  color: "#8B5CF6" },
+  visita:               { label: "Visita",           color: "#06B6D4" },
+  proposta:             { label: "Proposta",         color: "#F97316" },
+  negociacao:           { label: "Negociação",       color: "#F59E0B" },
+  fechamento_com_venda: { label: "Fechado c/ Venda", color: "#10B981" },
+  fechamento_sem_venda: { label: "Fechado s/ Venda", color: "#EF4444" },
+};
+
+export function getStageLabel(stage: string): string {
+  return FUNNEL_STAGE_META[stage]?.label ?? stage;
+}
+
+export function getStageColor(stage: string): string {
+  return FUNNEL_STAGE_META[stage]?.color ?? "#6B7280";
+}
+
+// ─────────────────────────────────────────────
+// Metadados de exibição — Temperatura (importância)
+// ─────────────────────────────────────────────
+export const TEMPERATURE_META: Record<string, { label: string; color: string }> = {
+  quente: { label: "Quente", color: "#EF4444" },
+  morno:  { label: "Morno",  color: "#F59E0B" },
+  frio:   { label: "Frio",   color: "#3B82F6" },
+};
+
+export function getTemperatureLabel(importance: string): string {
+  return TEMPERATURE_META[importance]?.label ?? importance;
+}
+
+export function getTemperatureColor(importance: string): string {
+  return TEMPERATURE_META[importance]?.color ?? "#6B7280";
+}
+
+// ─────────────────────────────────────────────
+// Formatação monetária (pt-BR / BRL)
+// ─────────────────────────────────────────────
+const brlFull = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+const brlCompact = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/** R$ 1.234,56 */
+export function formatBRL(value: number): string {
+  return brlFull.format(value);
+}
+
+/** R$ 1,2 mi — para KPIs onde o número completo não cabe. */
+export function formatBRLCompact(value: number): string {
+  return brlCompact.format(value);
+}
+
+// ─────────────────────────────────────────────
+// Tipos compartilhados entre visões
+// ─────────────────────────────────────────────
+export interface StageFunnelItem { stage: string; count: number; }
+export interface EvolutionPoint { date: string; opened: number; won: number; }
+export interface IdleLeadsBySourceItem { source: string; count: number; }
+export interface IdleLeadsResponse {
+  idleLeads: {
+    total: number;
+    neverNegotiated: number;
+    closedOnly: number;
+    bySource: IdleLeadsBySourceItem[];
+  };
+}
+
+// ─────────────────────────────────────────────
 // Interfaces de Resposta - Atendente
 // ─────────────────────────────────────────────
-export interface ActiveLeadsResponse { activeLeads: number; }
-export interface ConvertedLeadsResponse { convertedLeads: number; }
-export interface ConversionRateResponse {
-  conversionRate: number;
-  totalLeads: number;
-  convertedLeads: number;
+export interface ActiveNegotiationsResponse { activeNegotiations: number; }
+export interface SalesResponse { sales: number; }
+export interface ClosingRateResponse {
+  closingRate: number; // 0–100
+  wonCount: number;
+  lostCount: number;
 }
-export interface AvgServiceTimeResponse { avgServiceTimeHours: number; }
-export interface ChartEvolutionItem { date: string; count: number; }
-export interface ChartFunnelItem { status: string; count: number; }
-export interface ChartSourceItem { source: string; count: number; }
+export interface AvgClosingTimeResponse { avgClosingTimeHours: number; }
 
-export interface EvolutionResponse { evolution: ChartEvolutionItem[]; }
-export interface FunnelResponse { funnel: ChartFunnelItem[]; }
-export interface SourcesResponse { sources: ChartSourceItem[]; }
-export interface ConversionsPeriodResponse { conversions: ChartEvolutionItem[]; }
+export interface StageFunnelResponse { funnel: StageFunnelItem[]; }
+export interface NegotiationsEvolutionResponse { evolution: EvolutionPoint[]; }
+
+export interface TemperatureItem { importance: string; count: number; }
+export interface TemperatureResponse { temperature: TemperatureItem[]; }
+
+export interface NegotiationsBySourceItem { source: string; count: number; }
+export interface NegotiationsBySourceResponse { sources: NegotiationsBySourceItem[]; }
 
 // ─────────────────────────────────────────────
 // Interfaces de Resposta - Manager
 // ─────────────────────────────────────────────
-export interface TeamKpisResponse {
-  totalLeads: number;
-  convertedLeads: number;
-  conversionRate: number;
-  stagnantLeads: number;
+export interface TeamActiveNegotiationsResponse { activeNegotiations: number; }
+export interface TeamSalesResponse { sales: number; }
+export interface TeamClosingRateResponse {
+  closingRate: number;
+  wonCount: number;
+  lostCount: number;
 }
-export interface TopAttendantResponse {
-  topAttendant: { id: string; name: string; conversions: number } | null;
-}
-export interface LeadsByAttendantItem {
-  attendantId: string;
+export interface StagnantNegotiationsResponse { stagnantNegotiations: number; }
+
+export interface TeamStageFunnelResponse { funnel: StageFunnelItem[]; }
+export interface TeamEvolutionResponse { evolution: EvolutionPoint[]; }
+
+export interface SalesByAttendantItem {
+  attendantId: string | null;
   attendantName: string;
-  count: number;
+  sales: number;
 }
-export interface LeadsByAttendantResponse { leadsByAttendant: LeadsByAttendantItem[]; }
-export interface ConversionsByAttendantResponse { conversionsByAttendant: LeadsByAttendantItem[]; }
-export interface TeamEvolutionResponse { evolution: ChartEvolutionItem[]; }
-export interface TeamFunnelResponse { funnel: ChartFunnelItem[]; }
+export interface SalesByAttendantResponse { salesByAttendant: SalesByAttendantItem[]; }
+
+export interface WorkloadByAttendantItem {
+  attendantId: string | null;
+  attendantName: string;
+  active: number;
+}
+export interface WorkloadByAttendantResponse { workloadByAttendant: WorkloadByAttendantItem[]; }
 
 // ─────────────────────────────────────────────
 // Interfaces de Resposta - General Manager
 // ─────────────────────────────────────────────
-export interface GlobalKpisResponse {
-  totalLeads: number;
-  totalSales: number;
-  globalConversionRate: number;
+export interface GlobalActiveNegotiationsResponse { activeNegotiations: number; }
+export interface GlobalSalesResponse { sales: number; }
+
+export interface SalesValueResponse {
+  salesValue: number;        // R$ vendido na janela
+  salesWithoutValue: number; // vendas sem item/valor cadastrado
 }
-export interface TopTeamResponse {
-  topTeam: { id: string; name: string; conversions: number } | null;
+
+export interface PipelineValueResponse {
+  pipelineValue: number;            // R$ "na mesa" (carteira ativa)
+  negotiationsWithoutValue: number; // ativas sem item/valor cadastrado
 }
-export interface LeadsByTeamItem { teamId: string; teamName: string; count: number; }
-export interface LeadsByTeamResponse { leadsByTeam: LeadsByTeamItem[]; }
-export interface TeamRankingItem { teamId: string; teamName: string; conversions: number; }
-export interface TeamRankingResponse { teamRanking: TeamRankingItem[]; }
-export interface GlobalEvolutionResponse { evolution: ChartEvolutionItem[]; }
-export interface GlobalFunnelResponse { funnel: ChartFunnelItem[]; }
+
+export interface GlobalStageFunnelResponse { funnel: StageFunnelItem[]; }
+export interface GlobalEvolutionResponse { evolution: EvolutionPoint[]; }
+
+export interface SalesByTeamItem { teamId: string; teamName: string; sales: number; }
+export interface SalesByTeamResponse { salesByTeam: SalesByTeamItem[]; }
+
+export interface SalesByStoreItem {
+  storeId: string;
+  storeName: string;
+  sales: number;
+  salesValue: number;
+}
+export interface SalesByStoreResponse { salesByStore: SalesByStoreItem[]; }
 
 // ─────────────────────────────────────────────
 // Hook do Serviço
@@ -89,6 +190,12 @@ export function useDashboardService() {
     return s ? `?${s}` : "";
   }, []);
 
+  // Endpoints de SNAPSHOT do atendente — só o alvo, sem datas.
+  const buildAttendantSnapshotQuery = useCallback((f?: DashboardFilters) => {
+    if (!f?.targetAttendantId) return "";
+    return `?attendantId=${encodeURIComponent(f.targetAttendantId)}`;
+  }, []);
+
   // managerDashboardFilterSchema aceita: startDate, endDate, teamId
   const buildManagerQuery = useCallback((f?: DashboardFilters) => {
     if (!f) return "";
@@ -100,8 +207,14 @@ export function useDashboardService() {
     return s ? `?${s}` : "";
   }, []);
 
-  // generalManagerDashboardFilterSchema aceita SOMENTE: startDate, endDate
-  // (não há teamId/attendantId — os dashboards globais cobrem todas as equipes)
+  // Endpoints de SNAPSHOT do manager — só a equipe alvo, sem datas.
+  const buildManagerSnapshotQuery = useCallback((f?: DashboardFilters) => {
+    if (!f?.targetTeamId) return "";
+    return `?teamId=${encodeURIComponent(f.targetTeamId)}`;
+  }, []);
+
+  // generalManagerDashboardFilterSchema aceita SOMENTE: startDate, endDate.
+  // Snapshots globais não recebem parâmetro nenhum.
   const buildGlobalQuery = useCallback((f?: DashboardFilters) => {
     if (!f) return "";
     const p = new URLSearchParams();
@@ -111,82 +224,82 @@ export function useDashboardService() {
     return s ? `?${s}` : "";
   }, []);
 
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    // Métodos da visão Manager — também expostos como
+    // generalManager.team para o drill-down do GM.
+    const managerApi = {
+      getActiveNegotiations: async (f?: DashboardFilters): Promise<TeamActiveNegotiationsResponse> =>
+        (await apiFetch(`/api/dashboards/manager/kpi/active-negotiations${buildManagerSnapshotQuery(f)}`)).json(),
+      getSales: async (f?: DashboardFilters): Promise<TeamSalesResponse> =>
+        (await apiFetch(`/api/dashboards/manager/kpi/sales${buildManagerQuery(f)}`)).json(),
+      getClosingRate: async (f?: DashboardFilters): Promise<TeamClosingRateResponse> =>
+        (await apiFetch(`/api/dashboards/manager/kpi/closing-rate${buildManagerQuery(f)}`)).json(),
+      getStagnantNegotiations: async (f?: DashboardFilters): Promise<StagnantNegotiationsResponse> =>
+        (await apiFetch(`/api/dashboards/manager/kpi/stagnant-negotiations${buildManagerSnapshotQuery(f)}`)).json(),
+      getStageFunnel: async (f?: DashboardFilters): Promise<TeamStageFunnelResponse> =>
+        (await apiFetch(`/api/dashboards/manager/charts/stage-funnel${buildManagerSnapshotQuery(f)}`)).json(),
+      getSalesByAttendant: async (f?: DashboardFilters): Promise<SalesByAttendantResponse> =>
+        (await apiFetch(`/api/dashboards/manager/charts/sales-by-attendant${buildManagerQuery(f)}`)).json(),
+      getWorkloadByAttendant: async (f?: DashboardFilters): Promise<WorkloadByAttendantResponse> =>
+        (await apiFetch(`/api/dashboards/manager/charts/workload-by-attendant${buildManagerSnapshotQuery(f)}`)).json(),
+      getEvolution: async (f?: DashboardFilters): Promise<TeamEvolutionResponse> =>
+        (await apiFetch(`/api/dashboards/manager/charts/evolution${buildManagerQuery(f)}`)).json(),
+      getIdleLeads: async (f?: DashboardFilters): Promise<IdleLeadsResponse> =>
+        (await apiFetch(`/api/dashboards/manager/charts/idle-leads${buildManagerSnapshotQuery(f)}`)).json(),
+    };
+
+    return {
       // ── Visão do Atendente ──────────────────────────
       attendant: {
-        getActiveLeads: async (f?: DashboardFilters): Promise<ActiveLeadsResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/kpi/active-leads${buildAttendantQuery(f)}`)).json(),
-        getConvertedLeads: async (f?: DashboardFilters): Promise<ConvertedLeadsResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/kpi/converted-leads${buildAttendantQuery(f)}`)).json(),
-        getConversionRate: async (f?: DashboardFilters): Promise<ConversionRateResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/kpi/conversion-rate${buildAttendantQuery(f)}`)).json(),
-        getAvgServiceTime: async (f?: DashboardFilters): Promise<AvgServiceTimeResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/kpi/avg-service-time${buildAttendantQuery(f)}`)).json(),
-        getLeadsEvolution: async (f?: DashboardFilters): Promise<EvolutionResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/charts/leads-evolution${buildAttendantQuery(f)}`)).json(),
-        getSalesFunnel: async (f?: DashboardFilters): Promise<FunnelResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/charts/sales-funnel${buildAttendantQuery(f)}`)).json(),
-        getLeadsBySource: async (f?: DashboardFilters): Promise<SourcesResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/charts/leads-by-source${buildAttendantQuery(f)}`)).json(),
-        getConversionsByPeriod: async (f?: DashboardFilters): Promise<ConversionsPeriodResponse> =>
-          (await apiFetch(`/api/dashboards/attendant/charts/conversions-by-period${buildAttendantQuery(f)}`)).json(),
+        getActiveNegotiations: async (f?: DashboardFilters): Promise<ActiveNegotiationsResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/kpi/active-negotiations${buildAttendantSnapshotQuery(f)}`)).json(),
+        getSales: async (f?: DashboardFilters): Promise<SalesResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/kpi/sales${buildAttendantQuery(f)}`)).json(),
+        getClosingRate: async (f?: DashboardFilters): Promise<ClosingRateResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/kpi/closing-rate${buildAttendantQuery(f)}`)).json(),
+        getAvgClosingTime: async (f?: DashboardFilters): Promise<AvgClosingTimeResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/kpi/avg-closing-time${buildAttendantQuery(f)}`)).json(),
+        getStageFunnel: async (f?: DashboardFilters): Promise<StageFunnelResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/charts/stage-funnel${buildAttendantSnapshotQuery(f)}`)).json(),
+        getEvolution: async (f?: DashboardFilters): Promise<NegotiationsEvolutionResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/charts/evolution${buildAttendantQuery(f)}`)).json(),
+        getTemperature: async (f?: DashboardFilters): Promise<TemperatureResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/charts/temperature${buildAttendantSnapshotQuery(f)}`)).json(),
+        getNegotiationsBySource: async (f?: DashboardFilters): Promise<NegotiationsBySourceResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/charts/negotiations-by-source${buildAttendantQuery(f)}`)).json(),
+        getIdleLeads: async (f?: DashboardFilters): Promise<IdleLeadsResponse> =>
+          (await apiFetch(`/api/dashboards/attendant/charts/idle-leads${buildAttendantSnapshotQuery(f)}`)).json(),
       },
 
       // ── Visão Gerencial (Equipe) ────────────────────
-      manager: {
-        getTeamKpis: async (f?: DashboardFilters): Promise<TeamKpisResponse> =>
-          (await apiFetch(`/api/dashboards/manager/kpi/team${buildManagerQuery(f)}`)).json(),
-        getTopAttendant: async (f?: DashboardFilters): Promise<TopAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/kpi/top-attendant${buildManagerQuery(f)}`)).json(),
-        getLeadsByAttendant: async (f?: DashboardFilters): Promise<LeadsByAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/leads-by-attendant${buildManagerQuery(f)}`)).json(),
-        getConversionsByAttendant: async (f?: DashboardFilters): Promise<ConversionsByAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/conversions-by-attendant${buildManagerQuery(f)}`)).json(),
-        getTeamEvolution: async (f?: DashboardFilters): Promise<TeamEvolutionResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/team-evolution${buildManagerQuery(f)}`)).json(),
-        getTeamFunnel: async (f?: DashboardFilters): Promise<TeamFunnelResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/team-funnel${buildManagerQuery(f)}`)).json(),
-      },
+      manager: managerApi,
 
       // ── Visão Global (Empresa) ──────────────────────
-      // Os métodos globais (getGlobalKpis, getTopTeam, getLeadsByTeam,
-      // getTeamRanking, getGlobalEvolution, getGlobalFunnel) usam os endpoints
-      // /general-manager — só datas, sem teamId.
-      // Para drill-down em UMA equipe selecionada pelo GM, use os métodos
-      // getTeam* abaixo: batem nos endpoints /manager passando teamId
-      // (checkPermission('MANAGER') deixa o GM passar por hierarquia).
       generalManager: {
-        getGlobalKpis: async (f?: DashboardFilters): Promise<GlobalKpisResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/kpi/global${buildGlobalQuery(f)}`)).json(),
-        getTopTeam: async (f?: DashboardFilters): Promise<TopTeamResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/kpi/top-team${buildGlobalQuery(f)}`)).json(),
-        getLeadsByTeam: async (f?: DashboardFilters): Promise<LeadsByTeamResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/charts/leads-by-team${buildGlobalQuery(f)}`)).json(),
-        getTeamRanking: async (f?: DashboardFilters): Promise<TeamRankingResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/charts/team-ranking${buildGlobalQuery(f)}`)).json(),
-        getGlobalEvolution: async (f?: DashboardFilters): Promise<GlobalEvolutionResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/charts/global-evolution${buildGlobalQuery(f)}`)).json(),
-        getGlobalFunnel: async (f?: DashboardFilters): Promise<GlobalFunnelResponse> =>
-          (await apiFetch(`/api/dashboards/general-manager/charts/global-funnel${buildGlobalQuery(f)}`)).json(),
+        // KPIs
+        getActiveNegotiations: async (): Promise<GlobalActiveNegotiationsResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/kpi/active-negotiations`)).json(),
+        getSales: async (f?: DashboardFilters): Promise<GlobalSalesResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/kpi/sales${buildGlobalQuery(f)}`)).json(),
+        getSalesValue: async (f?: DashboardFilters): Promise<SalesValueResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/kpi/sales-value${buildGlobalQuery(f)}`)).json(),
+        getPipelineValue: async (): Promise<PipelineValueResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/kpi/pipeline-value`)).json(),
 
-        // ── Drill-down de equipe específica ─────────────
-        // O endpoint /general-manager NÃO aceita teamId (só datas globais).
-        // Quando o GM seleciona uma equipe, usamos os endpoints /manager
-        // passando teamId — checkPermission('MANAGER') deixa o GM passar por
-        // hierarquia. Retornam os mesmos shapes da visão Manager.
-        getTeamKpis: async (f?: DashboardFilters): Promise<TeamKpisResponse> =>
-          (await apiFetch(`/api/dashboards/manager/kpi/team${buildManagerQuery(f)}`)).json(),
-        getTeamTopAttendant: async (f?: DashboardFilters): Promise<TopAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/kpi/top-attendant${buildManagerQuery(f)}`)).json(),
-        getTeamLeadsByAttendant: async (f?: DashboardFilters): Promise<LeadsByAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/leads-by-attendant${buildManagerQuery(f)}`)).json(),
-        getTeamConversionsByAttendant: async (f?: DashboardFilters): Promise<ConversionsByAttendantResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/conversions-by-attendant${buildManagerQuery(f)}`)).json(),
-        getTeamEvolution: async (f?: DashboardFilters): Promise<TeamEvolutionResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/team-evolution${buildManagerQuery(f)}`)).json(),
-        getTeamFunnel: async (f?: DashboardFilters): Promise<TeamFunnelResponse> =>
-          (await apiFetch(`/api/dashboards/manager/charts/team-funnel${buildManagerQuery(f)}`)).json(),
+        // Charts
+        getStageFunnel: async (): Promise<GlobalStageFunnelResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/charts/stage-funnel`)).json(),
+        getSalesByTeam: async (f?: DashboardFilters): Promise<SalesByTeamResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/charts/sales-by-team${buildGlobalQuery(f)}`)).json(),
+        getSalesByStore: async (f?: DashboardFilters): Promise<SalesByStoreResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/charts/sales-by-store${buildGlobalQuery(f)}`)).json(),
+        getEvolution: async (f?: DashboardFilters): Promise<GlobalEvolutionResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/charts/evolution${buildGlobalQuery(f)}`)).json(),
+        getIdleLeads: async (): Promise<IdleLeadsResponse> =>
+          (await apiFetch(`/api/dashboards/general-manager/charts/idle-leads`)).json(),
+
+        // Drill-down de equipe específica → endpoints /manager (teamId)
+        team: managerApi,
       },
 
       // ── Métodos Auxiliares ──────────────────────────
@@ -202,7 +315,13 @@ export function useDashboardService() {
           return (json && typeof json === "object" && "data" in json ? json.data : json) ?? [];
         },
       },
-    }),
-    [apiFetch, buildAttendantQuery, buildManagerQuery, buildGlobalQuery]
-  );
+    };
+  }, [
+    apiFetch,
+    buildAttendantQuery,
+    buildAttendantSnapshotQuery,
+    buildManagerQuery,
+    buildManagerSnapshotQuery,
+    buildGlobalQuery,
+  ]);
 }
