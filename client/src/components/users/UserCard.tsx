@@ -136,13 +136,13 @@ export default function UserCard({ user, onEdit, onToggleStatus }: UserCardProps
           {phone !== "—" && (
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <Phone size={13} className="text-gray-400 shrink-0" />
-              <span>{user.phone}</span>
+              <span>{phone}</span>
             </div>
           )}
 
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <Users size={13} className="text-gray-400 shrink-0" />
-            <span>{user.team}</span>
+            <span>{teamNames}</span>
           </div>
         </div>
 
