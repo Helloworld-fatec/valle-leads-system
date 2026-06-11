@@ -20,6 +20,11 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // USERS ROUTES
@@ -28,24 +33,15 @@ import {
 //   authMiddleware          → exige access token válido + injeta req.user
 //   checkPermission/Role    → RBAC "grosso" por role
 //   validate*               → valida e tipifica dados via Zod
+//   createLogMiddleware     → agenda gravação assíncrona em system_logs
 //   controller.handler      → orquestra service e responde
 //
-// Regras de acesso:
-//   GET    /users              → MANAGER, GENERAL_MANAGER ou ADMIN
-//   GET    /users/:id          → qualquer role autenticado
-//   POST   /users              → somente ADMIN
-//   PUT    /users/:id          → ADMIN (qualquer usuário) ou qualquer role (próprio id)
-//   PATCH  /users/:id          → ADMIN (qualquer usuário) ou qualquer role (próprio id)
-//   DELETE /users/:id          → somente ADMIN (soft delete)
-//   DELETE /users/:id/hard     → somente ADMIN (hard delete físico)
-//
-// Importante:
-//   - PUT/PATCH usa middleware condicional que escolhe o schema Zod correto:
-//       ADMIN                     → updateUserAdminSchema (campos completos)
-//       qualquer role, próprio id → updateSelfSchema (inclui current/new_password)
-//     Isso evita que current_password e new_password sejam descartados antes
-//     de chegar ao controller, o que causava "Nenhum campo enviado para atualização".
-//   - /hard deve vir ANTES de /:id para o Express resolver primeiro.
+// O log middleware é posicionado ANTES do controller intencionalmente:
+//   - Ele só grava após res.on("finish"), então o controller já executou.
+//   - Precisa estar na pipeline (não no controller) para manter a separação
+//     de responsabilidades — o controller não sabe que existe log.
+//   - Fica DEPOIS das validações para não logar tentativas que falhariam
+//     em validação antes mesmo de chegar ao service.
 // ─────────────────────────────────────────────
 
 const usersRouter = Router();
@@ -59,6 +55,10 @@ usersRouter.get(
   "/",
   checkPermission("MANAGER"),
   validateQuery(listUsersQuerySchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.LIST,
+    module: LOG_MODULES.USERS,
+  }),
   controller.findAll
 );
 
@@ -67,6 +67,11 @@ usersRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.GET,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Consulta do usuário ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -75,6 +80,11 @@ usersRouter.post(
   "/",
   checkRole("ADMIN"),
   validateBody(createUserSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.CREATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Criação de usuário: ${(req.body as { email?: string }).email ?? ""}`,
+  }),
   controller.create
 );
 
@@ -82,9 +92,6 @@ usersRouter.post(
 // Middleware condicional: escolhe o schema Zod correto com base no actor.
 //   - ADMIN editando qualquer id     → updateUserAdminSchema (campos completos)
 //   - qualquer role no próprio id    → updateSelfSchema (inclui current/new_password)
-//
-// Corrige o erro "Nenhum campo enviado para atualização" que ocorria porque
-// o updateUserAdminSchema descartava current_password e new_password.
 function conditionalValidateBody(
   req: AuthRequest,
   res: Response,
@@ -104,6 +111,11 @@ usersRouter.put(
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
   conditionalValidateBody,
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.UPDATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Atualização (PUT) do usuário ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -112,14 +124,25 @@ usersRouter.patch(
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
   conditionalValidateBody,
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.UPDATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Atualização (PATCH) do usuário ${req.params.id}`,
+  }),
   controller.update
 );
 
 // ─── EXCLUSÃO ────────────────────────────────────────
+// /hard deve vir ANTES de /:id para o Express resolver corretamente
 usersRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.HARD_DELETE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Hard delete do usuário ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
@@ -127,6 +150,11 @@ usersRouter.delete(
   "/:id",
   checkRole("ADMIN"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.SOFT_DELETE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Soft delete do usuário ${req.params.id}`,
+  }),
   controller.softDelete
 );
 

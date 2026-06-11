@@ -30,7 +30,7 @@ function RoleCard({ role, users }: { role: UserRole; users: User[] }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow duration-200">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
         style={{ backgroundColor: bg, color: text }}
       >
         {roleIcons[role]}
@@ -54,7 +54,7 @@ function RoleCard({ role, users }: { role: UserRole; users: User[] }) {
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm animate-pulse">
-      <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0" />
+      <div className="w-10 h-10 rounded-xl bg-gray-100 shrink-0" />
       <div className="flex-1 space-y-2 pt-1">
         <div className="h-3 w-20 bg-gray-100 rounded" />
         <div className="h-7 w-10 bg-gray-100 rounded" />
@@ -72,7 +72,7 @@ const ROLE_ORDER: UserRole[] = [
 ];
 
 export default function UserStatsCards({ users, loading = false }: UserStatsCardsProps) {
-  const total      = users.length;
+  const total       = users.length;
   const activeCount = users.filter((u) => u.is_active).length;
   const inactiveCount = total - activeCount;
   const activePct  = total > 0 ? Math.round((activeCount / total) * 100) : 0;
@@ -126,30 +126,31 @@ export default function UserStatsCards({ users, loading = false }: UserStatsCard
 
       {/* Card Taxa de Atividade */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
           <svg
             viewBox="0 0 20 20"
             fill="currentColor"
             className="w-5 h-5"
           >
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: bg, color: text }}
-            >
-              {roleIcons[role]}
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {roleLabels[role]}s
-              </p>
-              <p className="text-2xl font-bold text-gray-900 mt-0.5">{count}</p>
-              <p className="text-xs mt-1" style={{ color: text }}>
-                {active} ativo{active !== 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
-        );
-      })}
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide truncate">
+            Taxa de Atividade
+          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-0.5 leading-none">
+            {activePct}%
+          </p>
+          <p className="text-xs mt-1.5 text-emerald-600">
+            {activeCount} de {total} ativos
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

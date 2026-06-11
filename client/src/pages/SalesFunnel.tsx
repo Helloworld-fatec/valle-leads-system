@@ -156,27 +156,7 @@ export default function SalesFunnel() {
         <div className="flex items-center gap-3">
           {/* Barra de Busca Rápida */}
           <div className="relative group hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar cliente ou veículo..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg w-64 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
-            />
           </div>
-
-          <button className="p-2 text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
-            <Filter size={18} />
-          </button>
-
-          <button 
-            onClick={handleCreateNew}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus size={16} />
-            Nova Negociação
-          </button>
         </div>
       </div>
 
