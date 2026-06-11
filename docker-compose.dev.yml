@@ -1,21 +1,20 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
-    container_name: valle_db
+    container_name: valle_db_dev
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-valle_leads}
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,39 +23,43 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-      target: build
-    container_name: valle_server
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file: .env
+      target: dev
+    container_name: valle_server_dev
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
-      CHOKIDAR_USEPOLLING: "true"
-    # Usamos o npx para garantir que o Docker encontre o tsx interno
-    command: npx tsx watch src/server.ts
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-valle_leads}?schema=public
+    ports:
+      - "3000:3000"
     volumes:
       - ./server:/app
       - /app/node_modules
-      - /app/src/generated
-    ports:
-      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
 
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
-      target: build
-    container_name: valle_client
+      target: dev
+      args:
+        VITE_BACKEND_URL: ""
+    container_name: valle_client_dev
+    restart: unless-stopped
     environment:
-      - CHOKIDAR_USEPOLLING=true
-    command: npm run dev -- --host
+      VITE_BACKEND_URL: ""
+    ports:
+      - "5173:5173"
     volumes:
       - ./client:/app
       - /app/node_modules
-    ports:
-      - "5173:5173"
+    depends_on:
+      - server
 
 volumes:
-  postgres_data:
-  seed_flag:
+  postgres_dev_data:

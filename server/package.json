@@ -10,9 +10,9 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "prisma": {
-  "seed": "tsx prisma/seed.ts",
-  "seednegotiations": "tsx prisma/seed_negotiations.ts"
-},
+    "seed": "tsx prisma/seed.ts",
+    "seednegotiations": "tsx prisma/seed_negotiations.ts"
+  },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.6.0",
@@ -41,7 +41,7 @@
     "prisma": "^7.6.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.2"
   }
 }

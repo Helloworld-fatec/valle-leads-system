@@ -71,6 +71,8 @@ export interface UpdateSelfDTO {
   address_zip?: string | null;
 }
 
+export type UpdateProfileDTO = UpdateSelfDTO;
+
 // Helper: aceita resposta { data: ... } ou corpo direto
 function unwrap<T>(json: any): T {
   return (json && typeof json === "object" && "data" in json ? json.data : json) as T;
@@ -116,13 +118,13 @@ export const useProfileService = () => {
   const updatePassword = useCallback(
     async (
       userId: string,
-      currentPassword: string,
-      newPassword: string
+      newPassword: string,
+      currentPassword?: string
     ): Promise<UserProfile> => {
       const res = await apiFetch(`/api/users/${userId}`, {
         method: "PUT",
         body: JSON.stringify({
-          current_password: currentPassword,
+          ...(currentPassword ? { current_password: currentPassword } : {}),
           new_password: newPassword,
         }),
       });
