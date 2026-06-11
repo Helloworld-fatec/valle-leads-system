@@ -3,13 +3,12 @@ import { z } from "zod";
 
 
 // Schema de criação de lead.
-// attendant_id é opcional: para ATTENDANT o service força o próprio id;
-// para os demais perfis o atendente pode ser informado ou deixado em branco.
+
 export const CreateLeadSchema = z.object({
   source: z.string().trim().max(100).optional(),
   status: z.string().optional(),
   customer_id: z.string().uuid("customer_id deve ser um UUID válido"),
-  team_id: z.string().uuid("team_id deve ser um UUID válido"),
+  team_id: z.string().uuid("team_id deve ser um UUID válido").optional(),
   attendant_id: z
     .string()
     .uuid("attendant_id deve ser um UUID válido")

@@ -1,12 +1,4 @@
 // src/pages/DashboardGeneralManager.tsx
-// REFACTOR negociação-cêntrico:
-//   - KPIs: negociações ativas, vendas, valor vendido (R$), valor em pipeline (R$).
-//   - Charts: evolução global (abertas × ganhas), funil global, ranking de
-//     equipes, vendas por loja, leads parados.
-//   - Snapshot (estado atual): ativas, pipeline, funil, leads parados
-//     → não mudam com o filtro de período.
-//   - Janela (eventos da negociação): vendas, valor vendido, ranking,
-//     lojas, evolução.
 import { useState, useCallback, useEffect } from "react";
 import { useDashboardService } from "../services/dashboardService";
 import type {
@@ -22,6 +14,9 @@ import type {
   IdleLeadsResponse,
 } from "../services/dashboardService";
 
+// Reutiliza o mesmo filtro do atendente — aplica imediatamente, sem "Aplicar"
+import DateRangeFilter from "../components/dashboards/attendant/DateRangeFilter";
+
 // Child components
 import GlobalKpiCards from "../components/dashboards/general-manager/GlobalKpiCards";
 import GlobalFunnelChart from "../components/dashboards/general-manager/GlobalFunnelChart";
@@ -29,7 +24,6 @@ import GlobalEvolutionChart from "../components/dashboards/general-manager/Globa
 import SalesByTeamChart from "../components/dashboards/general-manager/SalesByTeamChart";
 import SalesByStoreChart from "../components/dashboards/general-manager/SalesByStoreChart";
 import GlobalIdleLeadsChart from "../components/dashboards/general-manager/GlobalIdleLeadsChart";
-import DashboardFilterBar from "../components/dashboards/general-manager/DashboardFilterBar";
 
 // ─────────────────────────────────────────────
 // State shape
@@ -58,11 +52,13 @@ const INITIAL_STATE: DashboardState = {
   idleLeads: null,
 };
 
-// Filtro inicial: últimos 30 dias
 function defaultFilters(): DashboardFilters {
-  const end = new Date();
-  const start = new Date();
+  const now = new Date();
+  const start = new Date(now);
   start.setDate(start.getDate() - 30);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
   return {
     startDate: start.toISOString(),
     endDate: end.toISOString(),
@@ -75,8 +71,7 @@ function defaultFilters(): DashboardFilters {
 export default function DashboardGeneralManager() {
   const svc = useDashboardService();
 
-  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
-  const [pendingFilters, setPendingFilters] = useState<DashboardFilters>(defaultFilters);
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters());
   const [data, setData] = useState<DashboardState>(INITIAL_STATE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +81,6 @@ export default function DashboardGeneralManager() {
       setLoading(true);
       setError(null);
       try {
-        // Snapshots (ativas, pipeline, funil, leads parados) não recebem
-        // filtros — representam o estado ATUAL da empresa.
         const [
           activeNegotiations,
           sales,
@@ -131,24 +124,27 @@ export default function DashboardGeneralManager() {
     [svc],
   );
 
-  // Initial load
   useEffect(() => {
     fetchAll(filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAll]);
 
-  function handleApply() {
-    setFilters(pendingFilters);
-    fetchAll(pendingFilters);
+  function handleFilterChange(newFilters: DashboardFilters) {
+    setFilters(newFilters);
+    fetchAll(newFilters);
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard Geral</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-2xl font-bold" style={{ color: "#111827" }}>
+            Dashboard Geral
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>
             Desempenho das negociações em toda a empresa
           </p>
         </div>
@@ -160,20 +156,14 @@ export default function DashboardGeneralManager() {
         </span>
       </div>
 
-      {/* Filtro — aplica-se às métricas de período (vendas, valor vendido,
-          ranking, lojas, evolução). Carteira ativa, pipeline, funil e leads
-          parados são snapshots do estado atual. */}
-      <DashboardFilterBar
-        filters={pendingFilters}
-        onChange={setPendingFilters}
-        onApply={handleApply}
-        loading={loading}
-      />
+      {/* Filtro — mesmo componente do atendente, aplica imediatamente.
+          Snapshots (ativas, pipeline, funil, leads parados) ignoram as datas. */}
+      <DateRangeFilter onFilterChange={handleFilterChange} loading={loading} />
 
       {/* Erro */}
       {error && (
         <div
-          className="rounded-2xl p-5 border text-sm flex items-center justify-between"
+          className="rounded-xl p-4 border text-sm flex items-center justify-between"
           style={{ background: "#FEF2F2", borderColor: "#FECACA", color: "#B91C1C" }}
         >
           <span>{error}</span>
