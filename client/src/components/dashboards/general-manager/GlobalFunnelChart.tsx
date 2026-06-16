@@ -1,10 +1,15 @@
 // src/components/dashboards/general-manager/GlobalFunnelChart.tsx
 // Funil global: carteira ATIVA da empresa pelo estágio atual (snapshot).
+// fechamento_com_venda / fechamento_sem_venda são filtrados — são estágios
+// de transição, não resultados finais. O GM não tem endpoint de closing-rate
+// global, portanto a seção "Resultados do período" não é exibida aqui.
 import {
   getStageColor,
   getStageLabel,
   type GlobalStageFunnelResponse,
 } from "../../../services/dashboardService";
+
+const CLOSING_STAGES = new Set(["fechamento_com_venda", "fechamento_sem_venda"]);
 
 interface Props {
   data: GlobalStageFunnelResponse | null;
@@ -22,9 +27,10 @@ function SkeletonBar() {
 }
 
 export default function GlobalFunnelChart({ data, loading }: Props) {
-  const items = data?.funnel ?? [];
-  const max = items.length > 0 ? Math.max(...items.map((i) => i.count), 1) : 1;
-  const total = items.reduce((acc, i) => acc + i.count, 0);
+  const allItems = data?.funnel ?? [];
+  const items    = allItems.filter((i) => !CLOSING_STAGES.has(i.stage));
+  const max      = items.length > 0 ? Math.max(...items.map((i) => i.count), 1) : 1;
+  const total    = items.reduce((acc, i) => acc + i.count, 0);
 
   return (
     <div
@@ -50,14 +56,14 @@ export default function GlobalFunnelChart({ data, loading }: Props) {
 
       <div className="space-y-3">
         {loading ? (
-          Array.from({ length: 7 }).map((_, i) => <SkeletonBar key={i} />)
+          Array.from({ length: 5 }).map((_, i) => <SkeletonBar key={i} />)
         ) : items.length === 0 || total === 0 ? (
           <p className="text-sm text-center py-8" style={{ color: "#9CA3AF" }}>
             Nenhuma negociação ativa
           </p>
         ) : (
           items.map((item) => {
-            const pct = Math.round((item.count / max) * 100);
+            const pct   = Math.round((item.count / max) * 100);
             const color = getStageColor(item.stage);
             const label = getStageLabel(item.stage);
             return (

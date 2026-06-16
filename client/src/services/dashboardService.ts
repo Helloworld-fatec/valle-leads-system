@@ -326,82 +326,44 @@ export function useDashboardService() {
   ]);
 }
 
-export type LeadsByTeamItem = {
+// src/services/dashboardService.ts
+
+export interface LeadsByTeamItem {
   teamId: string;
   teamName: string;
   count: number;
+}
 
-  // compatibilidade com possíveis retornos em snake_case
-  team_id?: string | null;
-  team_name?: string | null;
-  name?: string | null;
-};
-
-export type LeadsByTeamResponse = {
+export interface LeadsByTeamResponse {
   leadsByTeam: LeadsByTeamItem[];
-};
+}
 
-export type TeamRankingItem = {
+export interface TeamRankingItem {
   teamId: string;
   teamName: string;
-  count: number;
   conversions: number;
-  conversionRate?: number;
+}
 
-  // compatibilidade com possíveis retornos em snake_case
-  team_id?: string | null;
-  team_name?: string | null;
-  name?: string | null;
-  conversion_rate?: number;
-};
-
-export type TeamRankingResponse = {
+export interface TeamRankingResponse {
   teamRanking: TeamRankingItem[];
-};
+}
 
-export type LeadsByAttendantItem = {
+export interface ConversionsByAttendantItem {
   attendantId: string;
   attendantName: string;
   count: number;
+}
 
-  // compatibilidade com possíveis retornos em snake_case
-  attendant_id?: string | null;
-  attendant_name?: string | null;
-  name?: string | null;
-};
-
-export type LeadsByAttendantResponse = {
-  leadsByAttendant: LeadsByAttendantItem[];
-};
-
-export type ConversionsByAttendantItem = {
-  attendantId: string;
-  attendantName: string;
-  count: number;
-  conversionRate?: number;
-
-  // compatibilidade com possíveis retornos em snake_case
-  attendant_id?: string | null;
-  attendant_name?: string | null;
-  name?: string | null;
-  conversion_rate?: number;
-};
-
-export type ConversionsByAttendantResponse = {
+export interface ConversionsByAttendantResponse {
   conversionsByAttendant: ConversionsByAttendantItem[];
-};
+}
 
-export type ChartEvolutionItem = {
-  date: string;
+export interface LeadsByAttendantItem {
+  attendantId: string;
+  attendantName: string;
   count: number;
-};
+}
 
-export type ChartSourceItem = {
-  source: string;
-  count: number;
-};
-
-export type ChartFunnelItem = {
-  stage: string;
-  count: number;
-};
+export interface LeadsByAttendantResponse {
+  leadsByAttendant: LeadsByAttendantItem[];
+}

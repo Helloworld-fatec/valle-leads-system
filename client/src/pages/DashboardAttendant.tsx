@@ -221,8 +221,8 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
     avgHours >= 24
       ? `${(avgHours / 24).toFixed(1)}d`
       : avgHours >= 1
-      ? `${avgHours.toFixed(1)}h`
-      : `${Math.round(avgHours * 60)}min`;
+        ? `${avgHours.toFixed(1)}h`
+        : `${Math.round(avgHours * 60)}min`;
 
   const closingRate = data.closingRate?.closingRate ?? 0;
 
@@ -304,7 +304,12 @@ export default function DashboardAttendant({ targetAttendantId }: DashboardAtten
           {/* Charts row 1: atividade do período */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <EvolutionChart data={data.evolution?.evolution ?? []} loading={loading} />
-            <StageFunnelChart data={data.stageFunnel?.funnel ?? []} loading={loading} />
+            <StageFunnelChart
+              data={data.stageFunnel?.funnel ?? []}
+              loading={loading}
+              wonCount={data.closingRate?.wonCount ?? 0}
+              lostCount={data.closingRate?.lostCount ?? 0}
+            />
           </div>
 
           {/* Charts row 2: composição da carteira */}

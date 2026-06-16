@@ -21,7 +21,10 @@ const leadInclude = {
 } as const satisfies Prisma.LeadsInclude;
 
 const leadIncludeWithNegotiations = {
-  ...leadInclude,
+  customers: true,
+  teams: true,
+  attendant: { select: attendantSelect },
+  interest_item: true,
   negotiations: true,
 } as const satisfies Prisma.LeadsInclude;
 
@@ -49,14 +52,6 @@ export class LeadsRepository {
   async findAll(filters: FindAllLeadsParams): Promise<PaginatedLeads> {
     const where = this.buildWhere(filters);
 
-    // Coerção robusta para inteiro. A query string sempre chega como string
-    // ("100"); o Zod do DTO valida e transforma, mas esse valor transformado
-    // NÃO está sendo persistido de volta em req.query (no Express 5 o req.query
-    // é somente-leitura), então aqui ainda pode chegar string. `Number(...)`
-    // cobre string, number e undefined; o `|| default` trata o NaN. O Prisma
-    // exige Int em take/skip e skip nunca pode ser NaN/undefined.
-    // (A faixa 1..100 continua sendo garantida pelo QueryLeadSchema, que roda
-    // no validateQuery antes daqui.)
     const page  = Number(filters.page)  || 1;
     const limit = Number(filters.limit) || 20;
     const skip  = (page - 1) * limit;
@@ -139,7 +134,8 @@ export class LeadsRepository {
       data: {
         status: dto.status ?? "new",
         customer_id: dto.customer_id,
-        team_id: dto.team_id,
+        // team_id é opcional (GM/Admin podem criar lead solto): undefined → null
+        team_id: dto.team_id ?? null,
         source: dto.source ?? null,
         attendant_id: dto.attendant_id ?? null,
         interest_item_id: dto.interest_item_id ?? null,

@@ -66,9 +66,8 @@ export default function UserListRow({
           <div className="relative">
             <UserAvatar name={user.name} role={user.role} size="sm" />
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                user.is_active ? "bg-green-500" : "bg-gray-300"
-              }`}
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${user.is_active ? "bg-green-500" : "bg-gray-300"
+                }`}
             />
           </div>
 
@@ -111,11 +110,10 @@ export default function UserListRow({
       {/* Status */}
       <td className="px-4 py-3.5 text-sm">
         <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-            user.is_active
+          className={`text-xs font-medium px-2 py-0.5 rounded-full ${user.is_active
               ? "text-green-700 bg-green-50"
               : "text-gray-500 bg-gray-100"
-          }`}
+            }`}
         >
           {user.is_active ? "Ativo" : "Inativo"}
         </span>

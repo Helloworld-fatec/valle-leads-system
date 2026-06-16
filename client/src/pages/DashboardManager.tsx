@@ -1,11 +1,4 @@
 // src/pages/DashboardManager.tsx
-// REFACTOR negociação-cêntrico:
-//   - KPIs: negociações ativas, vendas, taxa de fechamento, estagnadas.
-//   - Charts: evolução (abertas × ganhas), funil da carteira ativa,
-//     ranking de vendas, carga de trabalho, leads parados.
-//   - Snapshot (carteira atual): ativas, estagnadas, funil, carga, parados
-//     → não mudam com o filtro de período.
-//   - Janela (eventos da negociação): vendas, taxa, ranking, evolução.
 import { useState, useEffect, useCallback } from "react";
 import { useDashboardService } from "../services/dashboardService";
 import type {
@@ -21,13 +14,14 @@ import type {
   IdleLeadsResponse,
 } from "../services/dashboardService";
 
+import DateRangeFilter from "../components/dashboards/attendant/DateRangeFilter";
+
 import ManagerKpiCards from "../components/dashboards/manager/ManagerKpiCards";
 import ManagerFunnelChart from "../components/dashboards/manager/ManagerFunnelChart";
 import ManagerEvolutionChart from "../components/dashboards/manager/ManagerEvolutionChart";
 import ManagerSalesByAttendantChart from "../components/dashboards/manager/ManagerSalesByAttendantChart";
 import ManagerWorkloadChart from "../components/dashboards/manager/ManagerWorkloadChart";
 import ManagerIdleLeadsChart from "../components/dashboards/manager/ManagerIdleLeadsChart";
-import ManagerDateFilter from "../components/dashboards/manager/ManagerDateFilter";
 
 // ─────────────────────────────────────────────
 // Estado centralizado dos dados
@@ -56,11 +50,13 @@ const INITIAL_DATA: DashboardData = {
   idleLeads: null,
 };
 
-// Filtro inicial: últimos 30 dias
 function defaultFilters(): DashboardFilters {
-  const end = new Date();
-  const start = new Date();
+  const now = new Date();
+  const start = new Date(now);
   start.setDate(start.getDate() - 30);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
   return {
     startDate: start.toISOString(),
     endDate: end.toISOString(),
@@ -74,7 +70,8 @@ interface DashboardManagerProps {
 
 export default function DashboardManager({ targetTeamId }: DashboardManagerProps) {
   const service = useDashboardService();
-  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters());
   const [data, setData] = useState<DashboardData>(INITIAL_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,13 +81,7 @@ export default function DashboardManager({ targetTeamId }: DashboardManagerProps
       setLoading(true);
       setError(null);
 
-      // Mescla as datas com o targetTeamId do drill-down do GM.
-      // TODAS as chamadas usam finalFilters — os endpoints de snapshot
-      // aproveitam só o teamId (o service descarta as datas).
-      const finalFilters: DashboardFilters = {
-        ...f,
-        targetTeamId,
-      };
+      const finalFilters: DashboardFilters = { ...f, targetTeamId };
 
       try {
         const [
@@ -138,19 +129,24 @@ export default function DashboardManager({ targetTeamId }: DashboardManagerProps
 
   useEffect(() => {
     fetchAll(filters);
-  }, [filters, fetchAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchAll]);
 
-  function handleFiltersChange(newFilters: DashboardFilters) {
+  function handleFilterChange(newFilters: DashboardFilters) {
     setFilters(newFilters);
+    fetchAll(newFilters);
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard da Equipe</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-2xl font-bold" style={{ color: "#111827" }}>
+            Dashboard da Equipe
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>
             Desempenho das negociações da equipe
           </p>
         </div>
@@ -163,14 +159,14 @@ export default function DashboardManager({ targetTeamId }: DashboardManagerProps
       </div>
 
       {/* Filtro — aplica-se às métricas de período (vendas, taxa, ranking,
-          evolução). Carteira ativa, estagnadas, funil, carga e leads
-          parados são snapshots do estado atual. */}
-      <ManagerDateFilter filters={filters} onChange={handleFiltersChange} loading={loading} />
+          evolução). Snapshots (ativas, estagnadas, funil, carga, leads
+          parados) ignoram as datas. */}
+      <DateRangeFilter onFilterChange={handleFilterChange} loading={loading} />
 
       {/* Erro */}
       {error && (
         <div
-          className="rounded-2xl p-5 border text-sm flex items-center justify-between"
+          className="rounded-xl p-4 border text-sm flex items-center justify-between"
           style={{ background: "#FEF2F2", borderColor: "#FECACA", color: "#B91C1C" }}
         >
           <span>{error}</span>
