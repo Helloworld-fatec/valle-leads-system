@@ -475,7 +475,7 @@ O Docker **não executa seed automaticamente**.
 
 O seed deve ser executado manualmente quando o banco estiver vazio, para evitar duplicação de registros ou conflito de constraints.
 
-### 8.3 Rodar seed no modo produção/local
+### 8.3 Rodar Seeds no modo produção/local
 
 Após subir o projeto:
 
@@ -483,49 +483,68 @@ Após subir o projeto:
 docker compose up -d --build
 ```
 
-rode:
+execute:
 
 ```bash
-docker compose exec server npx prisma db seed
+docker compose exec server npx tsx prisma/seed.ts
+docker compose exec server npx tsx prisma/seed_negotiations.ts
 ```
 
-Depois tente logar novamente no sistema.
+---
 
-### 8.4 Rodar seed no modo desenvolvimento
+### 8.4 Rodar Seeds no modo desenvolvimento
 
-O banco do modo dev é separado do banco do modo produção/local.
+O banco do modo desenvolvimento é separado do banco do modo produção/local.
 
-Após subir o dev:
+Após subir o ambiente dev:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-rode:
+execute:
 
 ```bash
-docker compose -f docker-compose.dev.yml exec server npx prisma db seed
+docker compose -f docker-compose.dev.yml exec server npx tsx prisma/seed.ts
+docker compose -f docker-compose.dev.yml exec server npx tsx prisma/seed_negotiations.ts
 ```
 
-### 8.5 Rodar seed no modo cloud
+---
 
-Use com cuidado, pois esse comando afeta o banco em nuvem configurado em `.env.cloud`.
+### 8.5 Rodar Seeds no modo cloud
+
+Utilize com cuidado, pois esse ambiente utiliza o banco configurado em `.env.cloud`.
 
 ```bash
-docker compose -f docker-compose.cloud.yml exec server npx prisma db seed
+docker compose -f docker-compose.cloud.yml exec server npx tsx prisma/seed.ts
+docker compose -f docker-compose.cloud.yml exec server npx tsx prisma/seed_negotiations.ts
 ```
 
-Antes de rodar seed em banco remoto, confirme com o time se esse banco pode receber dados iniciais ou se já possui dados oficiais.
+Antes de executar as Seeds em ambiente remoto, confirme com o time se o banco pode receber dados de teste ou se já contém dados oficiais.
 
-### 8.6 Reset completo com seed no modo produção/local
+---
+
+### 8.6 Reset completo com Seeds no modo produção/local
 
 ```bash
 docker compose down -v
 docker compose up -d --build
-docker compose exec server npx prisma db seed
+
+docker compose exec server npx tsx prisma/seed.ts
+docker compose exec server npx tsx prisma/seed_negotiations.ts
 ```
 
-### 8.7 Reset completo com seed no modo dev
+---
+
+### 8.7 Reset completo com Seeds no modo desenvolvimento
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d --build
+
+docker compose -f docker-compose.dev.yml exec server npx tsx prisma/seed.ts
+docker compose -f docker-compose.dev.yml exec server npx tsx prisma/seed_negotiations.ts
+```
 
 ```bash
 docker compose -f docker-compose.dev.yml down -v

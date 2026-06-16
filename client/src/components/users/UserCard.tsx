@@ -5,6 +5,12 @@ import UserAvatar from "./UserAvatar";
 import RoleBadge from "./RoleBadge";
 import { Mail, Phone, Users, MoreVertical, Pencil, ShieldAlert, ShieldCheck } from "lucide-react";
 
+type UserCardView = User & {
+  phone?: string | null;
+  team?: string | null;
+  team_name?: string | null;
+};
+
 interface UserCardProps {
   user: User;
   onEdit?: () => void;
@@ -16,6 +22,9 @@ export default function UserCard({ user, onEdit, onToggleStatus }: UserCardProps
   const menuRef = useRef<HTMLDivElement>(null);
 
   const phone     = formatPhone(user.phone_1_ddd, user.phone_1_number);
+
+  const viewUser = user as UserCardView;
+
   const teamNames = getTeamNames(
     user.user_teams as Array<{
       id: string;
@@ -136,13 +145,13 @@ export default function UserCard({ user, onEdit, onToggleStatus }: UserCardProps
           {phone !== "—" && (
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <Phone size={13} className="text-gray-400 shrink-0" />
-              <span>{user.phone}</span>
+              <span>{viewUser.phone ?? "Sem telefone"}</span>
             </div>
           )}
 
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <Users size={13} className="text-gray-400 shrink-0" />
-            <span>{user.team}</span>
+            <span>{viewUser.team ?? viewUser.team_name ?? "Sem equipe"}</span>
           </div>
         </div>
 
