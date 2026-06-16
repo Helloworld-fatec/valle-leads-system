@@ -124,13 +124,14 @@ export default function UserStatsCards({ users, loading = false }: UserStatsCard
         <RoleCard key={role} role={role} users={users} />
       ))}
 
-      {/* Card Taxa de Atividade */}
+            {/* Card Taxa de Atividade */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
           <svg
             viewBox="0 0 20 20"
             fill="currentColor"
             className="w-5 h-5"
+            aria-hidden="true"
           >
             <path
               fillRule="evenodd"

@@ -201,9 +201,39 @@ Uma task é considerada **Concluída** quando:
 
 ---
 
+
 ## 📊 Revisão da Sprint
 
-> *Resumo da Sprint Review: o que foi demonstrado, feedbacks recebidos do PO e stakeholders.*
+### O que foi demonstrado
+
+Durante a Sprint Review foram apresentados:
+
+* Integração das principais páginas do sistema com dados reais do banco de dados.
+* Refatoração da página de usuários, removendo dados mockados e utilizando informações persistidas.
+* Atualização da página de perfil com dados reais vinculados à sessão do usuário.
+* Melhorias visuais nas páginas de usuários, perfil, leads, negociação e dashboards.
+* Dashboards atualizados para refletir dados reais do sistema.
+* Estrutura de logs implementada para rastreamento de operações.
+* Revisão da infraestrutura Docker e documentação técnica do projeto.
+* Atualização dos artefatos Scrum e documentação das sprints.
+
+### Feedback do Cliente
+
+#### Pontos positivos
+
+* Interface intuitiva e de fácil utilização.
+* Boa separação de informações através dos diferentes dashboards por perfil de usuário.
+* Sistema considerado simples, organizado e funcional.
+* Evolução visual perceptível em comparação às entregas anteriores.
+* Estrutura geral alinhada às necessidades apresentadas pelo cliente.
+
+#### Pontos de melhoria
+
+* Corrigir bugs e funcionalidades que apresentaram comportamento inesperado durante a demonstração.
+* Refinar filtros, pesquisas e mecanismos de busca em algumas telas.
+* Melhorar fluxos de edição e atualização de dados.
+* Implementar visualização dos logs registrados pelo sistema.
+* Continuar evoluindo a experiência de uso e a usabilidade geral da aplicação.
 
 ---
 
@@ -211,12 +241,26 @@ Uma task é considerada **Concluída** quando:
 
 ### O que funcionou bem?
 
-*
+* Integração dos módulos do frontend com dados reais do backend.
+* Refatoração das páginas que anteriormente utilizavam dados mockados.
+* Evolução significativa da documentação técnica e dos artefatos Scrum.
+* Organização das atividades da sprint e divisão equilibrada das responsabilidades.
+* Estrutura Docker revisada e validada para execução do projeto.
+* Melhorias visuais que aumentaram a qualidade da interface e da experiência do usuário.
 
 ### O que pode melhorar?
 
-*
+* Realizar testes integrados com maior antecedência para identificar erros antes da Sprint Review.
+* Aumentar a frequência das validações entre frontend e backend durante o desenvolvimento.
+* Melhorar a comunicação sobre alterações que impactam múltiplos módulos do sistema.
+* Reduzir o retrabalho causado por ajustes identificados apenas na fase final da sprint.
+* Ampliar a cobertura de testes antes da entrega das funcionalidades.
 
 ### Ações futuras
 
-*
+* Priorizar a correção dos bugs identificados durante a Sprint Review.
+* Refinar filtros, pesquisas e fluxos de edição de dados.
+* Evoluir a funcionalidade de logs e disponibilizar sua visualização para usuários autorizados.
+* Continuar aprimorando a usabilidade e a consistência visual do sistema.
+* Fortalecer os processos de validação e testes durante o desenvolvimento.
+* Consolidar a documentação para facilitar manutenção e evolução futura do projeto.
