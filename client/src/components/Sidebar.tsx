@@ -4,9 +4,11 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ClipboardList,
   Handshake,
   Settings,
+  UserCheck,
   X,
   Menu,
 } from "lucide-react";
@@ -56,6 +58,73 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+// ─── Roles que enxergam o grupo "Função Atendente" ───────────────────────────
+const MANAGER_ROLES: UserRole[] = ["MANAGER", "GENERAL_MANAGER", "ADMIN"];
+
+// Itens que ficam dentro do grupo "Função Atendente" para gerentes/admins
+const ATTENDANT_GROUP_PATHS = ["/funil", "/leads"];
+
+// ─── NavItem reutilizável ─────────────────────────────────────────────────────
+function NavButton({
+  item,
+  isActive,
+  collapsed,
+  indented = false,
+  animationDelay = 0,
+  onNavigate,
+  onClose,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  collapsed: boolean;
+  indented?: boolean;
+  animationDelay?: number;
+  onNavigate: (path: string) => void;
+  onClose?: () => void;
+}) {
+  return (
+    <motion.button
+      key={item.path}
+      initial={{ opacity: 0, x: -15 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: animationDelay }}
+      whileHover={{ x: collapsed ? 0 : 4 }}
+      onClick={() => { onNavigate(item.path); onClose?.(); }}
+      title={collapsed ? item.label : undefined}
+      className={`group relative flex items-center w-full overflow-hidden rounded-2xl transition-all duration-300 ${
+        collapsed ? "justify-center h-14" : `gap-4 h-12 ${indented ? "pl-9 pr-4" : "px-4"}`
+      } ${
+        isActive
+          ? "bg-linear-to-r from-blue-500/20 to-cyan-400/10 border border-blue-400/20 shadow-[0_0_25px_rgba(37,99,235,0.15)]"
+          : "hover:bg-white/5"
+      }`}
+    >
+      {isActive && (
+        <div className="absolute left-0 top-0 h-full w-1 bg-linear-to-b from-cyan-300 to-blue-500 rounded-r-full" />
+      )}
+
+      <div className={`relative flex items-center justify-center shrink-0 transition-all duration-300 ${
+        isActive ? "text-cyan-300" : "text-white/45 group-hover:text-white"
+      }`}>
+        {item.icon}
+      </div>
+
+      {!collapsed && (
+        <>
+          <span className={`text-sm transition-all ${
+            isActive ? "text-white font-medium" : "text-white/60 group-hover:text-white"
+          }`}>
+            {item.label}
+          </span>
+          {isActive && (
+            <motion.div layoutId="active-dot" className="ml-auto w-2 h-2 rounded-full bg-cyan-300" />
+          )}
+        </>
+      )}
+    </motion.button>
+  );
+}
+
 // ─── Conteúdo interno reutilizado em desktop e mobile ────────────────────────
 function SidebarContent({
   currentPath,
@@ -73,8 +142,24 @@ function SidebarContent({
   const { user } = useAuth();
   const role = user?.role;
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.allowedRoles || (role && item.allowedRoles.includes(role))
+  const isManager = role ? MANAGER_ROLES.includes(role) : false;
+
+  // Estado de expansão do grupo "Função Atendente"
+  const attendantGroupActive = ATTENDANT_GROUP_PATHS.includes(currentPath);
+  const [attendantOpen, setAttendantOpen] = useState(attendantGroupActive);
+
+  // Itens visíveis excluindo os que entram no grupo (quando for gerente)
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    const roleOk = !item.allowedRoles || (role && item.allowedRoles.includes(role));
+    if (!roleOk) return false;
+    // Para gerentes, Negociações e Leads ficam dentro do grupo
+    if (isManager && ATTENDANT_GROUP_PATHS.includes(item.path)) return false;
+    return true;
+  });
+
+  // Itens do grupo Atendente (sempre visíveis para quem tem acesso)
+  const attendantItems = NAV_ITEMS.filter((item) =>
+    ATTENDANT_GROUP_PATHS.includes(item.path)
   );
 
   return (
@@ -118,50 +203,97 @@ function SidebarContent({
         )}
 
         <nav className="space-y-2">
-          {visibleItems.map((item, index) => {
-            const isActive = currentPath === item.path;
-            return (
+          {/* ── GRUPO "Função Atendente" — só para gerentes/admin ── */}
+          {isManager && (
+            <div>
+              {/* Botão pai do grupo */}
               <motion.button
-                key={item.path}
                 initial={{ opacity: 0, x: -15 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.06 }}
+                transition={{ delay: 0 }}
                 whileHover={{ x: collapsed ? 0 : 4 }}
-                onClick={() => { onNavigate(item.path); onClose?.(); }}
-                title={collapsed ? item.label : undefined}
+                onClick={() => {
+                  if (collapsed) return; // no modo colapsado não expande
+                  setAttendantOpen((v) => !v);
+                }}
+                title={collapsed ? "Função Atendente" : undefined}
                 className={`group relative flex items-center w-full overflow-hidden rounded-2xl transition-all duration-300 ${
                   collapsed ? "justify-center h-14" : "gap-4 px-4 h-14"
                 } ${
-                  isActive
+                  attendantGroupActive
                     ? "bg-linear-to-r from-blue-500/20 to-cyan-400/10 border border-blue-400/20 shadow-[0_0_25px_rgba(37,99,235,0.15)]"
                     : "hover:bg-white/5"
                 }`}
               >
-                {isActive && (
-                  <div className="absolute left-0 top-0 h-full w-1 bg-linear-to-b from-cyan-300 to-blue-500 rounded-r-full" />
-                )}
-
                 <div className={`relative flex items-center justify-center shrink-0 transition-all duration-300 ${
-                  isActive ? "text-cyan-300" : "text-white/45 group-hover:text-white"
+                  attendantGroupActive ? "text-cyan-300" : "text-white/45 group-hover:text-white"
                 }`}>
-                  {item.icon}
+                  <UserCheck size={18} />
                 </div>
 
                 {!collapsed && (
                   <>
-                    <span className={`text-sm transition-all ${
-                      isActive ? "text-white font-medium" : "text-white/60 group-hover:text-white"
+                    <span className={`text-sm transition-all flex-1 text-left ${
+                      attendantGroupActive ? "text-white font-medium" : "text-white/60 group-hover:text-white"
                     }`}>
-                      {item.label}
+                      Função Atendente
                     </span>
-                    {isActive && (
-                      <motion.div layoutId="active-dot" className="ml-auto w-2 h-2 rounded-full bg-cyan-300" />
-                    )}
+                    <motion.div
+                      animate={{ rotate: attendantOpen ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`shrink-0 transition-colors ${
+                        attendantGroupActive ? "text-cyan-300" : "text-white/30 group-hover:text-white/60"
+                      }`}
+                    >
+                      <ChevronDown size={14} />
+                    </motion.div>
                   </>
                 )}
               </motion.button>
-            );
-          })}
+
+              {/* Itens filhos com AnimatePresence */}
+              <AnimatePresence initial={false}>
+                {(attendantOpen || collapsed) && (
+                  <motion.div
+                    key="attendant-group"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className={`space-y-1 ${collapsed ? "mt-1" : "mt-1 ml-2 pl-2 border-l border-white/10"}`}>
+                      {attendantItems.map((item, idx) => (
+                        <NavButton
+                          key={item.path}
+                          item={item}
+                          isActive={currentPath === item.path}
+                          collapsed={collapsed}
+                          indented={!collapsed}
+                          animationDelay={idx * 0.05}
+                          onNavigate={onNavigate}
+                          onClose={onClose}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* ── ITENS NORMAIS ── */}
+          {visibleItems.map((item, index) => (
+            <NavButton
+              key={item.path}
+              item={item}
+              isActive={currentPath === item.path}
+              collapsed={collapsed}
+              animationDelay={(isManager ? 1 : 0) * 0.06 + index * 0.06}
+              onNavigate={onNavigate}
+              onClose={onClose}
+            />
+          ))}
         </nav>
       </div>
 

@@ -1,1238 +1,1028 @@
 # 🚗 Valle Leads System — Backend
 
-<div align="center">
+Backend do **Valle Leads System**, sistema de gestão de leads e dashboards analíticos desenvolvido para a **1000 Valle Multimarcas**.
 
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+O backend é responsável pela autenticação, controle de acesso, regras de negócio, persistência de dados, dashboards e fornecimento dos endpoints REST consumidos pelo frontend.
 
-**Sistema de Gestão de Leads com Dashboard Analítico — 1000 Valle Multimarcas**
-ABP 2026-1 · 3DSM · FATEC Jacareí
-
-> Documentação do servidor (pasta `/server`) — [Ver repositório completo](https://github.com/Helloworld-fatec/valle-leads-system)
-
-</div>
+> Projeto acadêmico desenvolvido na **FATEC Jacareí** — ABP 2026-1 | 3º DSM
+> Parceiro: 1000 Valle Multimarcas | Focal Point: Prof. Arley Ferreira de Souza
 
 ---
 
-## 📖 Sobre o Backend
+## 📌 Sobre o Backend
 
-O servidor do Valle Leads System é responsável por toda a lógica de negócio do sistema de gestão de leads da **1000 Valle Multimarcas**, uma revendedora de veículos com múltiplas unidades.
+A API do Valle Leads System foi desenvolvida com **Node.js**, **Express**, **TypeScript**, **Prisma** e **PostgreSQL**.
 
-Após o registro de um lead, o sistema:
+Ela permite:
 
-1. Associa o cliente ao lead;
-2. Vincula o lead a uma loja e a um atendente responsável;
-3. Permite a evolução da negociação;
-4. Registra mudanças de estágio e status da negociação;
-5. Disponibiliza indicadores consolidados para fins gerenciais.
+* autenticação de usuários com JWT;
+* renovação de sessão com refresh token;
+* controle de acesso baseado em papéis;
+* gerenciamento de usuários, clientes, lojas, equipes e vínculos usuário/equipe;
+* gerenciamento de leads e itens de interesse;
+* criação e acompanhamento de negociações;
+* registro de histórico de etapa, status e importância de negociações;
+* consulta de dashboards para atendente, gerente e gerente geral;
+* execução via Docker com banco local ou banco em nuvem.
 
-### Padrão Arquitetural
+---
 
-A API segue o padrão **Controller → Service → Repository** (RNF11 / RNF12), com baixo acoplamento e alta coesão entre as camadas:
+## 🛠 Tecnologias Utilizadas
 
+| Tecnologia        | Uso                                   |
+| ----------------- | ------------------------------------- |
+| Node.js           | Runtime do backend                    |
+| TypeScript        | Tipagem estática                      |
+| Express           | Framework HTTP                        |
+| Prisma            | ORM, migrations, Prisma Client e seed |
+| PostgreSQL        | Banco de dados relacional             |
+| Zod               | Validação de body, params e query     |
+| JWT               | Access token e refresh token          |
+| bcrypt / bcryptjs | Hash de senhas                        |
+| cookie-parser     | Manipulação de cookies                |
+| cors              | Configuração de CORS                  |
+| dotenv            | Variáveis de ambiente                 |
+| csv-parse         | Leitura de arquivos CSV para seed     |
+| Docker            | Conteinerização                       |
+| Docker Compose    | Orquestração de containers            |
+
+---
+
+## 🏗️ Arquitetura
+
+O backend segue organização modular baseada no padrão:
+
+```txt
+Controller → Service → Repository
 ```
+
+### Fluxo de uma requisição
+
+```txt
 Requisição HTTP
      ↓
-  Controller     ← valida input (Zod) e chama o Service       [Camada de Apresentação]
+app.ts
      ↓
-   Service       ← aplica regras de negócio                   [Camada de Aplicação]
+/api
      ↓
- Repository      ← acessa o banco via Prisma                  [Camada de Acesso a Dados]
+Router principal
      ↓
-  PostgreSQL                                                   [Camada de Domínio]
+Router do módulo
+     ↓
+Middlewares
+     ↓
+Controller
+     ↓
+Service
+     ↓
+Repository
+     ↓
+Prisma
+     ↓
+PostgreSQL
 ```
 
-Todas as regras de autorização são aplicadas **exclusivamente no backend** (RNF02 / RP01). Controle de acesso implementado apenas no frontend não é aceito pelo projeto.
+### Responsabilidades por camada
 
-### Linguagem e Runtime
-
-- **Runtime:** Node.js com TypeScript (RP01)
-- **Estilo de API:** REST com JSON (RNF01)
-
----
-
-## 🛠️ Tecnologias Utilizadas
-
-| Tecnologia | Uso | Docs |
-|---|---|---|
-| ![Node](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white) | Runtime do servidor | [nodejs.org](https://nodejs.org) |
-| ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white) | Tipagem estática | [typescriptlang.org](https://www.typescriptlang.org) |
-| ![Express](https://img.shields.io/badge/Express-000000?style=flat&logo=express&logoColor=white) | Framework HTTP | [expressjs.com](https://expressjs.com) |
-| ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat&logo=prisma&logoColor=white) | ORM + migrations (DDL/DML) | [prisma.io](https://www.prisma.io) |
-| ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white) | Banco de dados relacional | [postgresql.org](https://www.postgresql.org) |
-| ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat&logo=zod&logoColor=white) | Validação de schemas e inputs | [zod.dev](https://zod.dev) |
-| ![JWT](https://img.shields.io/badge/JWT-000000?style=flat&logo=jsonwebtokens&logoColor=white) | Autenticação stateless | [jwt.io](https://jwt.io) |
-| ![bcrypt](https://img.shields.io/badge/bcryptjs-grey?style=flat) | Hash seguro de senhas (RNF02) | [npm](https://www.npmjs.com/package/bcryptjs) |
-| ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) | Conteinerização (RNF07 / RP02) | [docker.com](https://www.docker.com) |
-
----
-
-## 👥 Equipe
-
-| Nome | Papel |
-|---|---|
-| Bruno Berval | Product Owner (PO) |
-| Nicolas Kauê | Scrum Master (SM) |
-| Bruna Rodrigues | Dev Team |
-| Pedro Enrique | Dev Team |
-| Ryan Tinel | Dev Team |
-| Suelen Castro | Dev Team |
-
----
-
-## 🚀 Como Rodar o Projeto
-
-> A aplicação completa é executada exclusivamente via containers Docker (RP02).
-
-### Pré-requisitos
-
-- [Docker](https://www.docker.com) e Docker Compose
-- [Git](https://git-scm.com)
-- [Node.js](https://nodejs.org) — apenas para desenvolvimento local sem Docker
-
-### Passo a passo
-
-**1. Clone o repositório**
-```bash
-git clone https://github.com/Helloworld-fatec/valle-leads-system.git
-cd valle-leads-system/server
-```
-
-**2. Instale as dependências**
-```bash
-npm install
-```
-
-**3. Configure as variáveis de ambiente**
-```bash
-cp .env.example .env
-# Edite o arquivo .env com suas configurações locais
-```
-
-**4. Suba todos os containers**
-```bash
-docker compose up -d
-```
-
-Isso sobe os três containers obrigatórios (RNF07): **PostgreSQL**, **Backend** e **Frontend**.
-
-**5. Rode as migrations**
-```bash
-npx prisma migrate dev
-# ou dentro do container:
-docker compose exec backend npx prisma migrate dev
-```
-
-**6. Inicie o servidor em modo desenvolvimento**
-```bash
-npm run dev
-```
-
-O servidor estará disponível em `http://localhost:3000`.
+| Camada        | Responsabilidade                                           |
+| ------------- | ---------------------------------------------------------- |
+| `routes`      | Define endpoints e aplica middlewares                      |
+| `middlewares` | Autenticação, autorização, validação e tratamento de erros |
+| `controller`  | Recebe requisições e envia respostas                       |
+| `service`     | Aplica regras de negócio e escopo por perfil               |
+| `repository`  | Acessa o banco via Prisma                                  |
+| `Prisma`      | ORM, migrations e client de banco                          |
 
 ---
 
 ## 📁 Estrutura de Pastas
 
-A estrutura segue o padrão **modular por entidade**, com pastas em **kebab-case** e arquivos em **camelCase.tipo.ts** (conforme guia de padrões do projeto).
-
-```
+```txt
 server/
-├── src/
-│   ├── modules/                    # Um módulo por entidade do sistema (RNF01)
-│   │   ├── auth/
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.repository.ts
-│   │   │   └── auth.routes.ts
-│   │   ├── users/
-│   │   │   ├── user.controller.ts
-│   │   │   ├── user.service.ts
-│   │   │   ├── user.repository.ts
-│   │   │   └── user.routes.ts
-│   │   ├── leads/
-│   │   │   ├── lead.controller.ts
-│   │   │   ├── lead.service.ts
-│   │   │   ├── lead.repository.ts
-│   │   │   └── lead.routes.ts
-│   │   ├── negotiations/
-│   │   │   ├── negotiation.controller.ts
-│   │   │   ├── negotiation.service.ts
-│   │   │   ├── negotiation.repository.ts
-│   │   │   └── negotiation.routes.ts
-│   │   ├── customers/
-│   │   │   ├── customer.controller.ts
-│   │   │   ├── customer.service.ts
-│   │   │   ├── customer.repository.ts
-│   │   │   └── customer.routes.ts
-│   │   ├── teams/
-│   │   │   ├── team.controller.ts
-│   │   │   ├── team.service.ts
-│   │   │   ├── team.repository.ts
-│   │   │   └── team.routes.ts
-│   │   ├── stores/
-│   │   │   ├── store.controller.ts
-│   │   │   ├── store.service.ts
-│   │   │   ├── store.repository.ts
-│   │   │   └── store.routes.ts
-│   │   ├── dashboard/
-│   │   │   ├── dashboard.controller.ts
-│   │   │   ├── dashboard.service.ts
-│   │   │   └── dashboard.routes.ts
-│   │   └── logs/
-│   │       ├── log.controller.ts
-│   │       ├── log.service.ts
-│   │       ├── log.repository.ts
-│   │       └── log.routes.ts
-│   ├── middlewares/
-│   │   ├── auth.middleware.ts      # Verificação do JWT (RNF02)
-│   │   └── rbac.middleware.ts      # Controle de acesso por role — RBAC (RF02)
-│   ├── utils/
-│   │   ├── appError.utils.ts       # Tratamento de exceções (RNF05)
-│   │   └── logger.utils.ts         # Utilitário de log
-│   ├── types/
-│   │   └── express.types.ts        # Extensões de tipos globais
-│   └── app.ts                      # Configuração do Express
 ├── prisma/
-│   └── schema.prisma               # Schema com DDL e relações obrigatórias (RP03)
+│   ├── csv/
+│   │   ├── negotiations_seed_long.csv
+│   │   ├── seed_customers.csv
+│   │   ├── seed_data.csv
+│   │   ├── seed_interest_items.csv
+│   │   ├── seed_leads.csv
+│   │   ├── seed_negotiations.csv
+│   │   ├── seed_negotiation_importance.csv
+│   │   ├── seed_negotiation_stage.csv
+│   │   ├── seed_negotiation_status.csv
+│   │   ├── seed_stores.csv
+│   │   └── ...
+│   ├── migrations/
+│   │   └── ...
+│   ├── schema.prisma
+│   ├── seed.ts
+│   └── seed_negotiations.ts
+├── src/
+│   ├── @types/
+│   │   └── express/
+│   │       └── index.d.ts
+│   ├── config/
+│   │   └── prisma.ts
+│   ├── generated/
+│   │   └── prisma/
+│   ├── middlewares/
+│   │   ├── auth/
+│   │   │   ├── auth.middleware.ts
+│   │   │   └── permission.middleware.ts
+│   │   ├── errors/
+│   │   │   ├── domainErrors.middleware.ts
+│   │   │   └── globalError.middleware.ts
+│   │   └── validation/
+│   │       └── validate.middleware.ts
+│   ├── modules/
+│   │   ├── auth/
+│   │   │   └── login/
+│   │   ├── customers/
+│   │   ├── dashboards/
+│   │   │   ├── attendant/
+│   │   │   ├── general-manager/
+│   │   │   └── manager/
+│   │   ├── interest-items/
+│   │   ├── leads/
+│   │   ├── negotiation/
+│   │   ├── negotiation-importance/
+│   │   ├── negotiation-stage-history/
+│   │   ├── negotiation-status/
+│   │   ├── stores/
+│   │   ├── teams/
+│   │   ├── users/
+│   │   └── users-teams/
+│   ├── routes/
+│   │   └── index.ts
+│   ├── app.ts
+│   └── server.ts
+├── .dockerignore
 ├── .env.example
-├── tsconfig.json
-├── docker-compose.yml
-└── package.json
+├── .gitignore
+├── Dockerfile
+├── package.json
+├── package-lock.json
+├── prisma.config.ts
+├── README.md
+└── tsconfig.json
 ```
 
----
-
-## 🧩 Módulos do Sistema
-
-### 🔐 Auth
-**Descrição:** Gerencia autenticação e sessão dos usuários.
-**Responsabilidade:** Geração de token JWT contendo id do usuário, role e tempo de expiração. Login, logout e recuperação de senha por e-mail. (RF01)
-**Entidades:** `users`
-**Pasta:** `src/modules/auth/`
-
----
-
-### 👤 Users
-**Descrição:** CRUD completo de usuários do sistema.
-**Responsabilidade:** Criação, edição, listagem e desativação (soft delete) de usuários com perfis: Atendente, Gerente, Gerente Geral e Administrador. Todos os usuários podem atualizar seu próprio e-mail e senha. (RF01 / RF02)
-**Entidades:** `users`
-**Pasta:** `src/modules/users/`
-
----
-
-### 👥 Teams
-**Descrição:** Gerenciamento de equipes de vendas.
-**Responsabilidade:** Criação de equipes, vinculação de atendentes e gerentes. Suporte ao isolamento de dados por equipe (multi-tenant). (RF02)
-**Entidades:** `teams`, `users`
-**Pasta:** `src/modules/teams/`
-
----
-
-### 🏪 Stores
-**Descrição:** Gerenciamento das lojas/unidades da revenda.
-**Responsabilidade:** Cadastro e listagem das unidades físicas da 1000 Valle Multimarcas. Leads são vinculados à loja no momento do registro. (RF04)
-**Entidades:** `stores`
-**Pasta:** `src/modules/stores/`
-
----
-
-### 🙍 Customers
-**Descrição:** Cadastro e gestão de clientes/prospects.
-**Responsabilidade:** Criação, busca por CPF/nome/telefone e edição de dados de clientes captados pelos diferentes canais de entrada. (RF02)
-**Entidades:** `customers`
-**Pasta:** `src/modules/customers/`
-
----
-
-### 📋 Leads
-**Descrição:** Núcleo do sistema — registros de interesse de compra.
-**Responsabilidade:** Criação, listagem com filtros, edição, transferência entre atendentes e histórico de mudanças. Cada lead é vinculado a uma loja, um atendente e um cliente. (RF02 / RF04 / RF06)
-**Canais de captação:** visita presencial, telefone, WhatsApp, Instagram, formulários digitais e outros.
-**Entidades:** `leads`, `customers`, `users`, `stores`
-**Pasta:** `src/modules/leads/`
-
----
-
-### 🤝 Negotiations
-**Descrição:** Funil de negociações vinculado aos leads.
-**Responsabilidade:** Cada lead pode ter no máximo uma negociação ativa. Controla importância (frio/morno/quente), estágio, status (aberta/encerrada) e motivo de finalização. Mantém histórico completo de mudanças. Alimenta os dashboards operacional e analítico. (RF03 / RF04 / RF05)
-**Entidades:** `negotiations`, `negotiation_stage_history`
-**Pasta:** `src/modules/negotiations/`
-
----
-
-### 📊 Dashboard
-**Descrição:** Indicadores operacionais e analíticos.
-**Responsabilidade:** Consolida dados de leads e negociações para exibição em painéis gerenciais. Dashboard operacional acessível a atendentes; analítico restrito a gerentes e acima. (RF04 / RF05)
-**Pasta:** `src/modules/dashboard/`
-
----
-
-### 📜 Logs
-**Descrição:** Auditoria e rastreabilidade de operações.
-**Responsabilidade:** Registra login de usuários e todas as operações de criação, atualização e exclusão de clientes, usuários, times, leads e negociações — armazenando data, hora e usuário responsável. Acesso exclusivo do Administrador. (RF07)
-**Entidades:** `system_logs`
-**Pasta:** `src/modules/logs/`
-
----
-
-## 🌐 Rotas da API
-
-> Base URL: `http://localhost:3000/api`
-> Rotas protegidas exigem o header: `Authorization: Bearer <token>`
-> Todas as validações de permissão ocorrem no backend (RNF02 / RP01).
-
----
-
-### 🔐 Auth
-
-#### `POST /auth/login`
-Autentica o usuário e retorna um token JWT. (RF01)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Público |
-
-**Body:**
-```json
-{
-  "email": "joao@valle.com.br",
-  "password": "senhaSegura123"
-}
-```
-**Response `200 OK`:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "name": "João Silva",
-    "email": "joao@valle.com.br",
-    "role": "attendant"
-  }
-}
-```
-
----
-
-#### `POST /auth/logout`
-Encerra a sessão do usuário autenticado.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Todos |
-
-**Body:** nenhum
-**Response `204 No Content`**
-
----
-
-#### `POST /auth/recover`
-Solicita recuperação de senha por e-mail.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Público |
-
-**Body:**
-```json
-{
-  "email": "joao@valle.com.br"
-}
-```
-**Response `200 OK`:**
-```json
-{
-  "message": "Recovery email sent successfully"
-}
-```
-
----
-
-#### `PATCH /auth/password`
-Redefine a senha usando o token de recuperação.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Público |
-
-**Body:**
-```json
-{
-  "token": "recovery-token-uuid",
-  "newPassword": "novaSenhaSegura456"
-}
-```
-**Response `200 OK`:**
-```json
-{
-  "message": "Password updated successfully"
-}
-```
-
----
-
-### 👤 Users
-
-#### `GET /users`
-Lista todos os usuários do sistema.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": "uuid",
-    "name": "João Silva",
-    "email": "joao@valle.com.br",
-    "role": "attendant",
-    "isActive": true,
-    "createdAt": "2026-01-01T00:00:00.000Z"
-  }
-]
-```
-
----
-
-#### `POST /users`
-Cria um novo usuário.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:**
-```json
-{
-  "name": "João Silva",
-  "email": "joao@valle.com.br",
-  "password": "senhaSegura123",
-  "role": "attendant",
-  "storeId": "uuid"
-}
-```
-**Response `201 Created`:**
-```json
-{
-  "id": "uuid",
-  "name": "João Silva",
-  "email": "joao@valle.com.br",
-  "role": "attendant",
-  "isActive": true,
-  "createdAt": "2026-01-01T00:00:00.000Z"
-}
-```
-
----
-
-#### `GET /users/:id`
-Retorna os detalhes de um usuário específico.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "id": "uuid",
-  "name": "João Silva",
-  "email": "joao@valle.com.br",
-  "role": "attendant",
-  "isActive": true,
-  "store": { "id": "uuid", "name": "Valle Jacareí" },
-  "createdAt": "2026-01-01T00:00:00.000Z"
-}
-```
-
----
-
-#### `PATCH /users/:id`
-Edita dados de um usuário.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body** (todos os campos opcionais):
-```json
-{
-  "name": "João Silva Atualizado",
-  "email": "joao.novo@valle.com.br",
-  "role": "manager",
-  "storeId": "uuid"
-}
-```
-**Response `200 OK`:** objeto `user` atualizado
-
----
-
-#### `DELETE /users/:id`
-Desativa um usuário (soft delete — não remove do banco).
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "message": "User deactivated successfully"
-}
-```
-
----
-
-#### `GET /users/me`
-Retorna o perfil do usuário autenticado.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Todos |
-
-**Body:** nenhum
-**Response `200 OK`:** objeto `user` do usuário autenticado
-
----
-
-#### `PATCH /users/me`
-Atualiza o próprio e-mail ou senha. (RF01)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Todos |
-
-**Body** (ao menos um campo obrigatório):
-```json
-{
-  "email": "novo@valle.com.br",
-  "password": "novaSenha123"
-}
-```
-**Response `200 OK`:** objeto `user` atualizado
-
----
-
-### 📋 Leads
-
-#### `GET /leads`
-Lista leads conforme a role do usuário: atendente vê apenas os seus; gerente vê os da equipe; admin vê todos. (RF02)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente+ |
-| Query params | `?storeId=` `?status=` `?from=` `?to=` |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": "uuid",
-    "customer": { "id": "uuid", "name": "Maria Souza" },
-    "store": { "id": "uuid", "name": "Valle Jacareí" },
-    "attendant": { "id": "uuid", "name": "João Silva" },
-    "originChannel": "whatsapp",
-    "status": "open",
-    "createdAt": "2026-01-01T00:00:00.000Z"
-  }
-]
-```
-
----
-
-#### `POST /leads`
-Registra um novo lead.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "customerId": "uuid",
-  "storeId": "uuid",
-  "attendantId": "uuid",
-  "originChannel": "whatsapp",
-  "notes": "Cliente interessado em SUV"
-}
-```
-**Response `201 Created`:** objeto `lead` criado
-
----
-
-#### `GET /leads/:id`
-Retorna os detalhes de um lead específico.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente+ |
-
-**Body:** nenhum
-**Response `200 OK`:** objeto `lead` completo com relacionamentos
-
----
-
-#### `PATCH /leads/:id`
-Edita dados do lead.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body** (campos opcionais):
-```json
-{
-  "originChannel": "instagram",
-  "notes": "Cliente atualizou preferência para sedã"
-}
-```
-**Response `200 OK`:** objeto `lead` atualizado
-
----
-
-#### `DELETE /leads/:id`
-Exclui permanentemente um lead.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "message": "Lead deleted successfully"
-}
-```
-
----
-
-#### `POST /leads/:id/transfer`
-Transfere o lead para outro atendente.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Gerente / Admin |
-
-**Body:**
-```json
-{
-  "newAttendantId": "uuid",
-  "reason": "Atendente original saiu de férias"
-}
-```
-**Response `200 OK`:** objeto `lead` com novo atendente
-
----
-
-#### `GET /leads/:id/history`
-Retorna o histórico de mudanças do lead.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente+ |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": "uuid",
-    "field": "attendantId",
-    "oldValue": "uuid-antigo",
-    "newValue": "uuid-novo",
-    "changedBy": { "id": "uuid", "name": "Carlos Gerente" },
-    "changedAt": "2026-01-05T10:00:00.000Z"
-  }
-]
-```
-
----
-
-### 🤝 Negotiations
-
-#### `POST /negotiations`
-Cria uma negociação vinculada a um lead. Máximo de 1 ativa por lead. (RF03)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "leadId": "uuid",
-  "importance": "warm",
-  "stage": "contact",
-  "notes": "Cliente tem interesse em financiamento"
-}
-```
-**Response `201 Created`:** objeto `negotiation` criado
-
----
-
-#### `PATCH /negotiations/:id/stage`
-Avança o estágio da negociação no funil. (RF03)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "stage": "proposal",
-  "notes": "Proposta enviada por e-mail"
-}
-```
-**Response `200 OK`:** objeto `negotiation` atualizado
-
----
-
-#### `PATCH /negotiations/:id/importance`
-Altera a importância da negociação: `cold`, `warm` ou `hot`. (RF03)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "importance": "hot"
-}
-```
-**Response `200 OK`:** objeto `negotiation` atualizado
-
----
-
-#### `PATCH /negotiations/:id/close`
-Encerra a negociação com motivo obrigatório. (RF03)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "closingReason": "sold",
-  "notes": "Venda concluída — Honda HR-V"
-}
-```
-**Response `200 OK`:** objeto `negotiation` com `status: closed`
-
----
-
-#### `PATCH /negotiations/:id/reopen`
-Reabre uma negociação encerrada.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Gerente / Admin |
-
-**Body:**
-```json
-{
-  "notes": "Cliente voltou após reconsiderar a proposta"
-}
-```
-**Response `200 OK`:** objeto `negotiation` com `status: open`
-
----
-
-#### `POST /negotiations/:id/notes`
-Adiciona uma observação/comentário à negociação.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "content": "Cliente solicitou test-drive para sexta-feira"
-}
-```
-**Response `201 Created`:**
-```json
-{
-  "id": "uuid",
-  "content": "Cliente solicitou test-drive para sexta-feira",
-  "createdBy": { "id": "uuid", "name": "João Silva" },
-  "createdAt": "2026-01-05T14:00:00.000Z"
-}
-```
-
----
-
-#### `GET /negotiations/:id/history`
-Retorna o histórico completo de estágios e status da negociação. (RF03)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Todos (por permissão) |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": "uuid",
-    "stage": "proposal",
-    "status": "open",
-    "changedBy": { "id": "uuid", "name": "João Silva" },
-    "changedAt": "2026-01-03T09:00:00.000Z"
-  }
-]
-```
-
----
-
-### 🙍 Customers
-
-#### `GET /customers`
-Busca/lista clientes por CPF, nome ou telefone.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-| Query params | `?cpf=` `?name=` `?phone=` |
-
-**Body:** nenhum
-**Response `200 OK`:** lista de objetos `customer`
-
----
-
-#### `POST /customers`
-Cadastra um novo cliente.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:**
-```json
-{
-  "name": "Maria Souza",
-  "cpf": "123.456.789-00",
-  "phone": "(12) 99999-8888",
-  "email": "maria@email.com"
-}
-```
-**Response `201 Created`:** objeto `customer` criado
-
----
-
-#### `GET /customers/:id`
-Retorna detalhes de um cliente.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body:** nenhum
-**Response `200 OK`:** objeto `customer` completo
-
----
-
-#### `PATCH /customers/:id`
-Edita dados de um cliente.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente / Admin |
-
-**Body** (campos opcionais):
-```json
-{
-  "phone": "(12) 98888-7777",
-  "email": "maria.novo@email.com"
-}
-```
-**Response `200 OK`:** objeto `customer` atualizado
-
----
-
-#### `DELETE /customers/:id`
-Exclui um cliente.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "message": "Customer deleted successfully"
-}
-```
-
----
-
-### 👥 Teams
-
-#### `GET /teams`
-Lista todas as equipes.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:** lista de objetos `team` com membros
-
----
-
-#### `POST /teams`
-Cria uma nova equipe.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:**
-```json
-{
-  "name": "Equipe Norte",
-  "managerId": "uuid",
-  "storeId": "uuid"
-}
-```
-**Response `201 Created`:** objeto `team` criado
-
----
-
-#### `PATCH /teams/:id`
-Edita dados de uma equipe.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body** (campos opcionais):
-```json
-{
-  "name": "Equipe Norte — Jacareí",
-  "managerId": "uuid"
-}
-```
-**Response `200 OK`:** objeto `team` atualizado
-
----
-
-#### `POST /teams/:id/members`
-Vincula um atendente à equipe. (RF02)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Gerente / Admin |
-
-**Body:**
-```json
-{
-  "userId": "uuid"
-}
-```
-**Response `200 OK`:** objeto `team` com membros atualizados
-
----
-
-#### `DELETE /teams/:id/members/:userId`
-Remove um atendente da equipe.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Gerente / Admin |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "message": "Member removed successfully"
-}
-```
-
----
-
-### 🏪 Stores
-
-#### `GET /stores`
-Lista todas as lojas/unidades.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:** nenhum
-**Response `200 OK`:** lista de objetos `store`
-
----
-
-#### `POST /stores`
-Cadastra uma nova loja.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body:**
-```json
-{
-  "name": "Valle Jacareí",
-  "address": "Av. Presidente Vargas, 1000 — Jacareí/SP"
-}
-```
-**Response `201 Created`:** objeto `store` criado
-
----
-
-#### `PATCH /stores/:id`
-Edita dados de uma loja.
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-
-**Body** (campos opcionais):
-```json
-{
-  "name": "Valle Jacareí — Matriz",
-  "address": "Rua Nova, 200 — Jacareí/SP"
-}
-```
-**Response `200 OK`:** objeto `store` atualizado
-
----
-
-### 📊 Dashboard
-
-#### `GET /dashboard/operational`
-Retorna total de leads por status, origem, loja e importância. Padrão: últimos 30 dias. (RF04)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Atendente+ |
-| Query params | `?period=week\|month\|year` ou `?from=&to=` |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "totalLeads": 142,
-  "byStatus": { "open": 98, "closed": 44 },
-  "byOriginChannel": { "whatsapp": 60, "instagram": 30, "visit": 52 },
-  "byImportance": { "hot": 20, "warm": 55, "cold": 67 },
-  "byStore": [
-    { "storeId": "uuid", "storeName": "Valle Jacareí", "total": 90 }
-  ]
-}
-```
-
----
-
-#### `GET /dashboard/analytical`
-Retorna taxa de conversão, leads por atendente/equipe, motivos de finalização e tempo médio. (RF05)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Gerente+ |
-| Query params | `?period=week\|month\|year` ou `?from=&to=` |
-
-> Não administradores têm limite máximo de 1 ano. Validação ocorre no backend.
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-{
-  "conversionRate": 0.31,
-  "avgNegotiationDays": 12,
-  "byAttendant": [
-    { "attendantId": "uuid", "name": "João Silva", "leads": 28, "converted": 9 }
-  ],
-  "closingReasons": { "sold": 22, "lost": 15, "noContact": 7 }
-}
-```
-
----
-
-### 📜 Logs
-
-#### `GET /logs`
-Lista e filtra o log completo de operações. (RF07)
-
-| Campo | Valor |
-|---|---|
-| Autenticação | Admin |
-| Query params | `?userId=` `?entity=` `?from=` `?to=` |
-
-**Body:** nenhum
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": "uuid",
-    "action": "CREATE",
-    "entity": "lead",
-    "entityId": "uuid",
-    "performedBy": { "id": "uuid", "name": "João Silva" },
-    "performedAt": "2026-01-05T09:30:00.000Z"
-  }
-]
-```
+> Observação: `src/generated/prisma/` é o caminho configurado no Prisma para geração do Prisma Client. Ele é necessário para execução da aplicação e do seed.
 
 ---
 
 ## 🔑 Variáveis de Ambiente
 
-Crie um arquivo `.env` na raiz de `/server` baseado no `.env.example`. Dados sensíveis devem estar sempre em variáveis de ambiente — nunca hardcoded (RNF02).
+O backend depende das seguintes variáveis:
 
-**`.env.example`:**
+| Variável                   | Descrição                                  |
+| -------------------------- | ------------------------------------------ |
+| `DATABASE_URL`             | URL de conexão com PostgreSQL              |
+| `ACCESS_TOKEN_SECRET`      | Chave secreta do access token              |
+| `REFRESH_TOKEN_SECRET`     | Chave secreta do refresh token             |
+| `ACCESS_TOKEN_EXPIRES_IN`  | Tempo de expiração do access token         |
+| `REFRESH_TOKEN_EXPIRES_IN` | Tempo de expiração do refresh token        |
+| `PORT`                     | Porta do servidor. Opcional; padrão `3000` |
+
+### Exemplo para execução local sem Docker
+
+Arquivo `server/.env`:
+
 ```env
-# ─────────────────────────────────────────
-# Banco de dados
-# ─────────────────────────────────────────
-DATABASE_URL=postgresql://USUARIO:SENHA@HOST:PORTA/NOME_DO_BANCO
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/valle_leads?schema=public
 
-# ─────────────────────────────────────────
-# Autenticação JWT (RF01)
-# ─────────────────────────────────────────
-JWT_SECRET=COLOQUE_AQUI_UMA_CHAVE_SECRETA_COM_NO_MINIMO_32_CARACTERES
-JWT_EXPIRES_IN=8h
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
-# ─────────────────────────────────────────
-# Servidor
-# ─────────────────────────────────────────
 PORT=3000
-NODE_ENV=development
-
-# ─────────────────────────────────────────
-# E-mail (recuperação de senha)
-# ─────────────────────────────────────────
-MAIL_HOST=smtp.seuprovedor.com
-MAIL_PORT=587
-MAIL_USER=seu@email.com
-MAIL_PASS=SENHA_DO_EMAIL
-MAIL_FROM=noreply@vallemultimarcas.com.br
 ```
 
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `DATABASE_URL` | String de conexão do PostgreSQL | `postgresql://user:pass@localhost:5432/valle_leads` |
-| `JWT_SECRET` | Chave secreta para assinar tokens JWT | Mínimo 32 caracteres aleatórios |
-| `JWT_EXPIRES_IN` | Tempo de expiração do token (RF01) | `8h` |
-| `PORT` | Porta em que o servidor vai rodar | `3000` |
-| `NODE_ENV` | Ambiente de execução | `development` / `production` |
-| `MAIL_HOST` | Servidor SMTP para envio de e-mail | `smtp.gmail.com` |
-| `MAIL_PORT` | Porta do servidor SMTP | `587` |
-| `MAIL_USER` | Usuário de autenticação SMTP | `seu@email.com` |
-| `MAIL_PASS` | Senha de autenticação SMTP | — |
-| `MAIL_FROM` | Endereço de envio exibido ao destinatário | `noreply@vallemultimarcas.com.br` |
+### Exemplo para Docker com banco local
 
-> ⚠️ **Nunca commite o arquivo `.env` no repositório.** Ele já está no `.gitignore`.
+Arquivo `.env` na raiz do projeto:
 
----
+```env
+NODE_ENV=production
 
-## 📚 Documentação
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=valle_leads
 
-Conforme exigido pelo RNF06, o projeto contempla:
+DATABASE_URL=postgresql://postgres:postgres@db:5432/valle_leads?schema=public
 
-| Artefato | Status |
-|---|---|
-| Documento de visão geral | ✅ No repositório principal |
-| Modelo de dados (DER) | 🔄 Em construção |
-| Diagrama de Casos de Uso (UML) | 🔄 Em construção |
-| Diagrama de Classes (UML) | 🔄 Em construção |
-| Diagrama de Componentes (UML) | 🔄 Em construção |
-| Diagrama de Sequência (UML) | 🔄 Em construção |
-| Descrição das rotas/endpoints | ✅ Neste documento |
-| Instruções de execução | ✅ Neste documento |
-| README estruturado | ✅ Neste documento |
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
-| Recurso | Link |
-|---|---|
-| Repositório principal | [github.com/Helloworld-fatec/valle-leads-system](https://github.com/Helloworld-fatec/valle-leads-system) |
-| Documentação do Frontend | *em breve* |
+VITE_BACKEND_URL=
+```
 
----
+### Exemplo para Docker com banco em nuvem
 
-## 🌿 Estratégia de Versionamento e Git
+Arquivo `.env.cloud` na raiz do projeto:
 
-O projeto adota uma estratégia padronizada de versionamento baseada em múltiplas branches, garantindo organização, rastreabilidade e segurança durante o desenvolvimento em equipe.
+```env
+NODE_ENV=production
 
-### 🔀 Estrutura de Branches
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST/NOME_DO_BANCO?sslmode=require
 
-| Branch | Responsabilidade |
-|---|---|
-| `main` | Código estável e pronto para entrega |
-| `develop` | Integração contínua durante a sprint |
-| `feature/*` | Desenvolvimento de funcionalidades isoladas |
+ACCESS_TOKEN_SECRET=troque_por_uma_chave_segura_de_access_token
+REFRESH_TOKEN_SECRET=troque_por_uma_chave_segura_de_refresh_token
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
-### 🔁 Fluxo de Desenvolvimento
+VITE_BACKEND_URL=
+```
 
-- Toda funcionalidade é desenvolvida em uma branch `feature/*`
-- O merge ocorre via Pull Request para a `develop`
-- Ao final da sprint, a `develop` é integrada na `main`
-- Cada entrega é versionada com uma **tag de sprint**
-
-### 🏷️ Versionamento por Sprint
-
-| Sprint | Tag |
-|---|---|
-| Sprint 1 | `v1.0-sprint1` |
-| Sprint 2 | `v2.0-sprint2` |
-| Sprint 3 | `v3.0-sprint3` |
-
-### 📌 Convenção de Commits
-
-O projeto segue um padrão baseado em prefixos:
-
-| Prefixo | Uso |
-|---|---|
-| `feat` | Nova funcionalidade |
-| `fix` | Correção de bug |
-| `docs` | Documentação |
-| `refactor` | Refatoração |
-| `style` | Ajustes visuais |
-| `test` | Testes |
-| `chore` | Configuração |
-
-### 📖 Guia Completo
-
-Para detalhes completos sobre o fluxo de branches, Pull Requests e versionamento:
-
-➡️ [`Git Operation Guide`](../docs/guides/git_operation.guide.md)
+> Nunca commite arquivos `.env` reais. O `.env.example` deve conter apenas placeholders.
 
 ---
 
-## 📝 Manutenção da Documentação
+## 🚀 Como Rodar Localmente sem Docker
 
-Esta documentação acompanha o ciclo de desenvolvimento do projeto e deve refletir o estado atual do sistema a cada sprint.
+### 1. Acessar a pasta do backend
 
-**Responsável:** Bruna Rodrigues
+```bash
+cd server
+```
 
-**Protocolo de atualização:** toda funcionalidade mergeada na branch `main` que introduza, modifique ou remova rotas, módulos ou variáveis de ambiente deve ter o README atualizado no mesmo PR, antes do merge ser aprovado.
+### 2. Instalar dependências
+
+```bash
+npm install
+```
+
+### 3. Criar `.env`
+
+```bash
+cp .env.example .env
+```
+
+Configure a variável `DATABASE_URL` para apontar para um banco PostgreSQL válido.
+
+### 4. Gerar Prisma Client
+
+```bash
+npm run prisma:generate
+```
+
+### 5. Rodar migrations em desenvolvimento
+
+```bash
+npm run prisma:migrate
+```
+
+### 6. Rodar seed, se necessário
+
+```bash
+npx prisma db seed
+```
+
+### 7. Iniciar servidor
+
+```bash
+npm run dev
+```
+
+A API ficará disponível em:
+
+```txt
+http://localhost:3000
+```
+
+Base das rotas:
+
+```txt
+http://localhost:3000/api
+```
+
+---
+
+## 📜 Scripts Disponíveis
+
+| Script                    | Descrição                                                               |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `npm run dev`             | Inicia o servidor em modo desenvolvimento com `tsx watch src/server.ts` |
+| `npm run build`           | Compila o projeto TypeScript                                            |
+| `npm run start`           | Executa o build                                                         |
+| `npm run prisma:generate` | Gera o Prisma Client                                                    |
+| `npm run prisma:migrate`  | Executa migrations em modo desenvolvimento                              |
+
+### Scripts Prisma
+
+| Script                      | Descrição                                        |
+| --------------------------- | ------------------------------------------------ |
+| `npx prisma generate`       | Gera Prisma Client                               |
+| `npx prisma migrate deploy` | Aplica migrations em ambiente de deploy/produção |
+| `npx prisma migrate dev`    | Cria/aplica migrations em desenvolvimento        |
+| `npx prisma db seed`        | Executa seed configurado em `package.json`       |
+
+O seed principal executa:
+
+```txt
+tsx prisma/seed.ts
+```
+
+---
+
+## 🐳 Docker
+
+A infraestrutura Docker do projeto possui três modos principais:
+
+| Arquivo                    | Banco usado                      | Finalidade                     |
+| -------------------------- | -------------------------------- | ------------------------------ |
+| `docker-compose.yml`       | PostgreSQL local em container    | Produção/local e demonstração  |
+| `docker-compose.dev.yml`   | PostgreSQL local em container    | Desenvolvimento com hot reload |
+| `docker-compose.cloud.yml` | PostgreSQL em nuvem, como Render | Teste com banco remoto         |
+
+### Backend no Docker
+
+O `server/Dockerfile` possui stages para:
+
+| Stage   | Uso                                     |
+| ------- | --------------------------------------- |
+| `deps`  | Instala dependências                    |
+| `build` | Gera Prisma Client e compila TypeScript |
+| `dev`   | Executa backend em modo desenvolvimento |
+| `prod`  | Executa backend compilado               |
+
+No modo produção/local, o backend deve executar no start:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+node dist/src/server.js
+```
+
+Isso garante que:
+
+* o Prisma Client seja gerado;
+* as migrations sejam aplicadas;
+* o servidor seja iniciado.
+
+### Seed no Docker
+
+O seed **não é executado automaticamente** no start do container para evitar duplicação de dados.
+
+Após subir os containers, rode manualmente quando o banco estiver vazio:
+
+```bash
+docker compose exec server npx prisma db seed
+```
+
+No modo dev:
+
+```bash
+docker compose -f docker-compose.dev.yml exec server npx prisma db seed
+```
+
+No modo cloud, use com cuidado, pois o comando altera o banco remoto:
+
+```bash
+docker compose -f docker-compose.cloud.yml exec server npx prisma db seed
+```
+
+### Execução Docker produção/local
+
+Na raiz do projeto:
+
+```bash
+cp .env.example .env
+docker compose config
+docker compose up -d --build
+docker compose exec server npx prisma db seed
+```
+
+A API estará em:
+
+```txt
+http://localhost:3000/api
+```
+
+### Execução Docker dev
+
+```bash
+docker compose -f docker-compose.dev.yml config
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml exec server npx prisma db seed
+```
+
+### Execução Docker cloud
+
+```bash
+cp .env.example .env.cloud
+docker compose -f docker-compose.cloud.yml config
+docker compose -f docker-compose.cloud.yml up -d --build
+```
+
+---
+
+## 🔐 Autenticação
+
+A autenticação usa JWT com dois tokens:
+
+| Token         | Uso                                    |
+| ------------- | -------------------------------------- |
+| Access Token  | Autorização das requisições protegidas |
+| Refresh Token | Renovação da sessão                    |
+
+### Variáveis obrigatórias
+
+```env
+ACCESS_TOKEN_SECRET=...
+REFRESH_TOKEN_SECRET=...
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
+```
+
+As chaves `ACCESS_TOKEN_SECRET` e `REFRESH_TOKEN_SECRET` devem ser diferentes.
+
+### Rotas de autenticação
+
+Base:
+
+```txt
+/api/auth
+```
+
+| Método | Rota                | Descrição                          | Autenticação |
+| ------ | ------------------- | ---------------------------------- | ------------ |
+| POST   | `/api/auth/login`   | Autentica usuário e retorna tokens | Pública      |
+| POST   | `/api/auth/refresh` | Renova o par de tokens             | Pública      |
+| POST   | `/api/auth/logout`  | Encerra a sessão/logout            | Pública      |
+
+### Exemplo de login
+
+```json
+{
+  "email": "usuario@email.com",
+  "password": "senha123"
+}
+```
+
+### Autorização em rotas protegidas
+
+Rotas protegidas exigem header:
+
+```txt
+Authorization: Bearer <access_token>
+```
+
+---
+
+## 👤 Controle de Acesso e Permissões
+
+O backend usa controle de acesso baseado em papéis.
+
+### Roles
+
+| Role              | Descrição     | Nível |
+| ----------------- | ------------- | ----- |
+| `ATTENDANT`       | Atendente     | 1     |
+| `MANAGER`         | Gerente       | 2     |
+| `GENERAL_MANAGER` | Gerente Geral | 3     |
+| `ADMIN`           | Administrador | 4     |
+
+### Middlewares principais
+
+| Middleware           | Responsabilidade                  |
+| -------------------- | --------------------------------- |
+| `authMiddleware`     | Valida JWT e injeta `req.user`    |
+| `checkPermission`    | Verifica permissão por hierarquia |
+| `checkRole`          | Verifica roles explícitas         |
+| `validateBody`       | Valida body com Zod               |
+| `validateQuery`      | Valida query params com Zod       |
+| `validateParams`     | Valida route params com Zod       |
+| `globalErrorHandler` | Trata erros da aplicação          |
+
+### Diferença entre `checkPermission` e `checkRole`
+
+`checkPermission("MANAGER")` aprova:
+
+```txt
+MANAGER, GENERAL_MANAGER, ADMIN
+```
+
+`checkRole("MANAGER", "ADMIN")` aprova apenas:
+
+```txt
+MANAGER, ADMIN
+```
+
+Além dos middlewares, regras granulares de escopo são aplicadas nos services, como:
+
+* atendente visualizar apenas seus próprios dados;
+* gerente visualizar dados da equipe;
+* gerente geral visualizar escopo global;
+* restrições de edição por recurso e perfil.
+
+---
+
+## 🌐 Base da API
+
+O arquivo `app.ts` registra o router principal em:
+
+```txt
+/api
+```
+
+Portanto, todas as rotas dos módulos abaixo usam o prefixo:
+
+```txt
+http://localhost:3000/api
+```
+
+Rota de teste:
+
+| Método | Rota | Descrição                              |
+| ------ | ---- | -------------------------------------- |
+| GET    | `/`  | Retorna mensagem de boas-vindas da API |
+
+---
+
+## 🧩 Módulos Implementados
+
+### Auth/Login
+
+Diretório:
+
+```txt
+src/modules/auth/login/
+```
+
+Responsável por login, refresh token e logout.
+
+Rotas:
+
+* `POST /api/auth/login`
+* `POST /api/auth/refresh`
+* `POST /api/auth/logout`
+
+---
+
+### Users
+
+Diretório:
+
+```txt
+src/modules/users/
+```
+
+Responsável pelo gerenciamento de usuários.
+
+Rotas:
+
+| Método | Rota                  | Permissão                          |
+| ------ | --------------------- | ---------------------------------- |
+| GET    | `/api/users`          | `MANAGER` ou superior              |
+| GET    | `/api/users/:id`      | Qualquer usuário autenticado       |
+| POST   | `/api/users`          | `ADMIN`                            |
+| PUT    | `/api/users/:id`      | Autenticado, com regras no service |
+| PATCH  | `/api/users/:id`      | Autenticado, com regras no service |
+| DELETE | `/api/users/:id`      | `ADMIN`                            |
+| DELETE | `/api/users/:id/hard` | `ADMIN`                            |
+
+---
+
+### Customers
+
+Diretório:
+
+```txt
+src/modules/customers/
+```
+
+Responsável pelo gerenciamento de clientes/prospects.
+
+Rotas:
+
+| Método | Rota                      | Permissão   |
+| ------ | ------------------------- | ----------- |
+| GET    | `/api/customers`          | Autenticado |
+| GET    | `/api/customers/:id`      | Autenticado |
+| POST   | `/api/customers`          | Autenticado |
+| PUT    | `/api/customers/:id`      | Autenticado |
+| PATCH  | `/api/customers/:id`      | Autenticado |
+| DELETE | `/api/customers/:id`      | Autenticado |
+| DELETE | `/api/customers/:id/hard` | `ADMIN`     |
+
+---
+
+### Stores
+
+Diretório:
+
+```txt
+src/modules/stores/
+```
+
+Responsável pelo gerenciamento de lojas.
+
+Rotas:
+
+| Método | Rota                   | Permissão   |
+| ------ | ---------------------- | ----------- |
+| GET    | `/api/stores`          | Autenticado |
+| GET    | `/api/stores/:id`      | Autenticado |
+| POST   | `/api/stores`          | `ADMIN`     |
+| PUT    | `/api/stores/:id`      | `ADMIN`     |
+| PATCH  | `/api/stores/:id`      | `ADMIN`     |
+| DELETE | `/api/stores/:id`      | `ADMIN`     |
+| DELETE | `/api/stores/:id/hard` | `ADMIN`     |
+
+---
+
+### Teams
+
+Diretório:
+
+```txt
+src/modules/teams/
+```
+
+Responsável pelo gerenciamento de equipes.
+
+Rotas:
+
+| Método | Rota                  | Permissão                    |
+| ------ | --------------------- | ---------------------------- |
+| GET    | `/api/teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| GET    | `/api/teams/:id`      | Autenticado                  |
+| POST   | `/api/teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| PUT    | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| PATCH  | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/teams/:id/hard` | `ADMIN`                      |
+
+---
+
+### Users Teams
+
+Diretório:
+
+```txt
+src/modules/users-teams/
+```
+
+Responsável pelo vínculo entre usuários e equipes.
+
+Rotas:
+
+| Método | Rota                        | Permissão                    |
+| ------ | --------------------------- | ---------------------------- |
+| GET    | `/api/users-teams`          | Autenticado                  |
+| GET    | `/api/users-teams/:id`      | Autenticado                  |
+| POST   | `/api/users-teams`          | `GENERAL_MANAGER` ou `ADMIN` |
+| PUT    | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| PATCH  | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/users-teams/:id`      | `GENERAL_MANAGER` ou `ADMIN` |
+| DELETE | `/api/users-teams/:id/hard` | `ADMIN`                      |
+
+---
+
+### Interest Items
+
+Diretório:
+
+```txt
+src/modules/interest-items/
+```
+
+Responsável pelos itens de interesse vinculados a leads, como veículos ou produtos de interesse.
+
+Rotas:
+
+| Método | Rota                           | Permissão                     |
+| ------ | ------------------------------ | ----------------------------- |
+| GET    | `/api/interest-items`          | Autenticado                   |
+| GET    | `/api/interest-items/:id`      | Autenticado                   |
+| POST   | `/api/interest-items`          | `GENERAL_MANAGER` ou superior |
+| PUT    | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| PATCH  | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| DELETE | `/api/interest-items/:id`      | `GENERAL_MANAGER` ou superior |
+| DELETE | `/api/interest-items/:id/hard` | `ADMIN`                       |
+
+---
+
+### Leads
+
+Diretório:
+
+```txt
+src/modules/leads/
+```
+
+Responsável pelo gerenciamento de leads.
+
+Rotas:
+
+| Método | Rota                               | Permissão                          |
+| ------ | ---------------------------------- | ---------------------------------- |
+| GET    | `/api/leads`                       | Autenticado                        |
+| GET    | `/api/leads/:id`                   | Autenticado                        |
+| POST   | `/api/leads`                       | Autenticado                        |
+| PUT    | `/api/leads/:id`                   | Autenticado, com regras no service |
+| PATCH  | `/api/leads/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/leads/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/leads/:id/permanent`         | `ADMIN`                            |
+| POST   | `/api/leads/bulk/assign-attendant` | `MANAGER` ou `ADMIN`               |
+| POST   | `/api/leads/bulk/assign-team`      | `GENERAL_MANAGER` ou `ADMIN`       |
+
+---
+
+### Negotiations
+
+Diretório:
+
+```txt
+src/modules/negotiation/
+```
+
+Responsável pelo gerenciamento de negociações.
+
+Rotas:
+
+| Método | Rota                                      | Permissão                          |
+| ------ | ----------------------------------------- | ---------------------------------- |
+| GET    | `/api/negotiations`                       | Autenticado                        |
+| GET    | `/api/negotiations/:id`                   | Autenticado                        |
+| POST   | `/api/negotiations`                       | Autenticado                        |
+| PUT    | `/api/negotiations/:id`                   | Autenticado, com regras no service |
+| PATCH  | `/api/negotiations/:id`                   | Autenticado, com regras no service |
+| DELETE | `/api/negotiations/:id`                   | `ADMIN`                            |
+| POST   | `/api/negotiations/bulk/assign-attendant` | `MANAGER` ou `ADMIN`               |
+| POST   | `/api/negotiations/bulk/assign-team`      | `GENERAL_MANAGER` ou `ADMIN`       |
+
+---
+
+### Negotiation Status
+
+Diretório:
+
+```txt
+src/modules/negotiation-status/
+```
+
+Responsável pelo histórico de status de uma negociação.
+
+Rotas:
+
+| Método | Rota                          | Permissão   |
+| ------ | ----------------------------- | ----------- |
+| GET    | `/api/negotiation-status`     | Autenticado |
+| GET    | `/api/negotiation-status/:id` | Autenticado |
+| POST   | `/api/negotiation-status`     | Autenticado |
+| PUT    | `/api/negotiation-status/:id` | Autenticado |
+| PATCH  | `/api/negotiation-status/:id` | Autenticado |
+| DELETE | `/api/negotiation-status/:id` | `ADMIN`     |
+
+---
+
+### Negotiation Importance
+
+Diretório:
+
+```txt
+src/modules/negotiation-importance/
+```
+
+Responsável pelo histórico de importância de uma negociação.
+
+Rotas:
+
+| Método | Rota                              | Permissão   |
+| ------ | --------------------------------- | ----------- |
+| GET    | `/api/negotiation-importance`     | Autenticado |
+| GET    | `/api/negotiation-importance/:id` | Autenticado |
+| POST   | `/api/negotiation-importance`     | Autenticado |
+| PUT    | `/api/negotiation-importance/:id` | Autenticado |
+| PATCH  | `/api/negotiation-importance/:id` | Autenticado |
+| DELETE | `/api/negotiation-importance/:id` | `ADMIN`     |
+
+---
+
+### Negotiation Stage History
+
+Diretório:
+
+```txt
+src/modules/negotiation-stage-history/
+```
+
+Responsável pelo histórico de etapas do funil de negociação.
+
+Rotas:
+
+| Método | Rota                                 | Permissão   |
+| ------ | ------------------------------------ | ----------- |
+| GET    | `/api/negotiation-stage-history`     | Autenticado |
+| GET    | `/api/negotiation-stage-history/:id` | Autenticado |
+| POST   | `/api/negotiation-stage-history`     | Autenticado |
+| PUT    | `/api/negotiation-stage-history/:id` | Autenticado |
+| PATCH  | `/api/negotiation-stage-history/:id` | Autenticado |
+| DELETE | `/api/negotiation-stage-history/:id` | `ADMIN`     |
+
+---
+
+## 📊 Dashboards
+
+### Dashboard do Atendente
+
+Base:
+
+```txt
+/api/dashboards/attendant
+```
+
+Permissão mínima:
+
+```txt
+ATTENDANT
+```
+
+Rotas:
+
+| Método | Rota                                                     |
+| ------ | -------------------------------------------------------- |
+| GET    | `/api/dashboards/attendant/kpi/active-leads`             |
+| GET    | `/api/dashboards/attendant/kpi/converted-leads`          |
+| GET    | `/api/dashboards/attendant/kpi/conversion-rate`          |
+| GET    | `/api/dashboards/attendant/kpi/avg-service-time`         |
+| GET    | `/api/dashboards/attendant/charts/leads-evolution`       |
+| GET    | `/api/dashboards/attendant/charts/sales-funnel`          |
+| GET    | `/api/dashboards/attendant/charts/leads-by-source`       |
+| GET    | `/api/dashboards/attendant/charts/conversions-by-period` |
+
+---
+
+### Dashboard do Gerente
+
+Base:
+
+```txt
+/api/dashboards/manager
+```
+
+Permissão mínima:
+
+```txt
+MANAGER
+```
+
+Rotas:
+
+| Método | Rota                                                      |
+| ------ | --------------------------------------------------------- |
+| GET    | `/api/dashboards/manager/kpi/team`                        |
+| GET    | `/api/dashboards/manager/kpi/top-attendant`               |
+| GET    | `/api/dashboards/manager/charts/leads-by-attendant`       |
+| GET    | `/api/dashboards/manager/charts/conversions-by-attendant` |
+| GET    | `/api/dashboards/manager/charts/team-evolution`           |
+| GET    | `/api/dashboards/manager/charts/team-funnel`              |
+
+---
+
+### Dashboard do Gerente Geral
+
+Base:
+
+```txt
+/api/dashboards/general-manager
+```
+
+Permissão mínima:
+
+```txt
+GENERAL_MANAGER
+```
+
+Rotas:
+
+| Método | Rota                                                      |
+| ------ | --------------------------------------------------------- |
+| GET    | `/api/dashboards/general-manager/kpi/global`              |
+| GET    | `/api/dashboards/general-manager/kpi/top-team`            |
+| GET    | `/api/dashboards/general-manager/charts/leads-by-team`    |
+| GET    | `/api/dashboards/general-manager/charts/team-ranking`     |
+| GET    | `/api/dashboards/general-manager/charts/global-evolution` |
+| GET    | `/api/dashboards/general-manager/charts/global-funnel`    |
+
+---
+
+## 🗄️ Banco de Dados
+
+O projeto usa PostgreSQL com Prisma.
+
+Modelos definidos no `schema.prisma`:
+
+| Model                     | Tabela                      |
+| ------------------------- | --------------------------- |
+| `Stores`                  | `stores`                    |
+| `Teams`                   | `teams`                     |
+| `Users`                   | `users`                     |
+| `UserTeams`               | `user_teams`                |
+| `Customers`               | `customers`                 |
+| `InterestItems`           | `interest_items`            |
+| `Leads`                   | `leads`                     |
+| `Negotiations`            | `negotiations`              |
+| `NegotiationStatus`       | `negotiation_status`        |
+| `NegotiationStageHistory` | `negotiation_stage_history` |
+| `NegotiationImportance`   | `negotiation_importance`    |
+| `SystemLogs`              | `system_logs`               |
+
+---
+
+## 🧪 Validação e Tratamento de Erros
+
+O backend utiliza Zod para validação de:
+
+* body;
+* query params;
+* route params.
+
+Middlewares de validação:
+
+```txt
+validateBody
+validateQuery
+validateParams
+```
+
+Erros são tratados pelo middleware global:
+
+```txt
+globalErrorHandler
+```
+
+---
+
+## 🌐 CORS
+
+O backend permite requisições dos seguintes ambientes de desenvolvimento:
+
+```txt
+http://localhost:5173
+http://localhost:5174
+```
+
+No Docker produção/local, o frontend é servido pelo Nginx e acessa a API pelo proxy `/api`, evitando problema de CORS.
+
+---
+
+## ⚠️ Funcionalidades Planejadas ou Pendentes
+
+As funcionalidades abaixo aparecem como requisitos, modelos, comentários ou arquivos previstos, mas **não devem ser consideradas endpoints implementados nesta versão do backend**.
+
+| Funcionalidade                     | Status                                                           |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| Recuperação de senha por e-mail    | Não há endpoint implementado                                     |
+| Redefinição de senha por token     | Não há endpoint implementado                                     |
+| `GET /api/users/me`                | Não implementado                                                 |
+| `PATCH /api/users/me`              | Não implementado                                                 |
+| `GET /api/logs`                    | Não implementado                                                 |
+| Módulo de logs/auditoria           | Existe model `SystemLogs`, mas não há módulo/rotas implementadas |
+| `POST /api/leads/:id/transfer`     | Não implementado                                                 |
+| `GET /api/leads/:id/history`       | Não implementado                                                 |
+| Seed automático ao subir container | Não implementado por decisão técnica; seed é manual              |
+
+---
+
+## ✅ Checklist da Documentação Backend
+
+Esta documentação cobre:
+
+* estrutura real do `server`;
+* tecnologias utilizadas;
+* módulos reais do backend;
+* rotas reais registradas em `/api`;
+* autenticação e permissões;
+* variáveis de ambiente;
+* Docker, Prisma, migrations e seed;
+* pendências conhecidas;
+* endpoints que não devem ser considerados implementados.
+
+---
+
+## 📚 Documentação Relacionada
+
+| Recurso                  | Caminho                      |
+| ------------------------ | ---------------------------- |
+| README principal         | `../README.md`               |
+| Guia de execução Docker  | `../HOWTORUN.md`             |
+| Documentação do frontend | `../client/README.md`        |
+| Sprint 1                 | `../docs/sprint-1/README.md` |
+| Sprint 2                 | `../docs/sprint-2/README.md` |
+| Sprint 3                 | `../docs/sprint-3/README.md` |
 
 ---
 
 <div align="center">
 
-ABP 2026-1 · 3DSM · FATEC Jacareí · Sprint 1: 24/03 – 14/04/2026
-Parceiro: 1000 Valle Multimarcas | Contato: Leonardo Robles (contato@atitudeti.com.br)
+ABP 2026-1 · 3DSM · FATEC Jacareí
+Parceiro: 1000 Valle Multimarcas
 Focal Point: Prof. Arley Ferreira de Souza
 
 </div>

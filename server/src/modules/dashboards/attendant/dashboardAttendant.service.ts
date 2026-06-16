@@ -8,26 +8,25 @@ import {
 } from '../../../middlewares/errors/domainErrors.middleware.js';
 import {
   DashboardAttendantRepository,
-  groupDatesByDay,
-  calcAvgServiceTimeHours,
+  mergeEvolution,
+  calcAvgClosingTimeHours,
 } from './dashboardAttendant.repository.js';
 import type {
   AttendantDashboardFilterDTO,
-  ActiveLeadsResponse,
-  AvgServiceTimeResponse,
-  ConversionRateResponse,
-  ConversionsByPeriodResponse,
-  ConvertedLeadsResponse,
-  LeadsBySourceResponse,
-  LeadsEvolutionResponse,
-  SalesFunnelResponse,
+  ActiveNegotiationsResponse,
+  AvgClosingTimeResponse,
+  ClosingRateResponse,
+  IdleLeadsResponse,
+  NegotiationsBySourceResponse,
+  NegotiationsEvolutionResponse,
+  SalesResponse,
+  StageFunnelResponse,
+  TemperatureResponse,
 } from './dashboardAttendant.dto.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQUESTER TYPE
-// Representa o subconjunto de req.user necessário para as regras de autorização.
-// Usa o tipo AccessLevel importado do permission middleware para garantir que
-// o role seja sempre um dos 4 valores conhecidos.
+// Subconjunto de req.user necessário para as regras de autorização.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface AuthenticatedRequester {
@@ -37,7 +36,10 @@ export interface AuthenticatedRequester {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD ATTENDANT SERVICE
+// DASHBOARD ATTENDANT SERVICE — negociação-cêntrico
+// ─────────────────────────────────────────────────────────────────────────────
+// Autorização idêntica à versão anterior (regras inalteradas pelo refactor).
+// A semântica das métricas mudou: ver comentários no DTO e no repository.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardAttendantService {
@@ -86,7 +88,7 @@ export class DashboardAttendantService {
           team_id: { in: requester.team_ids },
           is_active: true,
         },
-        select: { id: true }, // select mínimo — só precisamos confirmar existência
+        select: { id: true },
       });
 
       if (!membership) {
@@ -99,104 +101,125 @@ export class DashboardAttendantService {
     }
 
     // Regra 4 — ATTENDANT tentando ver outro atendente
-    throw new AcessoNaoAutorizadoError('Acesso negado ao dashboard solicitado.');
+    throw new AcessoNaoAutorizadoError(
+      'Não tem permissão para ver dados de outros atendentes.',
+    );
   }
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
 
-  public async getActiveLeads(
+  /** 1. Negociações ativas (snapshot — não recebe filtros de data). */
+  public async getActiveNegotiations(
     requester: AuthenticatedRequester,
     targetId: string,
-    filters?: AttendantDashboardFilterDTO,
-  ): Promise<ActiveLeadsResponse> {
+  ): Promise<ActiveNegotiationsResponse> {
     await this.assertCanAccess(requester, targetId);
-    const count = await this.repository.countActiveLeads(targetId, filters);
-    return { activeLeads: count };
+    const activeNegotiations = await this.repository.countActiveNegotiations(targetId);
+    return { activeNegotiations };
   }
 
-  public async getConvertedLeads(
+  /** 2. Vendas no período (eventos 'won' na janela). */
+  public async getSales(
     requester: AuthenticatedRequester,
     targetId: string,
     filters?: AttendantDashboardFilterDTO,
-  ): Promise<ConvertedLeadsResponse> {
+  ): Promise<SalesResponse> {
     await this.assertCanAccess(requester, targetId);
-    const count = await this.repository.countConvertedLeads(targetId, filters);
-    return { convertedLeads: count };
+    const sales = await this.repository.countSales(targetId, filters);
+    return { sales };
   }
 
-  public async getConversionRate(
+  /** 3. Taxa de fechamento: won / (won + lost) das encerradas na janela. */
+  public async getClosingRate(
     requester: AuthenticatedRequester,
     targetId: string,
     filters?: AttendantDashboardFilterDTO,
-  ): Promise<ConversionRateResponse> {
+  ): Promise<ClosingRateResponse> {
     await this.assertCanAccess(requester, targetId);
-    const { totalLeads, convertedLeads } = await this.repository.getConversionData(
-      targetId,
-      filters,
-    );
+    const { wonCount, lostCount } = await this.repository.getClosingData(targetId, filters);
 
-    if (totalLeads === 0) {
-      return { conversionRate: 0, totalLeads, convertedLeads };
-    }
+    const closed = wonCount + lostCount;
+    const closingRate = closed === 0 ? 0 : (wonCount / closed) * 100;
 
-    const rate = (convertedLeads / totalLeads) * 100;
     return {
-      conversionRate: Number(rate.toFixed(2)),
-      totalLeads,
-      convertedLeads,
+      closingRate: Number(closingRate.toFixed(1)),
+      wonCount,
+      lostCount,
     };
   }
 
-  public async getAvgServiceTime(
+  /** 4. Tempo médio de fechamento (abertura da negociação → evento 'won'). */
+  public async getAvgClosingTime(
     requester: AuthenticatedRequester,
     targetId: string,
     filters?: AttendantDashboardFilterDTO,
-  ): Promise<AvgServiceTimeResponse> {
+  ): Promise<AvgClosingTimeResponse> {
     await this.assertCanAccess(requester, targetId);
-    const timestamps = await this.repository.getConvertedLeadTimestamps(targetId, filters);
-    const avgHours = calcAvgServiceTimeHours(timestamps);
-    return { avgServiceTimeHours: Number(avgHours.toFixed(2)) };
+    const events = await this.repository.getSaleEvents(targetId, filters);
+    const avgHours = calcAvgClosingTimeHours(events);
+    return { avgClosingTimeHours: Number(avgHours.toFixed(2)) };
   }
 
   // ─── CHARTS ───────────────────────────────────────────────────────────────
 
-  public async getLeadsEvolution(
+  /** 5. Funil de estágios da carteira ativa (snapshot). */
+  public async getStageFunnel(
     requester: AuthenticatedRequester,
     targetId: string,
-    filters?: AttendantDashboardFilterDTO,
-  ): Promise<LeadsEvolutionResponse> {
+  ): Promise<StageFunnelResponse> {
     await this.assertCanAccess(requester, targetId);
-    const dates = await this.repository.getLeadsCreatedDates(targetId, filters);
-    return { evolution: groupDatesByDay(dates) };
-  }
-
-  public async getSalesFunnel(
-    requester: AuthenticatedRequester,
-    targetId: string,
-    filters?: AttendantDashboardFilterDTO,
-  ): Promise<SalesFunnelResponse> {
-    await this.assertCanAccess(requester, targetId);
-    const funnel = await this.repository.getSalesFunnel(targetId, filters);
+    const funnel = await this.repository.getStageFunnel(targetId);
     return { funnel };
   }
 
-  public async getLeadsBySource(
+  /** 6. Evolução diária: aberturas × vendas na janela. */
+  public async getEvolution(
     requester: AuthenticatedRequester,
     targetId: string,
     filters?: AttendantDashboardFilterDTO,
-  ): Promise<LeadsBySourceResponse> {
+  ): Promise<NegotiationsEvolutionResponse> {
     await this.assertCanAccess(requester, targetId);
-    const sources = await this.repository.getLeadsBySource(targetId, filters);
+
+    const [openedDates, saleEvents] = await Promise.all([
+      this.repository.getNegotiationsCreatedDates(targetId, filters),
+      this.repository.getSaleEvents(targetId, filters),
+    ]);
+
+    return {
+      evolution: mergeEvolution(
+        openedDates,
+        saleEvents.map((e) => e.wonAt),
+      ),
+    };
+  }
+
+  /** 7. Temperatura da carteira ativa (snapshot). */
+  public async getTemperature(
+    requester: AuthenticatedRequester,
+    targetId: string,
+  ): Promise<TemperatureResponse> {
+    await this.assertCanAccess(requester, targetId);
+    const temperature = await this.repository.getTemperature(targetId);
+    return { temperature };
+  }
+
+  /** 8. Negociações abertas na janela por origem do lead. */
+  public async getNegotiationsBySource(
+    requester: AuthenticatedRequester,
+    targetId: string,
+    filters?: AttendantDashboardFilterDTO,
+  ): Promise<NegotiationsBySourceResponse> {
+    await this.assertCanAccess(requester, targetId);
+    const sources = await this.repository.getNegotiationsBySource(targetId, filters);
     return { sources };
   }
 
-  public async getConversionsByPeriod(
+  /** 9. Leads parados: sem nenhuma negociação aberta (snapshot). */
+  public async getIdleLeads(
     requester: AuthenticatedRequester,
     targetId: string,
-    filters?: AttendantDashboardFilterDTO,
-  ): Promise<ConversionsByPeriodResponse> {
+  ): Promise<IdleLeadsResponse> {
     await this.assertCanAccess(requester, targetId);
-    const dates = await this.repository.getConvertedLeadUpdateDates(targetId, filters);
-    return { conversions: groupDatesByDay(dates) };
+    return this.repository.getIdleLeads(targetId);
   }
 }

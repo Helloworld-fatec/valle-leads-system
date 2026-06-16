@@ -9,8 +9,7 @@ interface Props {
   lead: Lead;
 }
 
-// Status que impedem abertura de nova negociação
-const CLOSED_STATUSES: Lead["status"][] = ["finalizado", "perdido"];
+const CLOSED_STATUSES: Lead["status"][] = ["won", "lost"];
 
 export default function OpenNegotiationButton({ lead }: Props) {
   const { user } = useAuth();
@@ -18,14 +17,14 @@ export default function OpenNegotiationButton({ lead }: Props) {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Lead encerrado ou sem time não pode abrir negociação
-  const isClosed   = CLOSED_STATUSES.includes(lead.status);
-  const isDisabled = loading || isClosed || !lead.team_id;
+  const teamId = lead.team_id ?? undefined;
+  const isClosed = CLOSED_STATUSES.includes(lead.status);
+  const isDisabled = loading || isClosed || !teamId;
 
   async function handleClick() {
-    if (!user?.id || isDisabled) return;
+    if (!user?.id || isDisabled || !teamId) return;
 
     try {
       setLoading(true);
@@ -33,13 +32,12 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
       await createNegotiation({
         lead_id: lead.id,
-        team_id: lead.team_id, // já validado acima (isDisabled guarda o caso undefined)
+        team_id: teamId,
       });
 
       navigate("/funil");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Erro ao abrir negociação.";
+      const msg = err instanceof Error ? err.message : "Erro ao abrir negociação.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -48,7 +46,6 @@ export default function OpenNegotiationButton({ lead }: Props) {
 
   return (
     <div className="space-y-2">
-      {/* Aviso de lead encerrado */}
       {isClosed && (
         <div
           className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg"
@@ -59,7 +56,6 @@ export default function OpenNegotiationButton({ lead }: Props) {
         </div>
       )}
 
-      {/* Erro de requisição — aparece acima do botão sem fechar o modal */}
       {error && (
         <div
           className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg"

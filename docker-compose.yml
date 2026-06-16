@@ -3,71 +3,61 @@ services:
     image: postgres:16-alpine
     container_name: valle_db
     restart: unless-stopped
-    # Carrega as variáveis do .env (USER, PASSWORD, DB)
-    env_file: .env
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-valle_leads}
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ── Seed (manual) ─────────────────────────────────────────────────────────────
-  seed:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-      target: build
-    container_name: valle_seed
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
-    volumes:
-      # CORREÇÃO: Monta o CSV exatamente onde o script procura (/app/seed_data.csv)
-      - ./server/prisma/seed_data.csv:/app/seed_data.csv:ro
-      - seed_flag:/app/seed_flag
-    command: >
-      sh -c "npx prisma migrate deploy && npx prisma db seed"
-    profiles:
-      - seed
 
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
+      target: prod
     container_name: valle_server
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
-    env_file: .env
-    environment:
-      # Esta linha é vital para o prisma.config.ts funcionar
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
-    ports:
-      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
     container_name: valle_client
     restart: unless-stopped
-    depends_on:
-      - server
     ports:
       - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
 
-# ESTA SEÇÃO PRECISA ESTAR EXATAMENTE ASSIM NA RAIZ DO ARQUIVO
 volumes:
   postgres_data:
-  seed_flag:

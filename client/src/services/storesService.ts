@@ -25,6 +25,7 @@ export interface CreateStoreDTO {
 export interface UpdateStoreDTO {
   name?: string;
   address?: string;
+  is_active?: boolean;
 }
 
 // Helper: aceita resposta { data: ... } ou corpo direto

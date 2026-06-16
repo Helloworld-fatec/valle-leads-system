@@ -14,10 +14,10 @@ import { RequisicaoInvalidaError } from '../../../middlewares/errors/domainError
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Query params que chegam neste router — após validação pelo schema Zod.
- * attendantId é string | undefined; startDate/endDate chegam já como Date
- * após o transform do schema, mas a tipagem de req.query é sempre string-based
- * pelo Express, por isso o controller delega o cast para o service via DTO.
+ * Query params deste router — após validação pelo schema Zod.
+ * startDate/endDate chegam já como Date após o transform do schema, mas a
+ * tipagem de req.query é string-based pelo Express; o controller delega o
+ * cast para o service via DTO.
  */
 type DashboardQueryParams = ParsedQs & {
   attendantId?: string;
@@ -29,7 +29,7 @@ type DashboardQueryParams = ParsedQs & {
 type DashboardRequest = AuthRequest<Record<string, never>, unknown, DashboardQueryParams>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD ATTENDANT CONTROLLER
+// DASHBOARD ATTENDANT CONTROLLER — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class DashboardAttendantController {
@@ -43,11 +43,8 @@ export class DashboardAttendantController {
 
   /**
    * Extrai o ID do atendente alvo.
-   * - Query param `attendantId` tem precedência (uso por MANAGER/ADMIN).
+   * - Query param `attendantId` tem precedência (uso por MANAGER/ADMIN/GM).
    * - Fallback: ID do próprio usuário logado (uso típico do ATTENDANT).
-   *
-   * Lança RequisicaoInvalidaError se — por alguma falha de pipeline —
-   * nenhum ID estiver disponível.
    */
   private resolveTargetId(req: DashboardRequest): string {
     const targetId = req.query.attendantId ?? req.user.id;
@@ -57,11 +54,7 @@ export class DashboardAttendantController {
     return targetId;
   }
 
-  /**
-   * Mapeia req.user para AuthenticatedRequester, que é o tipo esperado pelo service.
-   * O role já foi validado pelo authMiddleware + permission.middleware antes de
-   * chegar aqui, então o cast para AccessLevel é seguro.
-   */
+  /** Mapeia req.user para o tipo esperado pelo service. */
   private buildRequester(req: DashboardRequest): AuthenticatedRequester {
     return {
       id: req.user.id,
@@ -71,150 +64,64 @@ export class DashboardAttendantController {
   }
 
   /**
-   * req.query foi validado e transformado pelo validateQuery(attendantDashboardFilterSchema),
-   * portanto o cast para AttendantDashboardFilterDTO é seguro neste ponto.
+   * req.query foi validado/transformado pelo validateQuery(schema);
+   * o cast é seguro neste ponto.
    */
   private extractFilters(req: DashboardRequest): AttendantDashboardFilterDTO {
     return req.query as unknown as AttendantDashboardFilterDTO;
   }
 
+  /**
+   * Fábrica de handlers — elimina os 9 blocos try/catch idênticos.
+   * Cada handler recebe (requester, targetId, filters) e devolve o payload.
+   * Métricas de snapshot simplesmente ignoram o terceiro argumento.
+   */
+  private handle(
+    serviceCall: (
+      requester: AuthenticatedRequester,
+      targetId: string,
+      filters: AttendantDashboardFilterDTO,
+    ) => Promise<unknown>,
+  ) {
+    return async (req: DashboardRequest, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const data = await serviceCall(
+          this.buildRequester(req),
+          this.resolveTargetId(req),
+          this.extractFilters(req),
+        );
+        res.status(200).json(data);
+      } catch (error) {
+        next(error);
+      }
+    };
+  }
+
   // ─── KPI HANDLERS ────────────────────────────────────────────────────────
 
-  public getActiveLeads = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getActiveLeads(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getActiveNegotiations = this.handle((r, t) =>
+    this.service.getActiveNegotiations(r, t),
+  );
 
-  public getConvertedLeads = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getConvertedLeads(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSales = this.handle((r, t, f) => this.service.getSales(r, t, f));
 
-  public getConversionRate = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getConversionRate(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getClosingRate = this.handle((r, t, f) => this.service.getClosingRate(r, t, f));
 
-  public getAvgServiceTime = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getAvgServiceTime(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getAvgClosingTime = this.handle((r, t, f) =>
+    this.service.getAvgClosingTime(r, t, f),
+  );
 
-  // ─── CHART HANDLERS ───────────────────────────────────────────────────────
+  // ─── CHART HANDLERS ──────────────────────────────────────────────────────
 
-  public getLeadsEvolution = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getLeadsEvolution(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getStageFunnel = this.handle((r, t) => this.service.getStageFunnel(r, t));
 
-  public getSalesFunnel = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getSalesFunnel(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getEvolution = this.handle((r, t, f) => this.service.getEvolution(r, t, f));
 
-  public getLeadsBySource = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getLeadsBySource(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getTemperature = this.handle((r, t) => this.service.getTemperature(r, t));
 
-  public getConversionsByPeriod = async (
-    req: DashboardRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getConversionsByPeriod(
-        this.buildRequester(req),
-        this.resolveTargetId(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getNegotiationsBySource = this.handle((r, t, f) =>
+    this.service.getNegotiationsBySource(r, t, f),
+  );
+
+  public getIdleLeads = this.handle((r, t) => this.service.getIdleLeads(r, t));
 }

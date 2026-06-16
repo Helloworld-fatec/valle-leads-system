@@ -1048,7 +1048,7 @@ export default function CreateLeadModal({
                                 type="button"
                                 key={item.id}
                                 onClick={() => handleSelectItem(item)}
-                                className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-b-0"
+                                className="w-full min-h-16 flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-b-0"
                               >
                                 <div className="w-9 h-9 rounded-full bg-gray-50 text-gray-500 flex items-center justify-center shrink-0">
                                   <Package size={15} />

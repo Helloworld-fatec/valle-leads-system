@@ -1,4 +1,4 @@
-// src/modules/dashboards/general-manager/dashboardGeneralManager.controller.ts
+// src/modules/dashboards/dashboard-general-manager/dashboardGeneralManager.controller.ts
 
 import type { Response, NextFunction } from 'express';
 import type { ParsedQs } from 'qs';
@@ -12,27 +12,16 @@ import type { GeneralManagerDashboardFilterDTO } from './dashboardGeneralManager
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Query params que chegam neste router após validação pelo schema Zod.
- * Não há teamId nem attendantId — a visão do General Manager é sempre global.
- */
-type DashboardGeneralManagerQueryParams = ParsedQs & {
+type DashboardGMQueryParams = ParsedQs & {
   startDate?: string;
   endDate?: string;
 };
 
-/** Especialização de AuthRequest para as rotas deste controller. */
-type DashboardGeneralManagerRequest = AuthRequest<
-  Record<string, never>,
-  unknown,
-  DashboardGeneralManagerQueryParams
->;
+type DashboardGMRequest = AuthRequest<Record<string, never>, unknown, DashboardGMQueryParams>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD GENERAL MANAGER CONTROLLER
+// DASHBOARD GENERAL MANAGER CONTROLLER — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
-// Mais simples que o DashboardManagerController: não há targetId para resolver
-// — todos os endpoints operam sobre a visão global sem parâmetro de escopo.
 
 export class DashboardGeneralManagerController {
   private readonly service: DashboardGeneralManagerService;
@@ -41,14 +30,10 @@ export class DashboardGeneralManagerController {
     this.service = new DashboardGeneralManagerService();
   }
 
-  // ─── HELPERS PRIVADOS ────────────────────────────────────────────────────
+  // ─── HELPERS PRIVADOS ─────────────────────────────────────────────────────
 
-  /**
-   * Mapeia req.user para AuthenticatedRequester.
-   * O role já foi validado pelo authMiddleware + permission.middleware,
-   * portanto o cast para AccessLevel é seguro neste ponto.
-   */
-  private buildRequester(req: DashboardGeneralManagerRequest): AuthenticatedRequester {
+  /** Mapeia req.user para o tipo esperado pelo service. */
+  private buildRequester(req: DashboardGMRequest): AuthenticatedRequester {
     return {
       id: req.user.id,
       role: req.user.role as AccessLevel,
@@ -56,113 +41,57 @@ export class DashboardGeneralManagerController {
     };
   }
 
-  /**
-   * req.query foi validado e transformado pelo validateQuery(generalManagerDashboardFilterSchema),
-   * portanto o cast para GeneralManagerDashboardFilterDTO é seguro neste ponto.
-   */
-  private extractFilters(
-    req: DashboardGeneralManagerRequest,
-  ): GeneralManagerDashboardFilterDTO {
+  /** req.query já validado/transformado pelo validateQuery(schema). */
+  private extractFilters(req: DashboardGMRequest): GeneralManagerDashboardFilterDTO {
     return req.query as unknown as GeneralManagerDashboardFilterDTO;
+  }
+
+  /**
+   * Fábrica de handlers — elimina os blocos try/catch repetidos.
+   * Métricas de snapshot simplesmente ignoram o segundo argumento.
+   */
+  private handle(
+    serviceCall: (
+      requester: AuthenticatedRequester,
+      filters: GeneralManagerDashboardFilterDTO,
+    ) => Promise<unknown>,
+  ) {
+    return async (
+      req: DashboardGMRequest,
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      try {
+        const data = await serviceCall(
+          this.buildRequester(req),
+          this.extractFilters(req),
+        );
+        res.status(200).json(data);
+      } catch (error) {
+        next(error);
+      }
+    };
   }
 
   // ─── KPI HANDLERS ────────────────────────────────────────────────────────
 
-  public getGlobalKpis = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getGlobalKpis(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getActiveNegotiations = this.handle((r) => this.service.getActiveNegotiations(r));
 
-  public getTopTeam = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTopTeam(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSales = this.handle((r, f) => this.service.getSales(r, f));
+
+  public getSalesValue = this.handle((r, f) => this.service.getSalesValue(r, f));
+
+  public getPipelineValue = this.handle((r) => this.service.getPipelineValue(r));
 
   // ─── CHART HANDLERS ──────────────────────────────────────────────────────
 
-  public getLeadsByTeam = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getLeadsByTeam(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getStageFunnel = this.handle((r) => this.service.getStageFunnel(r));
 
-  public getTeamRanking = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getTeamRanking(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSalesByTeam = this.handle((r, f) => this.service.getSalesByTeam(r, f));
 
-  public getGlobalEvolution = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getGlobalEvolution(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getSalesByStore = this.handle((r, f) => this.service.getSalesByStore(r, f));
 
-  public getGlobalFunnel = async (
-    req: DashboardGeneralManagerRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const data = await this.service.getGlobalFunnel(
-        this.buildRequester(req),
-        this.extractFilters(req),
-      );
-      res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  };
+  public getEvolution = this.handle((r, f) => this.service.getEvolution(r, f));
+
+  public getIdleLeads = this.handle((r) => this.service.getIdleLeads(r));
 }

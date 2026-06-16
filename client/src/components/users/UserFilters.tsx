@@ -1,5 +1,6 @@
 import { Search, SlidersHorizontal } from "lucide-react";
-import { UserRole, roleLabels } from "../../data/mockUsers";
+import { UserRole } from "../../services/userService";
+import { roleLabels } from "../../constants/userConstants";
 
 interface UserFiltersProps {
   search: string;
@@ -10,10 +11,23 @@ interface UserFiltersProps {
   onStatusChange: (v: "ALL" | "ACTIVE" | "INACTIVE") => void;
 }
 
-const roles: (UserRole | "ALL")[] = ["ALL", "MANAGER", "SELLER", "ATTENDANT"];
+const roles: (UserRole | "ALL")[] = [
+  "ALL",
+  "ATTENDANT",
+  "MANAGER",
+  "GENERAL_MANAGER",
+  "ADMIN",
+];
+
 const roleFilterLabels: Record<UserRole | "ALL", string> = {
-  ALL: "Todos os perfis",
+  ALL:             "Todos os perfis",
   ...roleLabels,
+};
+
+const statusLabels: Record<"ALL" | "ACTIVE" | "INACTIVE", string> = {
+  ALL:      "Todos",
+  ACTIVE:   "Ativos",
+  INACTIVE: "Inativos",
 };
 
 export default function UserFilters({
@@ -28,10 +42,13 @@ export default function UserFilters({
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
       {/* Search */}
       <div className="relative flex-1">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        />
         <input
           type="text"
-          placeholder="Buscar usuário..."
+          placeholder="Buscar por nome, e-mail ou equipe..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
@@ -47,7 +64,7 @@ export default function UserFilters({
         <select
           value={roleFilter}
           onChange={(e) => onRoleChange(e.target.value as UserRole | "ALL")}
-          className="pl-8 pr-8 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-400 appearance-none cursor-pointer text-gray-700"
+          className="pl-8 pr-8 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-400 appearance-none cursor-pointer text-gray-700 w-full sm:w-auto"
         >
           {roles.map((r) => (
             <option key={r} value={r}>
@@ -57,8 +74,8 @@ export default function UserFilters({
         </select>
       </div>
 
-      {/* Status filter */}
-      <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden">
+      {/* Status toggle */}
+      <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden shrink-0">
         {(["ALL", "ACTIVE", "INACTIVE"] as const).map((s) => (
           <button
             key={s}
@@ -69,7 +86,7 @@ export default function UserFilters({
                 : "text-gray-500 hover:bg-gray-50"
             }`}
           >
-            {s === "ALL" ? "Todos" : s === "ACTIVE" ? "Ativos" : "Inativos"}
+            {statusLabels[s]}
           </button>
         ))}
       </div>

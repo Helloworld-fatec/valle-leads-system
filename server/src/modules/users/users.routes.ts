@@ -1,5 +1,6 @@
 // src/modules/users/users.routes.ts
 import { Router } from "express";
+import type { Response, NextFunction } from "express";
 import { UsersController } from "./users.controller.js";
 import {
   validateBody,
@@ -14,10 +15,16 @@ import {
   userIdParamSchema,
 } from "./users.dto.js";
 import { authMiddleware } from "../../middlewares/auth/auth.middleware.js";
+import type { AuthRequest } from "../../middlewares/auth/auth.middleware.js";
 import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // USERS ROUTES
@@ -26,24 +33,15 @@ import {
 //   authMiddleware          → exige access token válido + injeta req.user
 //   checkPermission/Role    → RBAC "grosso" por role
 //   validate*               → valida e tipifica dados via Zod
+//   createLogMiddleware     → agenda gravação assíncrona em system_logs
 //   controller.handler      → orquestra service e responde
 //
-// Regras de acesso:
-//   GET    /users              → MANAGER, GENERAL_MANAGER ou ADMIN
-//   GET    /users/:id          → qualquer role autenticado
-//   POST   /users              → somente ADMIN
-//   PUT    /users/:id          → ADMIN (qualquer usuário) ou qualquer role (próprio id)
-//   PATCH  /users/:id          → ADMIN (qualquer usuário) ou qualquer role (próprio id)
-//   DELETE /users/:id          → somente ADMIN (soft delete)
-//   DELETE /users/:id/hard     → somente ADMIN (hard delete físico)
-//
-// Importante:
-//   - PUT/PATCH usa dois schemas diferentes injetados condicionalmente.
-//     O controller despacha para updateAdmin ou updateSelf conforme actor.role e id.
-//     A route usa validateBody com o schema mais permissivo (updateUserAdminSchema)
-//     para deixar o campo chegar ao controller — o service bloqueia via RBAC quem
-//     não pode usar campos sensíveis.
-//   - /hard deve vir ANTES de /:id para o Express resolver primeiro.
+// O log middleware é posicionado ANTES do controller intencionalmente:
+//   - Ele só grava após res.on("finish"), então o controller já executou.
+//   - Precisa estar na pipeline (não no controller) para manter a separação
+//     de responsabilidades — o controller não sabe que existe log.
+//   - Fica DEPOIS das validações para não logar tentativas que falhariam
+//     em validação antes mesmo de chegar ao service.
 // ─────────────────────────────────────────────
 
 const usersRouter = Router();
@@ -53,20 +51,27 @@ const controller = new UsersController();
 usersRouter.use(authMiddleware);
 
 // ─── LISTAGEM ────────────────────────────────────────
-// checkPermission("MANAGER") aprova MANAGER, GENERAL_MANAGER e ADMIN (hierárquico)
 usersRouter.get(
   "/",
   checkPermission("MANAGER"),
   validateQuery(listUsersQuerySchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.LIST,
+    module: LOG_MODULES.USERS,
+  }),
   controller.findAll
 );
 
 // ─── LEITURA POR ID ──────────────────────────────────
-// Qualquer autenticado — checkPermission("ATTENDANT") aprova todos os 4 roles
 usersRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.GET,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Consulta do usuário ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -75,23 +80,42 @@ usersRouter.post(
   "/",
   checkRole("ADMIN"),
   validateBody(createUserSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.CREATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Criação de usuário: ${(req.body as { email?: string }).email ?? ""}`,
+  }),
   controller.create
 );
 
 // ─── ATUALIZAÇÃO ─────────────────────────────────────
-// validateBody usa updateUserAdminSchema (superconjunto dos campos).
-// Para não-ADMIN no próprio id, o body é interpretado como UpdateSelfDTO
-// pelo controller — campos extras como role/is_active/team_ids não estarão
-// presentes porque o updateSelfSchema não os aceita no lado do cliente.
-// Se vierem, são simplesmente ignorados pelo Zod antes de chegar aqui.
-//
-// Nota: se quisermos rejeitar campos extras para não-ADMIN já no middleware,
-// basta criar um middleware condicional. Por ora, a defesa fica no service.
+// Middleware condicional: escolhe o schema Zod correto com base no actor.
+//   - ADMIN editando qualquer id     → updateUserAdminSchema (campos completos)
+//   - qualquer role no próprio id    → updateSelfSchema (inclui current/new_password)
+function conditionalValidateBody(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const isAdmin = req.user?.role === "ADMIN";
+  const isSelf  = req.user?.id === req.params.id;
+
+  if (!isAdmin && isSelf) {
+    return validateBody(updateSelfSchema)(req, res, next);
+  }
+  return validateBody(updateUserAdminSchema)(req, res, next);
+}
+
 usersRouter.put(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
-  validateBody(updateUserAdminSchema),
+  conditionalValidateBody,
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.UPDATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Atualização (PUT) do usuário ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -99,24 +123,38 @@ usersRouter.patch(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userIdParamSchema),
-  validateBody(updateUserAdminSchema),
+  conditionalValidateBody,
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.UPDATE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Atualização (PATCH) do usuário ${req.params.id}`,
+  }),
   controller.update
 );
 
 // ─── EXCLUSÃO ────────────────────────────────────────
-// Hard delete — rota específica ANTES da genérica /:id
+// /hard deve vir ANTES de /:id para o Express resolver corretamente
 usersRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.HARD_DELETE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Hard delete do usuário ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
-// Soft delete
 usersRouter.delete(
   "/:id",
   checkRole("ADMIN"),
   validateParams(userIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.users.SOFT_DELETE,
+    module: LOG_MODULES.USERS,
+    description: (req) => `Soft delete do usuário ${req.params.id}`,
+  }),
   controller.softDelete
 );
 

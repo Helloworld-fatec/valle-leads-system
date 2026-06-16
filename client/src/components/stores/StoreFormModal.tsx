@@ -20,7 +20,7 @@ export default function StoreFormModal({ store, onClose, onSuccess }: StoreFormM
   useEffect(() => {
     if (store) {
       setName(store.name);
-      setAddress(store.address);
+      setAddress(store.address ?? "");
     }
   }, [store]);
 

@@ -1,10 +1,15 @@
 // src/modules/dashboards/dashboard-manager/dashboardManager.dto.ts
 
 import { z } from 'zod';
+import type { NegotiationStage } from '../../negotiation-stage-history/negotiationStageHistory.dto.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FILTER SCHEMA
 // ─────────────────────────────────────────────────────────────────────────────
+// REFACTOR (negociação-cêntrico): a janela ancora na data do EVENTO da
+// negociação (abertura, won/lost) — nunca em leads.created_at.
+// Métricas de SNAPSHOT (carteira ativa, funil, estagnadas, carga, leads
+// parados) ignoram a janela: representam o estado ATUAL da equipa.
 
 export const managerDashboardFilterSchema = z.object({
   teamId: z
@@ -39,81 +44,115 @@ export const managerDashboardFilterSchema = z.object({
 export type ManagerDashboardFilterDTO = z.infer<typeof managerDashboardFilterSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE TYPES
-// Cada método do service retorna um tipo nomeado — sem objetos anônimos
-// espalhados pelo código. Contratos estáveis verificados pelo compilador.
+// RESPONSE TYPES — KPIs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface TeamKpisResponse {
-  totalLeads: number;
-  convertedLeads: number;
-  conversionRate: number;
-  stagnantLeads: number;
+/** KPI 1 — Negociações ativas da equipa (snapshot). */
+export interface TeamActiveNegotiationsResponse {
+  activeNegotiations: number;
 }
 
-export interface TopAttendantInfo {
-  id: string;
-  name: string;
-  conversions: number;
+/** KPI 2 — Vendas da equipa no período (eventos 'won' na janela). */
+export interface TeamSalesResponse {
+  sales: number;
 }
 
-export interface TopAttendantResponse {
-  topAttendant: TopAttendantInfo | null;
+/** KPI 3 — Taxa de fechamento da equipa: won / (won + lost) na janela. */
+export interface TeamClosingRateResponse {
+  closingRate: number; // percentual 0–100
+  wonCount: number;
+  lostCount: number;
 }
 
-export interface AttendantLeadsItem {
-  attendantId: string | null;
-  attendantName: string;
+/**
+ * KPI 4 — Negociações estagnadas (snapshot): ativas, abertas há 7+ dias e
+ * SEM movimentação de estágio nos últimos 7 dias. Lê o histórico de estágios,
+ * não `leads.updated_at` (que é bumpado por qualquer edição do lead).
+ */
+export interface StagnantNegotiationsResponse {
+  stagnantNegotiations: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESPONSE TYPES — CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Chart 1 — Funil: negociações ATIVAS da equipa pelo estágio atual. */
+export interface TeamStageFunnelItem {
+  stage: NegotiationStage;
   count: number;
 }
 
-export interface LeadsByAttendantResponse {
-  leadsByAttendant: AttendantLeadsItem[];
+export interface TeamStageFunnelResponse {
+  funnel: TeamStageFunnelItem[];
 }
 
-export interface AttendantConversionsItem {
+/** Chart 2 — Ranking de vendas por atendente (eventos 'won' na janela). */
+export interface SalesByAttendantItem {
   attendantId: string | null;
   attendantName: string;
-  count: number;
+  sales: number;
 }
 
-export interface ConversionsByAttendantResponse {
-  conversionsByAttendant: AttendantConversionsItem[];
+export interface SalesByAttendantResponse {
+  salesByAttendant: SalesByAttendantItem[];
 }
 
+/** Chart 3 — Carga de trabalho: negociações ATIVAS por atendente (snapshot). */
+export interface WorkloadByAttendantItem {
+  attendantId: string | null;
+  attendantName: string;
+  active: number;
+}
+
+export interface WorkloadByAttendantResponse {
+  workloadByAttendant: WorkloadByAttendantItem[];
+}
+
+/** Chart 4 — Evolução diária da equipa: abertas × ganhas. */
 export interface TeamEvolutionPoint {
-  date: string;
-  count: number;
+  date: string; // YYYY-MM-DD
+  opened: number;
+  won: number;
 }
 
 export interface TeamEvolutionResponse {
   evolution: TeamEvolutionPoint[];
 }
 
-export interface TeamFunnelItem {
-  status: string;
+/** Chart 5 — Leads parados da equipa: sem nenhuma negociação aberta. */
+export interface TeamIdleLeadsBySourceItem {
+  source: string;
   count: number;
 }
 
-export interface TeamFunnelResponse {
-  funnel: TeamFunnelItem[];
+export interface TeamIdleLeadsResponse {
+  idleLeads: {
+    total: number;
+    neverNegotiated: number;
+    closedOnly: number;
+    bySource: TeamIdleLeadsBySourceItem[];
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL TYPES (usados entre repository e service)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Retorno bruto do repository para o cálculo de KPIs de conversão da equipa. */
-export interface TeamConversionData {
-  totalLeads: number;
-  convertedLeads: number;
+/** Eventos terminais da janela — base da taxa de fechamento. */
+export interface TeamClosingData {
+  wonCount: number;
+  lostCount: number;
 }
 
-/**
- * Linha bruta retornada pelo groupBy de attendant_id.
- * Representa uma agregação de leads por atendente (total ou convertidos).
- */
-export interface AttendantLeadsRow {
+/** Linha bruta: vendas (eventos won) agregadas por atendente. */
+export interface AttendantSalesRow {
   attendant_id: string | null;
-  _count: { id: number };
+  sales: number;
+}
+
+/** Linha bruta: negociações ativas agregadas por atendente. */
+export interface AttendantWorkloadRow {
+  attendant_id: string | null;
+  active: number;
 }

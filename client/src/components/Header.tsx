@@ -79,7 +79,7 @@ export default function Header({ currentPath }: HeaderProps) {
             <div className="flex items-center gap-2 mb-2">
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse" />
               <span className="text-[10px] uppercase tracking-[0.35em] text-cyan-300/70 font-medium">
-                Valle Platform
+                1000 Valle Platform
               </span>
             </div>
             <h1 className="text-[21px] font-semibold tracking-tight text-white leading-none">

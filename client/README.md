@@ -1,448 +1,1000 @@
 # 🎨 Valle Leads System — Frontend
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+Frontend do **Valle Leads System**, sistema de gestão de leads e dashboards analíticos desenvolvido para a **1000 Valle Multimarcas**.
+
+O frontend é responsável pela interface de autenticação, navegação protegida por perfil, visualização de leads, funil de negociações, dashboards, usuários, lojas, equipes e perfil do usuário.
+
+> Projeto acadêmico desenvolvido na **FATEC Jacareí** — ABP 2026-1 | 3º DSM
+> Parceiro: 1000 Valle Multimarcas | Focal Point: Prof. Arley Ferreira de Souza
 
 ---
 
-## 📌 Objetivo
+## 📌 Sobre o Frontend
 
-Este diretório contém a documentação técnica do frontend do sistema **Valle Leads System**.
+A aplicação frontend foi construída com **React**, **TypeScript**, **Vite**, **Tailwind CSS** e **React Router**.
 
-O objetivo deste README é servir como referência para o desenvolvimento da interface, descrevendo as tecnologias utilizadas, organização das pastas, telas previstas, fluxos de navegação e integrações com a API backend.
+Ela consome a API do backend por meio de services centralizados e utiliza autenticação baseada em tokens JWT, armazenando os dados de sessão no `localStorage`.
 
-A documentação deverá ser mantida atualizada ao longo do desenvolvimento do frontend.
+O sistema contempla diferentes perfis de usuário:
 
----
+* `ATTENDANT` — Atendente
+* `MANAGER` — Gerente
+* `GENERAL_MANAGER` — Gerente Geral
+* `ADMIN` — Administrador
 
-## 🛠️ Tecnologias Utilizadas
-
-### ⚛️ React + TypeScript
-Biblioteca e linguagem utilizadas para construção da interface com tipagem estática, garantindo maior segurança e organização no desenvolvimento.
-
-### ⚡ Vite
-Ferramenta de build e ambiente de desenvolvimento rápido para aplicações frontend modernas.
-
-### 🎨 Tailwind CSS
-Framework CSS baseado em classes utilitárias, utilizado para estilização da interface de forma ágil e responsiva.
-
-### 🧭 React Router DOM
-Responsável pelo gerenciamento de rotas e navegação entre as telas da aplicação.
-
-### 🌐 Axios / Fetch
-Utilizado para comunicação com a API backend, enviando e recebendo dados do sistema.
-
-### 📊 Recharts / Chart.js
-Bibliotecas para construção de gráficos e indicadores nos dashboards do sistema.
+Cada perfil possui acesso a rotas e visualizações específicas.
 
 ---
 
-## ▶️ Como Rodar o Projeto
+## 🛠 Tecnologias Utilizadas
 
-### Pré-requisitos
-- Node.js instalado
-- npm instalado
-
-### Instalação
-
-```bash
-git clone https://github.com/Helloworld-fatec/valle-leads-system.git
-cd valle-leads-system/client
-npm install
-```
-
-### Variáveis de ambiente
-
-Crie um arquivo `.env` na raiz da pasta `client` com a variável:
-
-```env
-VITE_API_URL=http://localhost:3000
-```
-
-### Executar o projeto
-
-```bash
-npm run dev
-```
+| Tecnologia       | Uso                                 |
+| ---------------- | ----------------------------------- |
+| React            | Construção da interface             |
+| TypeScript       | Tipagem estática                    |
+| Vite             | Ambiente de desenvolvimento e build |
+| Tailwind CSS     | Estilização                         |
+| React Router DOM | Controle de rotas                   |
+| Framer Motion    | Animações e transições              |
+| DnD Kit          | Suporte a drag-and-drop no funil    |
+| Lucide React     | Ícones da interface                 |
+| React Icons      | Ícones adicionais                   |
+| Fetch API        | Comunicação com o backend           |
+| Docker           | Conteinerização                     |
+| Nginx            | Servir o frontend em produção       |
 
 ---
 
 ## 📁 Estrutura de Pastas
 
-```bash
+```txt
 client/
+├── docs/
+│   ├── croquis/
+│   │   ├── dashboards.png
+│   │   ├── funil.png
+│   │   ├── lead.png
+│   │   ├── logins.png
+│   │   ├── Perfil.png
+│   │   └── Usuario.png
+│   └── style/
+│       └── STYLE_GUIDE.md
+├── public/
+│   └── logo.jpeg
 ├── src/
-│   ├── components/   # Componentes reutilizáveis
-│   ├── pages/        # Telas principais do sistema
-│   ├── layouts/      # Estruturas como Sidebar, Header e Shell
-│   ├── hooks/        # Hooks customizados
-│   ├── services/     # Comunicação com a API
-│   ├── contexts/     # Contextos globais
-│   ├── types/        # Tipagens TypeScript
-│   ├── utils/        # Funções auxiliares
-│   └── routes/       # Definição de rotas
+│   ├── assets/
+│   │   ├── logo.jpeg
+│   │   └── logo.svg
+│   ├── components/
+│   │   ├── dashboards/
+│   │   │   ├── attendant/
+│   │   │   ├── general-manager/
+│   │   │   ├── manager/
+│   │   │   ├── FunnelChart.tsx
+│   │   │   ├── MetricCard.tsx
+│   │   │   ├── PipelineSummary.tsx
+│   │   │   └── RecentLeads.tsx
+│   │   ├── leads/
+│   │   ├── profile/
+│   │   ├── sales-funnel/
+│   │   ├── stores/
+│   │   ├── teams/
+│   │   ├── users/
+│   │   ├── Button.tsx
+│   │   ├── Card.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── Header.tsx
+│   │   ├── Input.tsx
+│   │   ├── Sidebar.tsx
+│   │   └── Table.tsx
+│   ├── contexts/
+│   │   └── AuthContext.tsx
+│   ├── data/
+│   │   └── mockUsers.ts
+│   ├── hook/
+│   │   └── useAuth.tsx
+│   ├── layouts/
+│   │   └── MainLayout.tsx
+│   ├── pages/
+│   │   ├── ClientDetails.tsx
+│   │   ├── Clients.tsx
+│   │   ├── Config.tsx
+│   │   ├── CreateLead.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── DashboardAttendant.tsx
+│   │   ├── DashboardGeneralManager.tsx
+│   │   ├── DashboardManager.tsx
+│   │   ├── Forbidden.tsx
+│   │   ├── GMLeads.tsx
+│   │   ├── LeadDetails.tsx
+│   │   ├── Leads.tsx
+│   │   ├── Login.tsx
+│   │   ├── Logs.tsx
+│   │   ├── ManagerLeads.tsx
+│   │   ├── NotFound.tsx
+│   │   ├── Profile.tsx
+│   │   ├── SalesFunnel.tsx
+│   │   ├── Stores.tsx
+│   │   ├── Teams.tsx
+│   │   └── Users.tsx
+│   ├── routes/
+│   │   ├── index.tsx
+│   │   ├── ProtectedRoute.tsx
+│   │   └── PublicOnlyRoute.tsx
+│   ├── services/
+│   │   ├── api.ts
+│   │   ├── clientService.ts
+│   │   ├── dashboardService.ts
+│   │   ├── itemService.ts
+│   │   ├── leadService.ts
+│   │   ├── logService.ts
+│   │   ├── loginService.ts
+│   │   ├── negotiationsService.ts
+│   │   ├── profileService.ts
+│   │   ├── storesService.ts
+│   │   ├── teamService.ts
+│   │   ├── userService.ts
+│   │   └── userTeamsService.ts
+│   ├── types/
+│   │   ├── Client.ts
+│   │   ├── Lead.ts
+│   │   ├── Team.ts
+│   │   ├── User.ts
+│   │   ├── index.ts
+│   │   └── negotiations.ts
+│   ├── utils/
+│   │   └── helpers.ts
+│   ├── App.tsx
+│   ├── index.css
+│   ├── main.tsx
+│   └── vite-env.d.ts
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── index.html
+├── nginx.conf
+├── package-lock.json
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
+> Observação: a pasta `dist/` pode ser gerada após o build do frontend, mas não é considerada parte da estrutura-fonte da aplicação.
+
+---
+
+## 🧱 Organização Geral
+
+| Pasta/Arquivo                      | Responsabilidade                                    |
+| ---------------------------------- | --------------------------------------------------- |
+| `src/pages/`                       | Páginas principais da aplicação                     |
+| `src/components/`                  | Componentes reutilizáveis e componentes por domínio |
+| `src/services/`                    | Comunicação com a API                               |
+| `src/routes/`                      | Rotas públicas, protegidas e protegidas por role    |
+| `src/contexts/AuthContext.tsx`     | Estado global de autenticação                       |
+| `src/hook/useAuth.tsx`             | Hook para acessar o contexto de autenticação        |
+| `src/layouts/MainLayout.tsx`       | Layout principal das rotas autenticadas             |
+| `src/types/`                       | Tipagens compartilhadas                             |
+| `client/docs/croquis/`             | Croquis e referências visuais                       |
+| `client/docs/style/STYLE_GUIDE.md` | Guia de estilo do frontend                          |
+
+---
+
+## 🚀 Como Rodar Localmente sem Docker
+
+### 1. Acessar a pasta do frontend
+
+```bash
+cd client
+```
+
+### 2. Instalar dependências
+
+```bash
+npm install
+```
+
+### 3. Configurar variáveis de ambiente
+
+Crie o arquivo `.env` dentro da pasta `client`:
+
+```bash
+cp .env.example .env
+```
+
+Exemplo para execução local sem Docker:
+
+```env
+VITE_BACKEND_URL=http://localhost:3000
+```
+
+### 4. Rodar em modo desenvolvimento
+
+```bash
+npm run dev
+```
+
+A aplicação estará disponível em:
+
+```txt
+http://localhost:5173
 ```
 
 ---
 
-## 🧾 Documentação das Telas
+## 📜 Scripts Disponíveis
 
-Abaixo estão descritas as principais telas previstas para o sistema, com suas rotas, objetivos, componentes e integrações com a API.
+| Script            | Descrição                                          |
+| ----------------- | -------------------------------------------------- |
+| `npm run dev`     | Inicia o frontend com Vite em modo desenvolvimento |
+| `npm run build`   | Executa TypeScript e gera build de produção        |
+| `npm run preview` | Executa uma prévia local da build de produção      |
 
----
+Antes de abrir Pull Request, recomenda-se executar:
 
-## 🖥️ T01 — Login
+```bash
+npm run build
+```
 
-- **Rota:** `/login`
-- **Objetivo:** Autenticar o usuário no sistema.
-- **Tipo de usuário:** Público
-- **Componentes utilizados:** `FormLogin`, `InputEmail`, `InputPassword`, `ButtonPrimary`
-- **API chamada:** `POST /api/auth/login`
+Esse comando valida:
 
-### Funcionalidades
-- Inserção de e-mail e senha
-- Validação dos campos
-- Envio das credenciais
-- Redirecionamento após autenticação
-
----
-
-## 🖥️ T02 — Solicitação de Recuperação de Senha
-
-- **Rota:** `/forgot-password`
-- **Objetivo:** Permitir que o usuário solicite redefinição de senha.
-- **Tipo de usuário:** Público
-- **Componentes utilizados:** `InputEmail`, `ButtonPrimary`, `FormRecovery`
-- **API chamada:** `POST /api/auth/forgot-password`
-
-### Funcionalidades
-- Inserção do e-mail
-- Envio da solicitação de recuperação
-- Exibição de mensagem de confirmação
+* erros de TypeScript;
+* imports quebrados;
+* tipagem dos componentes;
+* compatibilidade da build Vite.
 
 ---
 
-## 🖥️ T03 — Redefinição de Senha
+## 🔑 Variáveis de Ambiente
 
-- **Rota:** `/reset-password`
-- **Objetivo:** Permitir a criação de uma nova senha.
-- **Tipo de usuário:** Público
-- **Componentes utilizados:** `InputPassword`, `InputConfirmPassword`, `ButtonPrimary`
-- **API chamada:** `POST /api/auth/reset-password`
+### `client/.env`
 
-### Funcionalidades
-- Inserção da nova senha
-- Confirmação da nova senha
-- Atualização da credencial de acesso
+| Variável           | Uso                                             |
+| ------------------ | ----------------------------------------------- |
+| `VITE_BACKEND_URL` | Define a URL base usada nas chamadas para a API |
 
----
+### Execução local sem Docker
 
-## 🖥️ T04 — Shell / Layout Principal
+```env
+VITE_BACKEND_URL=http://localhost:3000
+```
 
-- **Rota:** `/`
-- **Objetivo:** Estruturar a navegação principal do sistema.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `Sidebar`, `Header`, `MainContent`, `ProtectedRoute`
-- **API chamada:** Não se aplica diretamente
+### Docker produção/local
 
-### Funcionalidades
-- Navegação lateral
-- Cabeçalho do sistema
-- Área principal de conteúdo
-- Controle de acesso autenticado
+No Docker de produção/local, o frontend é servido pelo Nginx e deve chamar a API por rota relativa:
 
----
+```env
+VITE_BACKEND_URL=
+```
 
-## 🖥️ T05 — Dashboard do Atendente
+Nesse caso, chamadas como:
 
-- **Rota:** `/dashboard/atendente`
-- **Objetivo:** Exibir métricas e indicadores do atendente.
-- **Tipo de usuário:** Atendente
-- **Componentes utilizados:** `CardMetric`, `ChartBar`, `ChartPie`, `LeadSummary`
-- **API chamada:** `GET /api/dashboard/atendente`
+```txt
+/api/auth/login
+```
 
-### Funcionalidades
-- Visualização de indicadores
-- Acompanhamento de leads
-- Exibição de gráficos
+são encaminhadas pelo Nginx para o backend.
+
+### Docker dev
+
+No Docker dev, o frontend deve usar proxy do Vite. Portanto, também deve manter:
+
+```env
+VITE_BACKEND_URL=
+```
+
+O proxy deve estar configurado no `vite.config.ts`, redirecionando `/api` para o serviço `server`.
 
 ---
 
-## 🖥️ T06 — Dashboard do Gerente
+## 🔐 Autenticação
 
-- **Rota:** `/dashboard/gerente`
-- **Objetivo:** Exibir métricas gerenciais da operação.
-- **Tipo de usuário:** Gerente
-- **Componentes utilizados:** `CardMetric`, `ChartBar`, `ChartLine`, `TeamPerformance`
-- **API chamada:** `GET /api/dashboard/gerente`
+A autenticação é gerenciada por:
 
-### Funcionalidades
-- Indicadores de produtividade
-- Desempenho da equipe
-- Comparação de resultados
+| Arquivo                          | Responsabilidade                                             |
+| -------------------------------- | ------------------------------------------------------------ |
+| `src/contexts/AuthContext.tsx`   | Armazena usuário autenticado, access token e estado de login |
+| `src/hook/useAuth.tsx`           | Disponibiliza o contexto de autenticação                     |
+| `src/services/loginService.ts`   | Realiza login e logout                                       |
+| `src/services/api.ts`            | Centraliza chamadas autenticadas e refresh token             |
+| `src/routes/ProtectedRoute.tsx`  | Protege rotas autenticadas e rotas por role                  |
+| `src/routes/PublicOnlyRoute.tsx` | Impede usuário autenticado de acessar `/login`               |
 
----
+### Dados armazenados no `localStorage`
 
-## 🖥️ T07 — Dashboard do Administrador / Gerente Geral
+| Chave          | Descrição                    |
+| -------------- | ---------------------------- |
+| `authUser`     | Dados do usuário autenticado |
+| `accessToken`  | Token de acesso              |
+| `refreshToken` | Token de renovação           |
 
-- **Rota:** `/dashboard/admin`
-- **Objetivo:** Exibir visão geral do sistema e da operação.
-- **Tipo de usuário:** Administrador / Gerente Geral
-- **Componentes utilizados:** `CardMetric`, `ChartBar`, `ChartLine`, `ChartPie`, `SystemSummary`
-- **API chamada:** `GET /api/dashboard/admin`
+### Fluxo de login
 
-### Funcionalidades
-- Visão consolidada do sistema
-- Indicadores globais
-- Monitoramento operacional
+```txt
+Usuário envia e-mail e senha
+        ↓
+POST /api/auth/login
+        ↓
+Backend retorna user, access_token e refresh_token
+        ↓
+AuthContext salva dados no localStorage
+        ↓
+Usuário é redirecionado para a área autenticada
+```
 
----
+### Fluxo de refresh token
 
-## 🖥️ T08 — Lista de Leads
+O hook `useApi`, em `src/services/api.ts`, trata requisições autenticadas.
 
-- **Rota:** `/leads`
-- **Objetivo:** Exibir todos os leads cadastrados.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `LeadTable`, `SearchInput`, `FilterBar`, `ButtonPrimary`
-- **API chamada:** `GET /api/leads`
+Quando uma requisição retorna `401`, o frontend tenta renovar o token por meio de:
 
-### Funcionalidades
-- Listagem de leads
-- Busca por nome ou status
-- Aplicação de filtros
-- Acesso ao detalhe do lead
+```txt
+POST /api/auth/refresh
+```
 
----
+Se o refresh funcionar:
 
-## 🖥️ T09 — Detalhe do Lead
+```txt
+novo token é salvo → requisição original é repetida
+```
 
-- **Rota:** `/leads/:id`
-- **Objetivo:** Exibir informações completas de um lead.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `LeadDetailCard`, `LeadHistory`, `StatusBadge`, `ActionButtons`
-- **API chamada:** `GET /api/leads/:id`
+Se o refresh falhar:
 
-### Funcionalidades
-- Visualização de dados do lead
-- Histórico de interações
-- Ações de edição e negociação
+```txt
+sessão é encerrada → usuário volta para /login
+```
 
 ---
 
-## 🖥️ T10 — Criar Lead
+## 🧭 Rotas do React Router
 
-- **Rota:** `/leads/novo`
-- **Objetivo:** Permitir o cadastro de um novo lead.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `LeadForm`, `InputText`, `SelectField`, `ButtonPrimary`
-- **API chamada:** `POST /api/leads`
+As rotas reais registradas estão em:
 
-### Funcionalidades
-- Cadastro de novo lead
-- Validação dos campos
-- Envio de dados para API
+```txt
+src/routes/index.tsx
+```
 
----
+### Rotas públicas
 
-## 🖥️ T11 — Negociação / Funil
-
-- **Rota:** `/negociacoes`
-- **Objetivo:** Gerenciar o avanço dos leads no funil de vendas.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `KanbanBoard`, `StageColumn`, `LeadCard`, `StatusBadge`
-- **API chamada:** `GET /api/negociacoes`
-
-### Funcionalidades
-- Visualização do funil
-- Movimentação entre etapas
-- Acompanhamento de negociação
+| Rota     | Página      | Descrição                                                    |
+| -------- | ----------- | ------------------------------------------------------------ |
+| `/login` | `Login.tsx` | Tela de login, acessível apenas para usuário não autenticado |
 
 ---
 
-## 🖥️ T12 — Lista de Clientes
+### Rotas de erro
 
-- **Rota:** `/clientes`
-- **Objetivo:** Exibir os clientes cadastrados.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `ClientTable`, `SearchInput`, `FilterBar`
-- **API chamada:** `GET /api/clientes`
-
-### Funcionalidades
-- Listagem de clientes
-- Busca e filtros
-- Acesso ao detalhe do cliente
+| Rota   | Página          | Descrição                     |
+| ------ | --------------- | ----------------------------- |
+| `/403` | `Forbidden.tsx` | Tela de acesso negado         |
+| `/404` | `NotFound.tsx`  | Tela de página não encontrada |
 
 ---
 
-## 🖥️ T13 — Detalhe do Cliente
+### Rotas protegidas para qualquer usuário autenticado
 
-- **Rota:** `/clientes/:id`
-- **Objetivo:** Exibir os dados completos de um cliente.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `ClientDetailCard`, `ContactInfo`, `HistoryPanel`
-- **API chamada:** `GET /api/clientes/:id`
-
-### Funcionalidades
-- Visualização cadastral
-- Histórico de relacionamento
-- Informações de contato
+| Rota         | Página            | Descrição                                             |
+| ------------ | ----------------- | ----------------------------------------------------- |
+| `/`          | `Navigate`        | Redireciona para `/funil`                             |
+| `/funil`     | `SalesFunnel.tsx` | Funil de negociações                                  |
+| `/dashboard` | `Dashboard.tsx`   | Dashboard renderizado de acordo com a role do usuário |
+| `/leads`     | `Leads.tsx`       | Listagem e visualização de leads                      |
+| `/perfil`    | `Profile.tsx`     | Perfil do usuário autenticado                         |
 
 ---
 
-## 🖥️ T14 — Lista de Usuários
+### Rotas protegidas para `MANAGER`, `GENERAL_MANAGER` e `ADMIN`
 
-- **Rota:** `/usuarios`
-- **Objetivo:** Exibir os usuários cadastrados no sistema.
-- **Tipo de usuário:** Administrador / Gerente
-- **Componentes utilizados:** `UserTable`, `SearchInput`, `FilterBar`, `ButtonPrimary`
-- **API chamada:** `GET /api/usuarios`
-
-### Funcionalidades
-- Listagem de usuários
-- Filtro por perfil
-- Acesso a cadastro ou edição
+| Rota             | Página             | Descrição                    |
+| ---------------- | ------------------ | ---------------------------- |
+| `/manager/leads` | `ManagerLeads.tsx` | Gestão de leads pelo gerente |
+| `/usuarios`      | `Users.tsx`        | Gestão/listagem de usuários  |
+| `/teams`         | `Teams.tsx`        | Gestão de equipes            |
+| `/config`        | `Config.tsx`       | Configurações                |
 
 ---
 
-## 🖥️ T15 — Cadastro / Edição de Usuário
+### Rotas protegidas para `GENERAL_MANAGER` e `ADMIN`
 
-- **Rota:** `/usuarios/novo` ou `/usuarios/:id`
-- **Objetivo:** Permitir cadastro e manutenção de usuários.
-- **Tipo de usuário:** Administrador
-- **Componentes utilizados:** `UserForm`, `InputText`, `SelectField`, `ButtonPrimary`
-- **API chamada:** `POST /api/usuarios` / `PUT /api/usuarios/:id`
-
-### Funcionalidades
-- Cadastro de usuário
-- Edição de dados
-- Definição de perfil e permissões
+| Rota        | Página        | Descrição                          |
+| ----------- | ------------- | ---------------------------------- |
+| `/stores`   | `Stores.tsx`  | Gestão de lojas                    |
+| `/gm/leads` | `GMLeads.tsx` | Gestão de leads pelo gerente geral |
 
 ---
 
-## 🖥️ T16 — Lista de Equipes
+### Rotas não registradas atualmente
 
-- **Rota:** `/equipes`
-- **Objetivo:** Exibir as equipes cadastradas.
-- **Tipo de usuário:** Administrador / Gerente
-- **Componentes utilizados:** `TeamTable`, `SearchInput`, `FilterBar`
-- **API chamada:** `GET /api/equipes`
+Os arquivos abaixo existem na pasta `src/pages`, mas **não estão registrados no React Router atual**:
 
-### Funcionalidades
-- Listagem de equipes
-- Busca e filtros
-- Acesso ao detalhe da equipe
+| Arquivo             | Situação                                      |
+| ------------------- | --------------------------------------------- |
+| `Clients.tsx`       | Página existe, mas não possui rota registrada |
+| `ClientDetails.tsx` | Página existe, mas não possui rota registrada |
+| `CreateLead.tsx`    | Página existe, mas não possui rota registrada |
+| `LeadDetails.tsx`   | Página existe, mas não possui rota registrada |
+| `Logs.tsx`          | Página existe, mas não possui rota registrada |
 
----
-
-## 🖥️ T17 — Cadastro / Edição de Equipe
-
-- **Rota:** `/equipes/nova` ou `/equipes/:id`
-- **Objetivo:** Permitir cadastro e manutenção das equipes.
-- **Tipo de usuário:** Administrador / Gerente
-- **Componentes utilizados:** `TeamForm`, `InputText`, `SelectMembers`, `ButtonPrimary`
-- **API chamada:** `POST /api/equipes` / `PUT /api/equipes/:id`
-
-### Funcionalidades
-- Cadastro de equipes
-- Associação de membros
-- Atualização de informações
+Essas páginas não devem ser documentadas como telas acessíveis até que sejam vinculadas ao roteamento.
 
 ---
 
-## 🖥️ T18 — Logs do Sistema
+## 👤 Controle de Acesso por Perfil
 
-- **Rota:** `/logs`
-- **Objetivo:** Exibir registros de eventos e ações do sistema.
-- **Tipo de usuário:** Administrador
-- **Componentes utilizados:** `LogTable`, `SearchInput`, `FilterBar`, `DateFilter`
-- **API chamada:** `GET /api/logs`
+O controle de acesso no frontend é feito por `ProtectedRoute`.
 
-### Funcionalidades
-- Visualização de logs
-- Busca por eventos
-- Filtros por data e tipo
+### Comportamento
 
----
+| Situação                                      | Resultado                 |
+| --------------------------------------------- | ------------------------- |
+| Usuário não autenticado acessa rota protegida | Redireciona para `/login` |
+| Usuário autenticado acessa rota sem permissão | Redireciona para `/403`   |
+| Usuário autenticado com permissão correta     | Renderiza a rota          |
 
-## 🖥️ T19 — Meu Perfil
+### Perfis utilizados
 
-- **Rota:** `/perfil`
-- **Objetivo:** Permitir que o usuário visualize e atualize seus próprios dados.
-- **Tipo de usuário:** Autenticado
-- **Componentes utilizados:** `ProfileCard`, `ProfileForm`, `AvatarUpload`, `ButtonPrimary`
-- **API chamada:** `GET /api/perfil` / `PUT /api/perfil`
+| Role              | Descrição     |
+| ----------------- | ------------- |
+| `ATTENDANT`       | Atendente     |
+| `MANAGER`         | Gerente       |
+| `GENERAL_MANAGER` | Gerente Geral |
+| `ADMIN`           | Administrador |
 
-### Funcionalidades
-- Visualização de dados pessoais
-- Edição de perfil
-- Atualização de senha e informações
+> O controle de acesso no frontend melhora a navegação e a experiência do usuário, mas as regras de segurança também precisam ser validadas no backend.
 
 ---
 
-## 🖥️ T20 — Página 404
+## 🖥️ Telas Implementadas e Acessíveis
 
-- **Rota:** `*`
-- **Objetivo:** Informar ao usuário que a página acessada não existe.
-- **Tipo de usuário:** Todos
-- **Componentes utilizados:** `ErrorMessage`, `BackButton`
-- **API chamada:** Não se aplica
+### Login
 
-### Funcionalidades
-- Exibição de erro de rota inexistente
-- Retorno para página principal
+| Campo   | Valor                                          |
+| ------- | ---------------------------------------------- |
+| Rota    | `/login`                                       |
+| Arquivo | `src/pages/Login.tsx`                          |
+| Acesso  | Público, apenas para usuários não autenticados |
 
----
+Funcionalidades:
 
-## 🖥️ T21 — Página de Erro Geral / Acesso Negado
-
-- **Rota:** `/erro` ou `/403`
-- **Objetivo:** Informar falhas de acesso ou erro interno.
-- **Tipo de usuário:** Todos
-- **Componentes utilizados:** `ErrorCard`, `BackButton`, `RetryButton`
-- **API chamada:** Não se aplica
-
-### Funcionalidades
-- Exibição de mensagem de erro
-- Retorno ao fluxo principal
+* formulário de e-mail e senha;
+* integração com `/api/auth/login`;
+* armazenamento de tokens;
+* redirecionamento após autenticação.
 
 ---
 
-## ✏️ Croquis das Telas (Opcional)
+### Funil de Negociações
 
-Os croquis das telas podem ser elaborados manualmente para representar de forma visual a estrutura inicial de cada interface.
+| Campo   | Valor                       |
+| ------- | --------------------------- |
+| Rota    | `/funil`                    |
+| Arquivo | `src/pages/SalesFunnel.tsx` |
+| Acesso  | Usuários autenticados       |
 
-Esses rascunhos podem ser incluídos futuramente neste documento como imagens ou anexados em PDF complementar.
+Funcionalidades:
 
----
-
-## 🔄 Fluxo de Navegação
-
-### Fluxo de autenticação
-`Login → Dashboard`
-
-### Fluxo de leads
-`Lista de Leads → Criar Lead → Detalhe do Lead → Negociação`
-
-### Fluxo de negociação
-`Detalhe do Lead → Funil de Negociação → Avançar estágio → Encerrar`
-
-### Fluxo de clientes
-`Lista de Clientes → Detalhe do Cliente`
-
-### Fluxo administrativo
-`Dashboard Administrativo → Usuários → Equipes → Logs`
-
-### Fluxo de perfil
-`Sistema → Meu Perfil → Atualização de dados`
+* visualização de negociações em formato de funil;
+* cards por negociação;
+* modal de detalhes;
+* histórico de etapa, status e importância;
+* integração com services de negociações.
 
 ---
 
-## 📌 Considerações Finais
+### Dashboard
 
-Esta documentação tem como objetivo servir como base técnica para o desenvolvimento e manutenção do frontend do sistema.
+| Campo               | Valor                                                                           |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Rota                | `/dashboard`                                                                    |
+| Arquivo principal   | `src/pages/Dashboard.tsx`                                                       |
+| Arquivos auxiliares | `DashboardAttendant.tsx`, `DashboardManager.tsx`, `DashboardGeneralManager.tsx` |
+| Acesso              | Usuários autenticados                                                           |
 
-À medida que novas telas, componentes e funcionalidades forem sendo implementados, este documento deverá ser atualizado para refletir a evolução do projeto.
+Funcionalidades:
+
+* renderiza dashboard conforme a role do usuário;
+* `ATTENDANT` visualiza dados próprios;
+* `MANAGER` visualiza dados da equipe e atendentes da equipe;
+* `GENERAL_MANAGER` e `ADMIN` acessam visão global e recortes por equipe/atendente;
+* integração com endpoints de dashboard.
 
 ---
+
+### Leads
+
+| Campo   | Valor                 |
+| ------- | --------------------- |
+| Rota    | `/leads`              |
+| Arquivo | `src/pages/Leads.tsx` |
+| Acesso  | Usuários autenticados |
+
+Funcionalidades:
+
+* listagem de leads;
+* filtros e busca;
+* visualização de detalhes;
+* integração com service de leads;
+* abertura de negociação a partir de lead, quando aplicável.
+
+---
+
+### Leads do Gerente
+
+| Campo   | Valor                                 |
+| ------- | ------------------------------------- |
+| Rota    | `/manager/leads`                      |
+| Arquivo | `src/pages/ManagerLeads.tsx`          |
+| Acesso  | `MANAGER`, `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* visualização de leads em contexto gerencial;
+* atribuição de leads;
+* suporte a ações em lote.
+
+---
+
+### Leads do Gerente Geral
+
+| Campo   | Valor                      |
+| ------- | -------------------------- |
+| Rota    | `/gm/leads`                |
+| Arquivo | `src/pages/GMLeads.tsx`    |
+| Acesso  | `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* visualização de leads em nível gerencial geral;
+* atribuição por equipe;
+* visão ampliada dos leads.
+
+---
+
+### Perfil
+
+| Campo   | Valor                   |
+| ------- | ----------------------- |
+| Rota    | `/perfil`               |
+| Arquivo | `src/pages/Profile.tsx` |
+| Acesso  | Usuários autenticados   |
+
+Funcionalidades:
+
+* exibição dos dados do usuário autenticado;
+* edição de dados do perfil;
+* alteração de senha via atualização do próprio usuário por ID;
+* integração com `profileService`.
+
+---
+
+### Usuários
+
+| Campo   | Valor                                 |
+| ------- | ------------------------------------- |
+| Rota    | `/usuarios`                           |
+| Arquivo | `src/pages/Users.tsx`                 |
+| Acesso  | `MANAGER`, `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* listagem de usuários;
+* filtros por perfil/status;
+* cards e/ou linhas de usuário;
+* indicadores/KPIs;
+* cadastro e edição via modal.
+
+---
+
+### Equipes
+
+| Campo   | Valor                                 |
+| ------- | ------------------------------------- |
+| Rota    | `/teams`                              |
+| Arquivo | `src/pages/Teams.tsx`                 |
+| Acesso  | `MANAGER`, `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* listagem de equipes;
+* criação/edição via modal;
+* integração com service de equipes.
+
+---
+
+### Lojas
+
+| Campo   | Valor                      |
+| ------- | -------------------------- |
+| Rota    | `/stores`                  |
+| Arquivo | `src/pages/Stores.tsx`     |
+| Acesso  | `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* listagem de lojas;
+* criação/edição via modal;
+* integração com service de lojas.
+
+---
+
+### Configurações
+
+| Campo   | Valor                                 |
+| ------- | ------------------------------------- |
+| Rota    | `/config`                             |
+| Arquivo | `src/pages/Config.tsx`                |
+| Acesso  | `MANAGER`, `GENERAL_MANAGER`, `ADMIN` |
+
+Funcionalidades:
+
+* área de configurações do sistema.
+
+---
+
+## 📦 Services
+
+Os services centralizam a comunicação com a API.
+
+| Service            | Arquivo                  | Responsabilidade                                              |
+| ------------------ | ------------------------ | ------------------------------------------------------------- |
+| API base           | `api.ts`                 | `apiFetch`, autenticação, refresh token e tratamento de erros |
+| Login              | `loginService.ts`        | Login e logout                                                |
+| Clientes           | `clientService.ts`       | Integração com `/api/customers`                               |
+| Dashboards         | `dashboardService.ts`    | Integração com dashboards por perfil                          |
+| Itens de interesse | `itemService.ts`         | Integração com `/api/interest-items`                          |
+| Leads              | `leadService.ts`         | Integração com `/api/leads` e abertura de negociação          |
+| Logs               | `logService.ts`          | Arquivo previsto, sem implementação funcional atual           |
+| Negociações        | `negotiationsService.ts` | Integração com negociações, estágio, status e importância     |
+| Perfil             | `profileService.ts`      | Busca e atualização do usuário autenticado por ID             |
+| Lojas              | `storesService.ts`       | Integração com `/api/stores`                                  |
+| Equipes            | `teamService.ts`         | Integração com `/api/teams`                                   |
+| Usuários           | `userService.ts`         | Integração com `/api/users`                                   |
+| Usuários/Equipes   | `userTeamsService.ts`    | Integração com `/api/users-teams`                             |
+
+---
+
+## 🔌 Principais Endpoints Consumidos
+
+### Auth
+
+| Método | Endpoint            | Service           |
+| ------ | ------------------- | ----------------- |
+| POST   | `/api/auth/login`   | `loginService.ts` |
+| POST   | `/api/auth/refresh` | `api.ts`          |
+| POST   | `/api/auth/logout`  | `loginService.ts` |
+
+### Users
+
+| Método | Endpoint              | Service                                 |
+| ------ | --------------------- | --------------------------------------- |
+| GET    | `/api/users`          | `userService.ts`, `dashboardService.ts` |
+| GET    | `/api/users/:id`      | `userService.ts`, `profileService.ts`   |
+| POST   | `/api/users`          | `userService.ts`                        |
+| PUT    | `/api/users/:id`      | `userService.ts`, `profileService.ts`   |
+| DELETE | `/api/users/:id`      | `userService.ts`                        |
+| DELETE | `/api/users/:id/hard` | `userService.ts`                        |
+
+### Customers
+
+| Método | Endpoint                  | Service            |
+| ------ | ------------------------- | ------------------ |
+| GET    | `/api/customers`          | `clientService.ts` |
+| GET    | `/api/customers/:id`      | `clientService.ts` |
+| POST   | `/api/customers`          | `clientService.ts` |
+| PATCH  | `/api/customers/:id`      | `clientService.ts` |
+| DELETE | `/api/customers/:id`      | `clientService.ts` |
+| DELETE | `/api/customers/:id/hard` | `clientService.ts` |
+
+### Leads
+
+| Método | Endpoint                      | Service          |
+| ------ | ----------------------------- | ---------------- |
+| GET    | `/api/leads`                  | `leadService.ts` |
+| GET    | `/api/leads/:id`              | `leadService.ts` |
+| PATCH  | `/api/leads/:id`              | `leadService.ts` |
+| POST   | `/api/leads/bulk/assign-team` | `leadService.ts` |
+
+### Negotiations
+
+| Método | Endpoint                | Service                                    |
+| ------ | ----------------------- | ------------------------------------------ |
+| GET    | `/api/negotiations`     | `negotiationsService.ts`                   |
+| GET    | `/api/negotiations/:id` | `negotiationsService.ts`                   |
+| POST   | `/api/negotiations`     | `negotiationsService.ts`, `leadService.ts` |
+
+### Negotiation History
+
+| Método | Endpoint                                         | Service                  |
+| ------ | ------------------------------------------------ | ------------------------ |
+| GET    | `/api/negotiation-stage-history?negotiation_id=` | `negotiationsService.ts` |
+| POST   | `/api/negotiation-stage-history`                 | `negotiationsService.ts` |
+| GET    | `/api/negotiation-importance?negotiation_id=`    | `negotiationsService.ts` |
+| POST   | `/api/negotiation-importance`                    | `negotiationsService.ts` |
+| GET    | `/api/negotiation-status?negotiation_id=`        | `negotiationsService.ts` |
+| POST   | `/api/negotiation-status`                        | `negotiationsService.ts` |
+
+### Stores
+
+| Método | Endpoint               | Service            |
+| ------ | ---------------------- | ------------------ |
+| GET    | `/api/stores`          | `storesService.ts` |
+| GET    | `/api/stores/:id`      | `storesService.ts` |
+| POST   | `/api/stores`          | `storesService.ts` |
+| PATCH  | `/api/stores/:id`      | `storesService.ts` |
+| DELETE | `/api/stores/:id`      | `storesService.ts` |
+| DELETE | `/api/stores/:id/hard` | `storesService.ts` |
+
+### Teams
+
+| Método | Endpoint         | Service                                 |
+| ------ | ---------------- | --------------------------------------- |
+| GET    | `/api/teams`     | `teamService.ts`, `dashboardService.ts` |
+| GET    | `/api/teams/:id` | `teamService.ts`                        |
+| POST   | `/api/teams`     | `teamService.ts`                        |
+| PATCH  | `/api/teams/:id` | `teamService.ts`                        |
+| DELETE | `/api/teams/:id` | `teamService.ts`                        |
+
+### Users Teams
+
+| Método | Endpoint                    | Service               |
+| ------ | --------------------------- | --------------------- |
+| GET    | `/api/users-teams`          | `userTeamsService.ts` |
+| GET    | `/api/users-teams/:id`      | `userTeamsService.ts` |
+| POST   | `/api/users-teams`          | `userTeamsService.ts` |
+| PATCH  | `/api/users-teams/:id`      | `userTeamsService.ts` |
+| DELETE | `/api/users-teams/:id`      | `userTeamsService.ts` |
+| DELETE | `/api/users-teams/:id/hard` | `userTeamsService.ts` |
+
+### Interest Items
+
+| Método | Endpoint                       | Service          |
+| ------ | ------------------------------ | ---------------- |
+| GET    | `/api/interest-items`          | `itemService.ts` |
+| GET    | `/api/interest-items/:id`      | `itemService.ts` |
+| POST   | `/api/interest-items`          | `itemService.ts` |
+| PATCH  | `/api/interest-items/:id`      | `itemService.ts` |
+| DELETE | `/api/interest-items/:id`      | `itemService.ts` |
+| DELETE | `/api/interest-items/:id/hard` | `itemService.ts` |
+
+---
+
+## 📊 Dashboards
+
+O dashboard principal fica em:
+
+```txt
+/dashboard
+```
+
+A página `Dashboard.tsx` decide qual dashboard renderizar conforme a role do usuário:
+
+| Role              | Dashboard renderizado                                   |
+| ----------------- | ------------------------------------------------------- |
+| `ATTENDANT`       | `DashboardAttendant.tsx`                                |
+| `MANAGER`         | `DashboardManager.tsx` com visão da equipe e atendentes |
+| `GENERAL_MANAGER` | `DashboardGeneralManager.tsx` com visão global          |
+| `ADMIN`           | `DashboardGeneralManager.tsx` com visão global          |
+
+Services relacionados:
+
+```txt
+src/services/dashboardService.ts
+```
+
+Principais grupos de endpoints consumidos:
+
+* `/api/dashboards/attendant/...`
+* `/api/dashboards/manager/...`
+* `/api/dashboards/general-manager/...`
+
+---
+
+## 🎨 Guia de Estilo
+
+O projeto possui documentação visual em:
+
+```txt
+client/docs/style/STYLE_GUIDE.md
+```
+
+E croquis em:
+
+```txt
+client/docs/croquis/
+```
+
+Arquivos de croqui disponíveis:
+
+| Arquivo          | Referência                             |
+| ---------------- | -------------------------------------- |
+| `dashboards.png` | Estrutura visual dos dashboards        |
+| `funil.png`      | Estrutura visual do funil              |
+| `lead.png`       | Estrutura visual das telas de leads    |
+| `logins.png`     | Estrutura visual do login              |
+| `Perfil.png`     | Estrutura visual do perfil             |
+| `Usuario.png`    | Estrutura visual da página de usuários |
+
+Diretrizes gerais:
+
+* usar Tailwind CSS;
+* manter consistência visual entre páginas;
+* priorizar legibilidade e contraste;
+* evitar CSS isolado fora do padrão;
+* manter filtros e ações visíveis;
+* usar cores para diferenciar status, prioridade ou loja quando fizer sentido.
+
+---
+
+## 🐳 Docker e Nginx
+
+O frontend possui Dockerfile com três stages principais:
+
+| Stage   | Uso                                  |
+| ------- | ------------------------------------ |
+| `deps`  | Instala dependências                 |
+| `build` | Gera build de produção               |
+| `dev`   | Executa Vite em modo desenvolvimento |
+| `prod`  | Serve a build com Nginx              |
+
+### Produção/local com Docker
+
+No modo produção/local, o frontend é servido via Nginx na porta 80:
+
+```txt
+http://localhost
+```
+
+O Nginx também atua como proxy para a API:
+
+```txt
+/api/* → server:3000
+```
+
+Arquivo relacionado:
+
+```txt
+client/nginx.conf
+```
+
+### Desenvolvimento com Docker
+
+No modo dev, o frontend roda pelo Vite:
+
+```txt
+http://localhost:5173
+```
+
+Para evitar CORS e manter o mesmo padrão da produção, o frontend deve chamar a API por caminho relativo:
+
+```txt
+/api/...
+```
+
+O `vite.config.ts` deve configurar proxy para o backend:
+
+```ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    host: "0.0.0.0",
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://server:3000",
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("origin");
+          });
+        },
+      },
+    },
+  },
+});
+```
+
+---
+
+## 🧪 Validação Antes do PR
+
+Antes de abrir Pull Request, recomenda-se validar:
+
+### Build local do frontend
+
+```bash
+cd client
+npm install
+npm run build
+```
+
+### Docker produção/local
+
+```bash
+docker compose config
+docker compose up -d --build
+```
+
+### Docker dev
+
+```bash
+docker compose -f docker-compose.dev.yml config
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+### Testes básicos
+
+* abrir `http://localhost` no modo produção/local;
+* abrir `http://localhost:5173` no modo dev;
+* realizar login;
+* acessar `/funil`;
+* acessar `/dashboard`;
+* acessar `/leads`;
+* validar navegação por perfil.
+
+---
+
+## ⚠️ Pendências Conhecidas
+
+| Item                 | Situação                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `Logs.tsx`           | Página existe, mas não está registrada no React Router                                 |
+| `logService.ts`      | Arquivo existe, mas não possui implementação funcional atual                           |
+| `Clients.tsx`        | Página existe, mas não está registrada no React Router                                 |
+| `ClientDetails.tsx`  | Página existe, mas não está registrada no React Router                                 |
+| `CreateLead.tsx`     | Página existe, mas não está registrada no React Router                                 |
+| `LeadDetails.tsx`    | Página existe, mas não está registrada no React Router                                 |
+| `mockUsers.ts`       | Arquivo ainda existe em `src/data`; verificar se há dependência ativa antes de remover |
+| Recuperação de senha | Não há rota ativa documentada no React Router                                          |
+| Redefinição de senha | Não há rota ativa documentada no React Router                                          |
+
+Essas funcionalidades não devem ser apresentadas como rotas/telas acessíveis até que sejam integradas ao roteamento e ao backend.
+
+---
+
+## 📌 Regras de Manutenção
+
+Atualize este README sempre que houver alteração em:
+
+* rotas do React Router;
+* páginas acessíveis;
+* services;
+* endpoints consumidos;
+* autenticação;
+* permissões por role;
+* variáveis de ambiente;
+* Docker/Nginx;
+* proxy do Vite;
+* pendências conhecidas.
+
+Alterações de frontend que modifiquem navegação, autenticação, consumo da API ou permissões devem atualizar esta documentação no mesmo Pull Request.
+
+---
+
+## 📚 Documentação Relacionada
+
+| Recurso                 | Caminho                       |
+| ----------------------- | ----------------------------- |
+| README principal        | `../README.md`                |
+| Guia de execução Docker | `../HOWTORUN.md`              |
+| Documentação do backend | `../server/README.md`         |
+| Sprint 1                | `../docs/sprint-1/README.md`  |
+| Sprint 2                | `../docs/sprint-2/README.md`  |
+| Sprint 3                | `../docs/sprint-3/README.md`  |
+| Guia de estilo          | `./docs/style/STYLE_GUIDE.md` |
+| Croquis                 | `./docs/croquis/`             |
+
+---
+
+<div align="center">
+
+ABP 2026-1 · 3DSM · FATEC Jacareí
+Parceiro: 1000 Valle Multimarcas
+Focal Point: Prof. Arley Ferreira de Souza
+
+</div>

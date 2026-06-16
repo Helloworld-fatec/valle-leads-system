@@ -165,7 +165,7 @@ function formatDate(iso: string): string {
 export default function ClosedNegotiationsList() {
   const { user } = useAuth();
   const { getNegotiations } = useNegotiationsService();
-  const { getLeads } = useLeadService();
+  const { getAllLeads } = useLeadService();
 
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,7 +194,7 @@ export default function ClosedNegotiationsList() {
     // listagem traz o último status e a última importância (take: 1).
     Promise.all([
       getNegotiations({ attendant_id: user.id }),
-      getLeads({ attendant_id: user.id }),
+      getAllLeads({ attendant_id: user.id }),
     ])
       .then(([negs, leads]) => {
         // Mesmo enriquecimento usado no SalesFunnel: o embed `lead` da

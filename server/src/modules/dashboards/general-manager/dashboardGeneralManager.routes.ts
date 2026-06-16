@@ -1,4 +1,4 @@
-// src/modules/dashboards/general-manager/dashboardGeneralManager.routes.ts
+// src/modules/dashboards/dashboard-general-manager/dashboardGeneralManager.routes.ts
 
 import { Router } from 'express';
 import { authMiddleware } from '../../../middlewares/auth/auth.middleware.js';
@@ -8,48 +8,43 @@ import { generalManagerDashboardFilterSchema } from './dashboardGeneralManager.d
 import { DashboardGeneralManagerController } from './dashboardGeneralManager.controller.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD GENERAL MANAGER ROUTES
+// DASHBOARD GENERAL MANAGER ROUTES — negociação-cêntrico
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Pipeline aplicada a TODAS as rotas via .use():
+//   1. authMiddleware                       → JWT válido, injeta req.user.
+//   2. checkPermission('GENERAL_MANAGER')   → restrito a GM e ADMIN.
+//   3. validateQuery(schema)                → startDate/endDate tipados via Zod.
 //
-//   1. authMiddleware
-//      → Valida o access token JWT e injeta req.user com { id, email, role, team_ids }.
-//        Qualquer requisição sem token válido é rejeitada com 403 antes de chegar
-//        ao controller.
+// SEMÂNTICA DOS ENDPOINTS:
+//   - SNAPSHOT (ignoram startDate/endDate): active-negotiations,
+//     pipeline-value, stage-funnel, idle-leads — estado ATUAL da empresa.
+//   - JANELA (âncora na data do EVENTO da negociação): sales, sales-value,
+//     sales-by-team, sales-by-store, evolution.
 //
-//   2. checkPermission('GENERAL_MANAGER')
-//      → Hierárquico: apenas GENERAL_MANAGER e ADMIN passam. MANAGER e ATTENDANT
-//        recebem 403. O RF02 é explícito: o dashboard do ADMIN inclui o mesmo
-//        dashboard do GENERAL_MANAGER, então a hierarquia resolve corretamente
-//        sem precisar de checkRole.
-//
-//   3. validateQuery(generalManagerDashboardFilterSchema)
-//      → Valida e transforma os query params via Zod. Após este middleware,
-//        req.query contém valores já tipados (Dates em vez de strings brutas).
-//        Requisições com params inválidos recebem 422 antes de chegar ao controller.
-//
-// Não há restrição de escopo a aplicar no service além dos filtros temporais:
-// os endpoints desta rota são globais por definição — cobrem todas as equipas.
+// Drill-down de equipe/atendente: o frontend usa os endpoints /manager e
+// /attendant com teamId/attendantId — não há rotas de drill-down aqui.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
 const dashboardGeneralManagerRoutes = Router();
 const controller = new DashboardGeneralManagerController();
 
-// Aplica a pipeline de segurança e validação globalmente neste router
 dashboardGeneralManagerRoutes.use(authMiddleware);
 dashboardGeneralManagerRoutes.use(checkPermission('GENERAL_MANAGER'));
 dashboardGeneralManagerRoutes.use(validateQuery(generalManagerDashboardFilterSchema));
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────
-dashboardGeneralManagerRoutes.get('/kpi/global', controller.getGlobalKpis);
-dashboardGeneralManagerRoutes.get('/kpi/top-team', controller.getTopTeam);
+dashboardGeneralManagerRoutes.get('/kpi/active-negotiations', controller.getActiveNegotiations);
+dashboardGeneralManagerRoutes.get('/kpi/sales', controller.getSales);
+dashboardGeneralManagerRoutes.get('/kpi/sales-value', controller.getSalesValue);
+dashboardGeneralManagerRoutes.get('/kpi/pipeline-value', controller.getPipelineValue);
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────
-dashboardGeneralManagerRoutes.get('/charts/leads-by-team', controller.getLeadsByTeam);
-dashboardGeneralManagerRoutes.get('/charts/team-ranking', controller.getTeamRanking);
-dashboardGeneralManagerRoutes.get('/charts/global-evolution', controller.getGlobalEvolution);
-dashboardGeneralManagerRoutes.get('/charts/global-funnel', controller.getGlobalFunnel);
+dashboardGeneralManagerRoutes.get('/charts/stage-funnel', controller.getStageFunnel);
+dashboardGeneralManagerRoutes.get('/charts/sales-by-team', controller.getSalesByTeam);
+dashboardGeneralManagerRoutes.get('/charts/sales-by-store', controller.getSalesByStore);
+dashboardGeneralManagerRoutes.get('/charts/evolution', controller.getEvolution);
+dashboardGeneralManagerRoutes.get('/charts/idle-leads', controller.getIdleLeads);
 
-export default dashboardGeneralManagerRoutes;  
+export default dashboardGeneralManagerRoutes;

@@ -3,22 +3,16 @@ import { useState } from "react";
 import { Save, CheckCircle2, Loader2, Eye, EyeOff } from "lucide-react";
 import type { UserProfile } from "../../services/profileService";
 
-// ─────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────
-
 interface EditPasswordFormProps {
   profile: UserProfile;
-  onUpdatePassword: (password: string) => Promise<void>;
+  onUpdatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
-// ─────────────────────────────────────────────
-// Componente
-// ─────────────────────────────────────────────
-
 export default function EditPasswordForm({ profile, onUpdatePassword }: EditPasswordFormProps) {
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword]         = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent]         = useState(false);
   const [showNew, setShowNew]                 = useState(false);
   const [showConfirm, setShowConfirm]         = useState(false);
   const [saving, setSaving]                   = useState(false);
@@ -28,8 +22,12 @@ export default function EditPasswordForm({ profile, onUpdatePassword }: EditPass
   async function handleSave() {
     setError(null);
 
+    if (!currentPassword) {
+      setError("Informe a senha atual.");
+      return;
+    }
     if (newPassword.length < 6) {
-      setError("A senha deve ter no mínimo 6 caracteres.");
+      setError("A nova senha deve ter no mínimo 6 caracteres.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -39,8 +37,9 @@ export default function EditPasswordForm({ profile, onUpdatePassword }: EditPass
 
     setSaving(true);
     try {
-      await onUpdatePassword(newPassword);
+      await onUpdatePassword(currentPassword, newPassword);
       setSaved(true);
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setTimeout(() => setSaved(false), 2500);
@@ -56,11 +55,33 @@ export default function EditPasswordForm({ profile, onUpdatePassword }: EditPass
       <h3 className="text-sm font-bold text-gray-900 mb-1">Segurança</h3>
       <p className="text-xs text-gray-400 mb-4">Alterar senha da conta</p>
 
-      {/* Referência visual — somente leitura */}
+      {/* Referência visual */}
       <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 mb-5">
         <div className="flex flex-col">
           <span className="text-xs font-semibold text-gray-700">{profile.name}</span>
           <span className="text-xs text-gray-400">{profile.email}</span>
+        </div>
+      </div>
+
+      {/* Senha atual */}
+      <div className="mb-3">
+        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+          Senha atual
+        </label>
+        <div className="relative">
+          <input
+            type={showCurrent ? "text" : "password"}
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full pl-3.5 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
+          />
+          <button
+            onClick={() => setShowCurrent((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
         </div>
       </div>
 
@@ -108,12 +129,10 @@ export default function EditPasswordForm({ profile, onUpdatePassword }: EditPass
         </div>
       </div>
 
-      {/* Erro inline */}
       {error && (
         <p className="text-xs text-red-500 mb-3">{error}</p>
       )}
 
-      {/* Botão salvar */}
       <button
         onClick={handleSave}
         disabled={saving || saved}

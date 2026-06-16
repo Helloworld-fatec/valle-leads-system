@@ -11,11 +11,15 @@ import {
 import type { Negotiation, ImportanceLevel } from "../../types/negotiations";
 import NegotiationModal from "./NegotiationModal";
 
+// ─── Configuração de importância ──────────────────────────────────────────────
+
 const importanceConfig: Record<ImportanceLevel, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
   quente: { icon: <Flame size={12} className="animate-pulse" />, color: "#DC2626", bg: "#FEE2E2", label: "Quente" },
   morno:  { icon: <Thermometer size={12} />, color: "#D97706", bg: "#FEF3C7", label: "Morno"  },
   frio:   { icon: <Snowflake size={12} />,   color: "#2563EB", bg: "#DBEAFE", label: "Frio"   },
 };
+
+// ─── Gradientes de avatar ─────────────────────────────────────────────────────
 
 const avatarGradients = [
   "linear-gradient(135deg,#6366F1,#8B5CF6)",
@@ -25,9 +29,13 @@ const avatarGradients = [
   "linear-gradient(135deg,#EC4899,#8B5CF6)",
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   negotiation: Negotiation;
@@ -36,18 +44,20 @@ interface Props {
   onChangeImportance?: (id: string, level: ImportanceLevel) => void;
 }
 
+// ─── Componente ───────────────────────────────────────────────────────────────
+
 export default function NegotiationCard({ 
   negotiation, 
   color, 
   onAdvance, 
   onChangeImportance 
 }: Props) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [modalOpen, setModalOpen]               = useState(false);
+  const [isDragging, setIsDragging]             = useState(false);
   const [showImportanceMenu, setShowImportanceMenu] = useState(false);
 
   const clientName = negotiation.lead?.customers?.name ?? "—";
-  const vehicle = negotiation.lead?.vehicle_interest || "Sem descrição do interesse";
+  const vehicle    = negotiation.lead?.vehicle_interest || "Sem descrição do interesse";
 
   const importanceHistory = negotiation.importance_history ?? [];
   const rawImportance: ImportanceLevel =
@@ -56,24 +66,28 @@ export default function NegotiationCard({
 
   const idx = negotiation.id.charCodeAt(0) % avatarGradients.length;
 
-  // Handlers para o Drag and Drop Nativo
+  // ─── Drag and Drop ──────────────────────────────────────────────────────────
+
   function handleDragStart(e: React.DragEvent) {
     setIsDragging(true);
     e.dataTransfer.setData("application/json", negotiation.id);
     e.dataTransfer.effectAllowed = "move";
-    
-    // Cria um efeito visual limpo reduzindo ligeiramente a opacidade do elemento original
+
+    // Reduz levemente a opacidade do card original durante o arraste
     setTimeout(() => {
-      const element = document.getElementById(`card-${negotiation.id}`);
-      if (element) element.style.opacity = "0.4";
+      const el = document.getElementById(`card-${negotiation.id}`);
+      if (el) el.style.opacity = "0.4";
     }, 0);
   }
 
-  function handleDragEnd(e: React.DragEvent) {
+  function handleDragEnd() {
     setIsDragging(false);
-    const element = document.getElementById(`card-${negotiation.id}`);
-    if (element) element.style.opacity = "1";
+    // Restaura opacidade ao soltar
+    const el = document.getElementById(`card-${negotiation.id}`);
+    if (el) el.style.opacity = "1";
   }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -82,33 +96,44 @@ export default function NegotiationCard({
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        className={`relative bg-white rounded-xl transition-all duration-200 group border border-slate-200/80 cursor-grab active:cursor-grabbing select-none hover:border-slate-300 hover:shadow-md ${
-          isDragging ? "shadow-sm border-blue-200 bg-slate-50/50" : "shadow-sm"
-        }`}
+        className={`
+          relative bg-white rounded-xl
+          transition-all duration-200
+          group border border-slate-200/80
+          cursor-grab active:cursor-grabbing
+          select-none overflow-hidden
+          hover:border-slate-300 hover:shadow-md
+          ${isDragging ? "shadow-sm border-blue-200 bg-slate-50/50" : "shadow-sm"}
+        `}
       >
-        {/* Indicador lateral sutil da Etapa Atual */}
+        {/* Indicador lateral colorido — overflow-hidden no pai evita vazamento durante scroll */}
         <div 
-          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl opacity-80 transition-all group-hover:w-1.5" 
+          className="absolute left-0 top-0 bottom-0 w-1 opacity-80 transition-all group-hover:w-1.5" 
           style={{ backgroundColor: color }} 
         />
 
         <div className="p-3.5 pl-4 flex flex-col gap-3">
-          {/* Top Bar: Grip, Avatar, Título e Ações */}
+
+          {/* ── Top: Grip + Avatar + Nome ── */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
+
+              {/* Handle de arrastar */}
               <div className="text-slate-300 group-hover:text-slate-400 transition-colors p-0.5 -ml-1 rounded">
                 <GripVertical size={14} />
               </div>
 
+              {/* Avatar com gradiente único por negociação */}
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-inner shrink-0"
                 style={{ background: avatarGradients[idx] }}
               >
                 {initials(clientName)}
               </div>
-              
+
+              {/* Nome do cliente — abre o modal ao clicar */}
               <div className="flex flex-col min-w-0">
-                <h4 
+                <h4
                   onClick={() => setModalOpen(true)}
                   className="text-sm font-semibold text-slate-800 line-clamp-1 hover:text-blue-600 transition-colors cursor-pointer"
                   title={clientName}
@@ -119,14 +144,16 @@ export default function NegotiationCard({
             </div>
           </div>
 
-          {/* Descrição e Info Intermediária */}
+          {/* ── Meio: Interesse + Badge de importância ── */}
           <div className="flex items-center justify-between gap-2">
+
+            {/* Interesse no veículo */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded-md min-w-0 flex-1 border border-slate-100">
               <Car size={13} className="text-slate-400 shrink-0" />
               <span className="truncate" title={vehicle}>{vehicle}</span>
             </div>
 
-            {/* Badge de Prioridade com seletor rápido */}
+            {/* Badge de importância com dropdown rápido */}
             <div className="relative shrink-0">
               <button
                 onClick={(e) => {
@@ -141,9 +168,9 @@ export default function NegotiationCard({
                 <span>{imp.label}</span>
               </button>
 
-              {/* Dropdown de Importância Rápida */}
+              {/* Dropdown de seleção rápida de importância */}
               {showImportanceMenu && (
-                <div 
+                <div
                   className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-50 w-24 flex flex-col gap-0.5"
                   onMouseLeave={() => setShowImportanceMenu(false)}
                 >
@@ -166,7 +193,7 @@ export default function NegotiationCard({
             </div>
           </div>
 
-          {/* Botão de Avanço Rápido Unificado */}
+          {/* ── Rodapé: Botão de avanço rápido (visível no hover) ── */}
           {onAdvance && (
             <div className="flex justify-end border-t border-slate-100/70 pt-2 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <button
@@ -182,9 +209,11 @@ export default function NegotiationCard({
               </button>
             </div>
           )}
+
         </div>
       </div>
 
+      {/* Modal de detalhes da negociação — renderizado via portal no document.body */}
       {modalOpen && (
         <NegotiationModal
           negotiationId={negotiation.id}
