@@ -14,6 +14,10 @@ import {
   queryInterestItemSchema,
   interestItemIdParamSchema,
 } from "./item.dto.js";
+import {
+  createLogMiddleware,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // INTEREST ITEMS ROUTES
@@ -41,12 +45,21 @@ router.use(authMiddleware);
 router.get(
   "/",
   validateQuery(queryInterestItemSchema),
+  createLogMiddleware({
+    action: "LIST_INTEREST_ITEMS",
+    module: LOG_MODULES.INTEREST_ITEMS,
+  }),
   InterestItemsController.findAll
 );
 
 router.get(
   "/:id",
   validateParams(interestItemIdParamSchema),
+  createLogMiddleware({
+    action: "GET_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+    description: (req) => `Consulta do item de interesse ${req.params.id}`,
+  }),
   InterestItemsController.findById
 );
 
@@ -58,6 +71,10 @@ router.post(
   "/",
   checkPermission("GENERAL_MANAGER"),
   validateBody(createInterestItemSchema),
+  createLogMiddleware({
+    action: "CREATE_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+  }),
   InterestItemsController.create
 );
 
@@ -66,6 +83,11 @@ router.put(
   checkPermission("GENERAL_MANAGER"),
   validateParams(interestItemIdParamSchema),
   validateBody(updateInterestItemSchema),
+  createLogMiddleware({
+    action: "UPDATE_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+    description: (req) => `Atualização (PUT) do item de interesse ${req.params.id}`,
+  }),
   InterestItemsController.update
 );
 
@@ -75,6 +97,11 @@ router.patch(
   checkPermission("GENERAL_MANAGER"),
   validateParams(interestItemIdParamSchema),
   validateBody(updateInterestItemSchema),
+  createLogMiddleware({
+    action: "UPDATE_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+    description: (req) => `Atualização (PATCH) do item de interesse ${req.params.id}`,
+  }),
   InterestItemsController.update
 );
 
@@ -83,6 +110,11 @@ router.delete(
   "/:id",
   checkPermission("GENERAL_MANAGER"),
   validateParams(interestItemIdParamSchema),
+  createLogMiddleware({
+    action: "SOFT_DELETE_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+    description: (req) => `Soft delete do item de interesse ${req.params.id}`,
+  }),
   InterestItemsController.softDelete
 );
 
@@ -93,6 +125,11 @@ router.delete(
   "/:id/hard",
   checkPermission("ADMIN"),
   validateParams(interestItemIdParamSchema),
+  createLogMiddleware({
+    action: "HARD_DELETE_INTEREST_ITEM",
+    module: LOG_MODULES.INTEREST_ITEMS,
+    description: (req) => `Hard delete do item de interesse ${req.params.id}`,
+  }),
   InterestItemsController.hardDelete
 );
 

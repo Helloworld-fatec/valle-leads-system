@@ -3,6 +3,11 @@ import { Router } from "express";
 import { LoginController } from "./login.controller.js";
 import { validateBody } from "../../../middlewares/validation/validate.middleware.js";
 import { loginSchema, refreshTokenSchema } from "./login.dto.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../../middlewares/log/log.middleware.js";
 
 // Será adicionado na Etapa 3.
 // import { authMiddleware } from "../../../middlewares/auth/auth.middleware.js";
@@ -26,6 +31,10 @@ const loginController = new LoginController();
 router.post(
   "/login",
   validateBody(loginSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.auth.LOGIN,
+    module: LOG_MODULES.AUTH,
+  }),
   loginController.login.bind(loginController)
 );
 
@@ -33,6 +42,10 @@ router.post(
 router.post(
   "/refresh",
   validateBody(refreshTokenSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.auth.REFRESH_TOKEN,
+    module: LOG_MODULES.AUTH,
+  }),
   loginController.refresh.bind(loginController)
 );
 
@@ -43,6 +56,10 @@ router.post(
 router.post(
   "/logout",
   // authMiddleware,
+  createLogMiddleware({
+    action: LOG_ACTIONS.auth.LOGOUT,
+    module: LOG_MODULES.AUTH,
+  }),
   loginController.logout.bind(loginController)
 );
 

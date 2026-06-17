@@ -15,6 +15,10 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware";
+import {
+  createLogMiddleware,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION STATUS ROUTES
@@ -41,6 +45,10 @@ negotiationStatusRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
   validateQuery(QueryNegotiationStatusSchema),
+  createLogMiddleware({
+    action: "LIST_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+  }),
   NegotiationStatusController.findAll
 );
 
@@ -48,6 +56,11 @@ negotiationStatusRoutes.get(
 negotiationStatusRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
+  createLogMiddleware({
+    action: "GET_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+    description: (req) => `Consulta do status de negociação ${req.params.id}`,
+  }),
   NegotiationStatusController.findById
 );
 
@@ -59,6 +72,10 @@ negotiationStatusRoutes.post(
   "/",
   checkPermission("ATTENDANT"),
   validateBody(CreateNegotiationStatusSchema),
+  createLogMiddleware({
+    action: "CREATE_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+  }),
   NegotiationStatusController.create
 );
 
@@ -68,6 +85,11 @@ negotiationStatusRoutes.put(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationStatusSchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+    description: (req) => `Atualização (PUT) do status de negociação ${req.params.id}`,
+  }),
   NegotiationStatusController.update
 );
 
@@ -76,6 +98,11 @@ negotiationStatusRoutes.patch(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationStatusSchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+    description: (req) => `Atualização (PATCH) do status de negociação ${req.params.id}`,
+  }),
   NegotiationStatusController.update
 );
 
@@ -85,6 +112,11 @@ negotiationStatusRoutes.patch(
 negotiationStatusRoutes.delete(
   "/:id",
   checkRole("ADMIN"),
+  createLogMiddleware({
+    action: "DELETE_NEGOTIATION_STATUS",
+    module: LOG_MODULES.NEGOTIATION_STATUS,
+    description: (req) => `Hard delete do status de negociação ${req.params.id}`,
+  }),
   NegotiationStatusController.delete
 );
 
