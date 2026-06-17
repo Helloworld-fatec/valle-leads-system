@@ -19,6 +19,11 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // Estrutura da pipeline em cada rota:
 //   authMiddleware     → exige access token válido + injeta req.user
@@ -48,6 +53,10 @@ leadsRoutes.post(
   "/bulk/assign-attendant",
   checkRole("MANAGER", "ADMIN"),
   validateBody(BulkAssignAttendantSchema),
+  createLogMiddleware({
+    action: "BULK_ASSIGN_ATTENDANT_LEAD",
+    module: LOG_MODULES.LEADS,
+  }),
   controller.bulkAssignAttendant
 );
 
@@ -56,6 +65,10 @@ leadsRoutes.post(
   "/bulk/assign-team",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateBody(BulkAssignTeamSchema),
+  createLogMiddleware({
+    action: "BULK_ASSIGN_TEAM_LEAD",
+    module: LOG_MODULES.LEADS,
+  }),
   controller.bulkAssignTeam
 );
 
@@ -67,6 +80,10 @@ leadsRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
   validateQuery(QueryLeadSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.LIST,
+    module: LOG_MODULES.LEADS,
+  }),
   controller.findAll
 );
 
@@ -74,6 +91,11 @@ leadsRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.GET,
+    module: LOG_MODULES.LEADS,
+    description: (req) => `Consulta do lead ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -84,6 +106,10 @@ leadsRoutes.post(
   "/",
   checkPermission("ATTENDANT"),
   validateBody(CreateLeadSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.CREATE,
+    module: LOG_MODULES.LEADS,
+  }),
   controller.create
 );
 
@@ -96,6 +122,11 @@ leadsRoutes.put(
   checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
   validateBody(UpdateLeadSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.UPDATE,
+    module: LOG_MODULES.LEADS,
+    description: (req) => `Atualização (PUT) do lead ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -104,6 +135,11 @@ leadsRoutes.patch(
   checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
   validateBody(UpdateLeadSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.UPDATE,
+    module: LOG_MODULES.LEADS,
+    description: (req) => `Atualização (PATCH) do lead ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -115,6 +151,11 @@ leadsRoutes.delete(
   "/:id/permanent",
   checkRole("ADMIN"),
   validateParams(LeadIdParamSchema),
+  createLogMiddleware({
+    action: "HARD_DELETE_LEAD",
+    module: LOG_MODULES.LEADS,
+    description: (req) => `Hard delete do lead ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
@@ -123,6 +164,11 @@ leadsRoutes.delete(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(LeadIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.leads.SOFT_DELETE,
+    module: LOG_MODULES.LEADS,
+    description: (req) => `Soft delete do lead ${req.params.id}`,
+  }),
   controller.softDelete
 );
 

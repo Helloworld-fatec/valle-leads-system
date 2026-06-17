@@ -15,6 +15,10 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware";
+import {
+  createLogMiddleware,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION STAGE HISTORY ROUTES
@@ -40,6 +44,10 @@ negotiationStageHistoryRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
   validateQuery(QueryNegotiationStageHistorySchema),
+  createLogMiddleware({
+    action: "LIST_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+  }),
   NegotiationStageHistoryController.findAll
 );
 
@@ -47,6 +55,11 @@ negotiationStageHistoryRoutes.get(
 negotiationStageHistoryRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
+  createLogMiddleware({
+    action: "GET_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+    description: (req) => `Consulta do estágio de negociação ${req.params.id}`,
+  }),
   NegotiationStageHistoryController.findById
 );
 
@@ -58,6 +71,10 @@ negotiationStageHistoryRoutes.post(
   "/",
   checkPermission("ATTENDANT"),
   validateBody(CreateNegotiationStageHistorySchema),
+  createLogMiddleware({
+    action: "CREATE_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+  }),
   NegotiationStageHistoryController.create
 );
 
@@ -67,6 +84,11 @@ negotiationStageHistoryRoutes.put(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationStageHistorySchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+    description: (req) => `Atualização (PUT) do estágio de negociação ${req.params.id}`,
+  }),
   NegotiationStageHistoryController.update
 );
 
@@ -75,6 +97,11 @@ negotiationStageHistoryRoutes.patch(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationStageHistorySchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+    description: (req) => `Atualização (PATCH) do estágio de negociação ${req.params.id}`,
+  }),
   NegotiationStageHistoryController.update
 );
 
@@ -84,6 +111,11 @@ negotiationStageHistoryRoutes.patch(
 negotiationStageHistoryRoutes.delete(
   "/:id",
   checkRole("ADMIN"),
+  createLogMiddleware({
+    action: "DELETE_NEGOTIATION_STAGE",
+    module: LOG_MODULES.NEGOTIATION_STAGE,
+    description: (req) => `Hard delete do estágio de negociação ${req.params.id}`,
+  }),
   NegotiationStageHistoryController.delete
 );
 

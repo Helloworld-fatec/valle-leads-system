@@ -15,6 +15,10 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // USERS-TEAMS ROUTES
@@ -42,6 +46,10 @@ usersTeamsRouter.use(authMiddleware);
 usersTeamsRouter.get(
   "/",
   checkPermission("ATTENDANT"),
+  createLogMiddleware({
+    action: "LIST_USERS_TEAMS",
+    module: LOG_MODULES.USERS_TEAMS,
+  }),
   controller.findAll
 );
 
@@ -49,6 +57,11 @@ usersTeamsRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(userTeamIdParamSchema),
+  createLogMiddleware({
+    action: "GET_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+    description: (req) => `Consulta do vínculo usuário-time ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -57,6 +70,10 @@ usersTeamsRouter.post(
   "/",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateBody(createUserTeamSchema),
+  createLogMiddleware({
+    action: "CREATE_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+  }),
   controller.create
 );
 
@@ -66,6 +83,11 @@ usersTeamsRouter.put(
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(userTeamIdParamSchema),
   validateBody(updateUserTeamSchema),
+  createLogMiddleware({
+    action: "UPDATE_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+    description: (req) => `Atualização (PUT) do vínculo usuário-time ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -74,6 +96,11 @@ usersTeamsRouter.patch(
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(userTeamIdParamSchema),
   validateBody(updateUserTeamSchema),
+  createLogMiddleware({
+    action: "UPDATE_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+    description: (req) => `Atualização (PATCH) do vínculo usuário-time ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -83,6 +110,11 @@ usersTeamsRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(userTeamIdParamSchema),
+  createLogMiddleware({
+    action: "HARD_DELETE_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+    description: (req) => `Hard delete do vínculo usuário-time ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
@@ -91,6 +123,11 @@ usersTeamsRouter.delete(
   "/:id",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(userTeamIdParamSchema),
+  createLogMiddleware({
+    action: "SOFT_DELETE_USER_TEAM",
+    module: LOG_MODULES.USERS_TEAMS,
+    description: (req) => `Soft delete do vínculo usuário-time ${req.params.id}`,
+  }),
   controller.softDelete
 );
 

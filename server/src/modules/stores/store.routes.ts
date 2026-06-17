@@ -15,6 +15,11 @@ import {
   updateStoreSchema,
   storeIdParamSchema,
 } from "./stores.dto.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // STORES ROUTES
@@ -39,6 +44,10 @@ storesRouter.use(authMiddleware);
 storesRouter.get(
   "/",
   checkPermission("ATTENDANT"),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.LIST,
+    module: LOG_MODULES.STORES,
+  }),
   controller.findAll
 );
 
@@ -46,6 +55,11 @@ storesRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(storeIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.GET,
+    module: LOG_MODULES.STORES,
+    description: (req) => `Consulta da loja ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -54,6 +68,10 @@ storesRouter.post(
   "/",
   checkRole("ADMIN"),
   validateBody(createStoreSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.CREATE,
+    module: LOG_MODULES.STORES,
+  }),
   controller.create
 );
 
@@ -63,6 +81,11 @@ storesRouter.put(
   checkRole("ADMIN"),
   validateParams(storeIdParamSchema),
   validateBody(updateStoreSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.UPDATE,
+    module: LOG_MODULES.STORES,
+    description: (req) => `Atualização (PUT) da loja ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -71,6 +94,11 @@ storesRouter.patch(
   checkRole("ADMIN"),
   validateParams(storeIdParamSchema),
   validateBody(updateStoreSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.UPDATE,
+    module: LOG_MODULES.STORES,
+    description: (req) => `Atualização (PATCH) da loja ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -80,6 +108,11 @@ storesRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(storeIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.HARD_DELETE,
+    module: LOG_MODULES.STORES,
+    description: (req) => `Hard delete da loja ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
@@ -87,6 +120,11 @@ storesRouter.delete(
   "/:id",
   checkRole("ADMIN"),
   validateParams(storeIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.stores.SOFT_DELETE,
+    module: LOG_MODULES.STORES,
+    description: (req) => `Soft delete da loja ${req.params.id}`,
+  }),
   controller.softDelete
 );
 

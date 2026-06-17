@@ -15,6 +15,10 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware";
+import {
+  createLogMiddleware,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware";
 
 // ─────────────────────────────────────────────
 // NEGOTIATION IMPORTANCE ROUTES
@@ -41,6 +45,10 @@ negotiationImportanceRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
   validateQuery(QueryNegotiationImportanceSchema),
+  createLogMiddleware({
+    action: "LIST_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+  }),
   NegotiationImportanceController.findAll
 );
 
@@ -48,6 +56,11 @@ negotiationImportanceRoutes.get(
 negotiationImportanceRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
+  createLogMiddleware({
+    action: "GET_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+    description: (req) => `Consulta do nível de importância de negociação ${req.params.id}`,
+  }),
   NegotiationImportanceController.findById
 );
 
@@ -59,6 +72,10 @@ negotiationImportanceRoutes.post(
   "/",
   checkPermission("ATTENDANT"),
   validateBody(CreateNegotiationImportanceSchema),
+  createLogMiddleware({
+    action: "CREATE_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+  }),
   NegotiationImportanceController.create
 );
 
@@ -68,6 +85,11 @@ negotiationImportanceRoutes.put(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationImportanceSchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+    description: (req) => `Atualização (PUT) do nível de importância de negociação ${req.params.id}`,
+  }),
   NegotiationImportanceController.update
 );
 
@@ -76,6 +98,11 @@ negotiationImportanceRoutes.patch(
   "/:id",
   checkPermission("ATTENDANT"),
   validateBody(UpdateNegotiationImportanceSchema),
+  createLogMiddleware({
+    action: "UPDATE_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+    description: (req) => `Atualização (PATCH) do nível de importância de negociação ${req.params.id}`,
+  }),
   NegotiationImportanceController.update
 );
 
@@ -85,6 +112,11 @@ negotiationImportanceRoutes.patch(
 negotiationImportanceRoutes.delete(
   "/:id",
   checkRole("ADMIN"),
+  createLogMiddleware({
+    action: "DELETE_NEGOTIATION_IMPORTANCE",
+    module: LOG_MODULES.NEGOTIATION_IMPORTANCE,
+    description: (req) => `Hard delete do nível de importância de negociação ${req.params.id}`,
+  }),
   NegotiationImportanceController.delete
 );
 

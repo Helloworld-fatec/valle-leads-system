@@ -19,6 +19,11 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // Pipeline:
 //   authMiddleware     → injeta req.user
@@ -43,6 +48,10 @@ negotiationsRoutes.post(
   "/bulk/assign-attendant",
   checkRole("MANAGER", "ADMIN"),
   validateBody(BulkAssignAttendantSchema),
+  createLogMiddleware({
+    action: "BULK_ASSIGN_ATTENDANT_NEGOTIATION",
+    module: LOG_MODULES.NEGOTIATIONS,
+  }),
   controller.bulkAssignAttendant
 );
 
@@ -51,6 +60,10 @@ negotiationsRoutes.post(
   "/bulk/assign-team",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateBody(BulkAssignTeamSchema),
+  createLogMiddleware({
+    action: "BULK_ASSIGN_TEAM_NEGOTIATION",
+    module: LOG_MODULES.NEGOTIATIONS,
+  }),
   controller.bulkAssignTeam
 );
 
@@ -61,6 +74,10 @@ negotiationsRoutes.get(
   "/",
   checkPermission("ATTENDANT"),
   validateQuery(QueryNegotiationSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.negotiations.LIST,
+    module: LOG_MODULES.NEGOTIATIONS,
+  }),
   controller.findAll
 );
 
@@ -68,6 +85,11 @@ negotiationsRoutes.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(NegotiationIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.negotiations.GET,
+    module: LOG_MODULES.NEGOTIATIONS,
+    description: (req) => `Consulta da negociação ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -78,6 +100,10 @@ negotiationsRoutes.post(
   "/",
   checkPermission("ATTENDANT"),
   validateBody(CreateNegotiationSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.negotiations.CREATE,
+    module: LOG_MODULES.NEGOTIATIONS,
+  }),
   controller.create
 );
 
@@ -88,6 +114,11 @@ negotiationsRoutes.put(
   checkPermission("ATTENDANT"),
   validateParams(NegotiationIdParamSchema),
   validateBody(UpdateNegotiationSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.negotiations.UPDATE,
+    module: LOG_MODULES.NEGOTIATIONS,
+    description: (req) => `Atualização (PUT) da negociação ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -96,6 +127,11 @@ negotiationsRoutes.patch(
   checkPermission("ATTENDANT"),
   validateParams(NegotiationIdParamSchema),
   validateBody(UpdateNegotiationSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.negotiations.UPDATE,
+    module: LOG_MODULES.NEGOTIATIONS,
+    description: (req) => `Atualização (PATCH) da negociação ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -107,6 +143,11 @@ negotiationsRoutes.delete(
   "/:id",
   checkRole("ADMIN"),
   validateParams(NegotiationIdParamSchema),
+  createLogMiddleware({
+    action: "HARD_DELETE_NEGOTIATION",
+    module: LOG_MODULES.NEGOTIATIONS,
+    description: (req) => `Hard delete da negociação ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 

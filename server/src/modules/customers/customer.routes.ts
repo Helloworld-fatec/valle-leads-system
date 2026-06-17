@@ -14,6 +14,11 @@ import {
   queryCustomerSchema,
   customerIdParamSchema,
 } from "./customer.dto.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // ─────────────────────────────────────────────
 // CUSTOMER ROUTES
@@ -38,12 +43,21 @@ customersRouter.use(authMiddleware);
 customersRouter.get(
   "/",
   validateQuery(queryCustomerSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.LIST,
+    module: LOG_MODULES.CUSTOMERS,
+  }),
   CustomersController.findAll
 );
 
 customersRouter.get(
   "/:id",
   validateParams(customerIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.GET,
+    module: LOG_MODULES.CUSTOMERS,
+    description: (req) => `Consulta do cliente ${req.params.id}`,
+  }),
   CustomersController.findById
 );
 
@@ -51,6 +65,10 @@ customersRouter.get(
 customersRouter.post(
   "/",
   validateBody(createCustomerSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.CREATE,
+    module: LOG_MODULES.CUSTOMERS,
+  }),
   CustomersController.create
 );
 
@@ -59,6 +77,11 @@ customersRouter.put(
   "/:id",
   validateParams(customerIdParamSchema),
   validateBody(updateCustomerSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.UPDATE,
+    module: LOG_MODULES.CUSTOMERS,
+    description: (req) => `Atualização (PUT) do cliente ${req.params.id}`,
+  }),
   CustomersController.update
 );
 
@@ -66,6 +89,11 @@ customersRouter.patch(
   "/:id",
   validateParams(customerIdParamSchema),
   validateBody(updateCustomerSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.UPDATE,
+    module: LOG_MODULES.CUSTOMERS,
+    description: (req) => `Atualização (PATCH) do cliente ${req.params.id}`,
+  }),
   CustomersController.update
 );
 
@@ -75,6 +103,11 @@ customersRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(customerIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.HARD_DELETE,
+    module: LOG_MODULES.CUSTOMERS,
+    description: (req) => `Hard delete do cliente ${req.params.id}`,
+  }),
   CustomersController.hardDelete
 );
 
@@ -82,6 +115,11 @@ customersRouter.delete(
 customersRouter.delete(
   "/:id",
   validateParams(customerIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.customers.SOFT_DELETE,
+    module: LOG_MODULES.CUSTOMERS,
+    description: (req) => `Soft delete do cliente ${req.params.id}`,
+  }),
   CustomersController.softDelete
 );
 

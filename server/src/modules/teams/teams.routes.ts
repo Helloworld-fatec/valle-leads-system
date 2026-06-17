@@ -17,6 +17,11 @@ import {
   checkPermission,
   checkRole,
 } from "../../middlewares/auth/permission.middleware.js";
+import {
+  createLogMiddleware,
+  LOG_ACTIONS,
+  LOG_MODULES,
+} from "../../middlewares/log/log.middleware.js";
 
 // Pipeline de cada rota:
 //   authMiddleware          → exige access token válido + injeta req.user
@@ -47,6 +52,10 @@ teamsRouter.get(
   "/",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateQuery(queryTeamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.LIST,
+    module: LOG_MODULES.TEAMS,
+  }),
   controller.findAll
 );
 
@@ -57,6 +66,11 @@ teamsRouter.get(
   "/:id",
   checkPermission("ATTENDANT"),
   validateParams(teamIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.GET,
+    module: LOG_MODULES.TEAMS,
+    description: (req) => `Consulta do time ${req.params.id}`,
+  }),
   controller.findById
 );
 
@@ -65,6 +79,10 @@ teamsRouter.post(
   "/",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateBody(createTeamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.CREATE,
+    module: LOG_MODULES.TEAMS,
+  }),
   controller.create
 );
 
@@ -74,6 +92,11 @@ teamsRouter.put(
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(teamIdParamSchema),
   validateBody(updateTeamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.UPDATE,
+    module: LOG_MODULES.TEAMS,
+    description: (req) => `Atualização (PUT) do time ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -82,6 +105,11 @@ teamsRouter.patch(
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(teamIdParamSchema),
   validateBody(updateTeamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.UPDATE,
+    module: LOG_MODULES.TEAMS,
+    description: (req) => `Atualização (PATCH) do time ${req.params.id}`,
+  }),
   controller.update
 );
 
@@ -91,6 +119,11 @@ teamsRouter.delete(
   "/:id/hard",
   checkRole("ADMIN"),
   validateParams(teamIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.HARD_DELETE,
+    module: LOG_MODULES.TEAMS,
+    description: (req) => `Hard delete do time ${req.params.id}`,
+  }),
   controller.hardDelete
 );
 
@@ -99,6 +132,11 @@ teamsRouter.delete(
   "/:id",
   checkRole("GENERAL_MANAGER", "ADMIN"),
   validateParams(teamIdParamSchema),
+  createLogMiddleware({
+    action: LOG_ACTIONS.teams.SOFT_DELETE,
+    module: LOG_MODULES.TEAMS,
+    description: (req) => `Soft delete do time ${req.params.id}`,
+  }),
   controller.softDelete
 );
 
